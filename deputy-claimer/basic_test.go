@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -49,15 +48,11 @@ func TestBasic(t *testing.T) {
 	)
 	require.NoError(t, createMsg.ValidateBasic())
 
-	fmt.Println(createMsg.GetSigners())
-	fmt.Println(kavaKeyM.GetAddr())
-
-	resK, err := kavaClient.Broadcast(createMsg, client.Sync)
+	_, err = kavaClient.Broadcast(createMsg, client.Sync)
 	require.NoError(t, err)
-	fmt.Printf("htlt res: %+v\n", resK)
 
 	// send corresponding htlt on bnb
-	resB, err := bnbClient.HTLT(
+	_, err = bnbClient.HTLT(
 		common.BnbUserAddrs[0],           // recipient
 		common.KavaDeputyAddr.String(),   // recipient other chain
 		common.KavaUserAddrs[0].String(), // other chain sender
@@ -70,18 +65,16 @@ func TestBasic(t *testing.T) {
 		bnbRpc.Sync,
 	)
 	require.NoError(t, err)
-	fmt.Printf("htlt res: %+v\n", resB)
 
 	// claim bnb htlt
 	time.Sleep(3 * time.Second)
 	bnbID := msg.CalculateSwapID(rndHash, common.BnbDeputyAddr, common.KavaUserAddrs[0].String())
-	resB, err = bnbClient.ClaimHTLT(bnbID, rndNum, bnbRpc.Sync)
+	_, err = bnbClient.ClaimHTLT(bnbID, rndNum, bnbRpc.Sync)
 	require.NoError(t, err)
-	fmt.Printf("claim res: %+v\n", resB)
 
 	// run thing
 	time.Sleep(5 * time.Second)
-	err = RunKava("http://localhost:1317", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7")
+	err = RunKava("http://localhost:1317", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2])
 	require.NoError(t, err)
 
 	// check kava claims were claimed

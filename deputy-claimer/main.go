@@ -8,11 +8,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
 	"github.com/binance-chain/go-sdk/common/types"
 	bnbmsg "github.com/binance-chain/go-sdk/types/msg"
+	"github.com/kava-labs/cosmos-sdk/client/rpc"
 	sdk "github.com/kava-labs/cosmos-sdk/types"
 	authexported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
 	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
@@ -23,18 +25,6 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-const ( // TODO move these to env vars / some kind of config
-	kavaRestURL         = "http://kava3.data.kava.io"
-	bnbRPCURL           = "tcp://dataseed1.binance.org:80"
-	bnbDeputyAddrString = "bnb1jh7uv2rm6339yue8k4mj9406k3509kr4wt5nxn"
-	kavaChainID         = "testing" // "kava-3" // TODO query from node
-)
-
-var claimerMnemonics = []string{
-	"census museum crew rude tower vapor mule rib weasel faith page cushion rain inherit much cram that blanket occur region track hub zero topple",
-	"flavor print loyal canyon expand salmon century field say frequent human dinosaur frame claim bridge affair web way direct win become merry crash frequent",
-}
-
 type restResponse struct {
 	Height int             `json:"height"`
 	Result json.RawMessage `json:"result"`
@@ -43,10 +33,30 @@ type restPostTxRequest struct {
 	Tx   authtypes.StdTx `json:"tx"`
 	Mode string          `json:"mode"`
 }
+type Config struct {
+	BnbRPCURL        string
+	KavaRestURL      string
+	BnbDeputyAddress string
+	KavaMnemonics    []string
+}
 
 func main() {
+
+	cfg := Config{
+		BnbRPCURL:        os.Getenv("BNB_RPC_URL"),
+		KavaRestURL:      os.Getenv("BNB_REST_URL"),
+		BnbDeputyAddress: os.Getenv("BNB_DEPUTY_ADDRESS"),
+	}
+	for i := 0; ; i++ {
+		mnemonic, found := os.LookupEnv(fmt.Sprintf("KAVA_MNEMONIC_%d", i))
+		if !found {
+			break
+		}
+		cfg.KavaMnemonics = append(cfg.KavaMnemonics, mnemonic)
+	}
+
 	for {
-		err := RunKava(kavaRestURL, bnbRPCURL, bnbDeputyAddrString)
+		err := RunKava(cfg.KavaRestURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
 		if err != nil {
 			log.Println(err)
 		}
@@ -55,7 +65,7 @@ func main() {
 	// repeat for bnb
 }
 
-func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
+func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) error {
 
 	// setup kava codec and config
 	cdc := kava.MakeCodec()
@@ -102,8 +112,22 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 		rndNums = append(rndNums, tmbytes.HexBytes(bnbSwap.RandomNumber))
 	}
 
+	// Get the chain id
+	infoResp, err := http.Get(kavaRestURL + "/node_info")
+	if err != nil {
+		return err
+	}
+	defer infoResp.Body.Close()
+	infoBz, err := ioutil.ReadAll(infoResp.Body)
+	if err != nil {
+		return err
+	}
+	var nodeInfo rpc.NodeInfoResponse
+	cdc.MustUnmarshalJSON(infoBz, &nodeInfo)
+	chainID := nodeInfo.Network
+
 	// create and submit claim txs, distributing work over several addresses to avoid sequence number problems
-	sem := semaphore.NewWeighted(int64(len(claimerMnemonics)))
+	sem := semaphore.NewWeighted(int64(len(mnemonics)))
 	ctx := context.TODO()
 	errs := make(chan error, len(rndNums))
 	for i, r := range rndNums {
@@ -114,7 +138,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 			defer sem.Release(1)
 
 			// choose private key
-			mnemonic := claimerMnemonics[i%len(claimerMnemonics)]
+			mnemonic := mnemonics[i%len(mnemonics)]
 			kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
 			if err != nil {
 				errs <- err
@@ -138,7 +162,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 			var account authexported.Account
 			cdc.MustUnmarshalJSON(res.Result, &account)
 			signMsg := authtypes.StdSignMsg{
-				ChainID:       kavaChainID,
+				ChainID:       chainID,
 				AccountNumber: account.GetAccountNumber(),
 				Sequence:      account.GetSequence(),
 				Fee:           authtypes.NewStdFee(250000, nil),
@@ -180,7 +204,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 	}
 
 	// wait for all go routines to finish
-	if err := sem.Acquire(ctx, int64(len(claimerMnemonics))); err != nil {
+	if err := sem.Acquire(ctx, int64(len(mnemonics))); err != nil {
 		return err
 	}
 	// TODO look for "proper" way of handling errors from many goroutines (sync/errgroup?)
