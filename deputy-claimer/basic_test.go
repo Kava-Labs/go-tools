@@ -35,7 +35,7 @@ func TestBasic(t *testing.T) {
 	// send htlt on kva
 	rndNum, err := bep3.GenerateSecureRandomNumber()
 	require.NoError(t, err)
-	timestamp := time.Now().Unix()
+	timestamp := time.Now().Unix() - 10*60 - 1 // set the timestamp to be in the past
 	rndHash := bep3.CalculateRandomHash(rndNum, timestamp)
 	createMsg := bep3.NewMsgCreateAtomicSwap(
 		kavaKeyM.GetAddr(),              // sender

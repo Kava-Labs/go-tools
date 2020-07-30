@@ -78,6 +78,13 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 	cdc.MustUnmarshalJSON(bz, &res)
 	var swaps bep3.AtomicSwaps
 	cdc.MustUnmarshalJSON(res.Result, &swaps)
+	// filter out swaps to
+	var filteredSwaps bep3.AtomicSwaps
+	for _, s := range swaps {
+		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
+			filteredSwaps = append(filteredSwaps, s)
+		}
+	}
 
 	// parse out swap ids, query those txs on bnb, extract random numbers
 	bnbDeputyAddr, err := types.AccAddressFromBech32(bnbDeputyAddrString)
@@ -86,7 +93,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 	}
 	bnbClient := bnbRpc.NewRPCClient(bnbRPCURL, types.ProdNetwork)
 	var rndNums []tmbytes.HexBytes
-	for _, s := range swaps { // TODO could be concurrent
+	for _, s := range filteredSwaps { // TODO could be concurrent
 		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
 		bnbSwap, err := bnbClient.GetSwapByID(bID)
 		if err != nil {
@@ -114,7 +121,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 				return
 			}
 			// construct and sign tx
-			msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), swaps[i].GetSwapID(), r)
+			msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), filteredSwaps[i].GetSwapID(), r)
 			resp, err := http.Get(kavaRestURL + "/auth/accounts/" + kavaKeyM.GetAddr().String()) // TODO construct urls properly
 			if err != nil {
 				errs <- err
