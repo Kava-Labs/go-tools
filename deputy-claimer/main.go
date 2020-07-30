@@ -23,11 +23,11 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-const ( // TODO move these to env vars
-	kavaRestURL         = "http://localhost:1317"                      // "http://kava3.data.kava.io"
-	bnbRPCURL           = "tcp://localhost:26658"                      // "tcp://dataseed1.binance.org:80"
-	bnbDeputyAddrString = "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7" // "bnb1jh7uv2rm6339yue8k4mj9406k3509kr4wt5nxn"
-	kavaChainID         = "testing"                                    // "kava-3" // TODO query from node
+const ( // TODO move these to env vars / some kind of config
+	kavaRestURL         = "http://kava3.data.kava.io"
+	bnbRPCURL           = "tcp://dataseed1.binance.org:80"
+	bnbDeputyAddrString = "bnb1jh7uv2rm6339yue8k4mj9406k3509kr4wt5nxn"
+	kavaChainID         = "testing" // "kava-3" // TODO query from node
 )
 
 var claimerMnemonics = []string{
@@ -46,7 +46,7 @@ type restPostTxRequest struct {
 
 func main() {
 	for {
-		err := RunKava()
+		err := RunKava(kavaRestURL, bnbRPCURL, bnbDeputyAddrString)
 		if err != nil {
 			log.Println(err)
 		}
@@ -55,7 +55,7 @@ func main() {
 	// repeat for bnb
 }
 
-func RunKava() error {
+func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string) error {
 
 	// setup kava codec and config
 	cdc := kava.MakeCodec()
@@ -79,8 +79,6 @@ func RunKava() error {
 	var swaps bep3.AtomicSwaps
 	cdc.MustUnmarshalJSON(res.Result, &swaps)
 
-	fmt.Println("fetched swaps: ", swaps)
-
 	// parse out swap ids, query those txs on bnb, extract random numbers
 	bnbDeputyAddr, err := types.AccAddressFromBech32(bnbDeputyAddrString)
 	if err != nil {
@@ -92,13 +90,10 @@ func RunKava() error {
 		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
 		bnbSwap, err := bnbClient.GetSwapByID(bID)
 		if err != nil {
-			// do nothing, log maybe
 			return err
 		}
 		rndNums = append(rndNums, tmbytes.HexBytes(bnbSwap.RandomNumber))
 	}
-
-	fmt.Println("parsed random numbers: ", rndNums)
 
 	// create and submit claim txs, distributing work over several addresses to avoid sequence number problems
 	sem := semaphore.NewWeighted(int64(len(claimerMnemonics)))
@@ -120,7 +115,6 @@ func RunKava() error {
 			}
 			// construct and sign tx
 			msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), swaps[i].GetSwapID(), r)
-			fmt.Println("msg: ", msg)
 			resp, err := http.Get(kavaRestURL + "/auth/accounts/" + kavaKeyM.GetAddr().String()) // TODO construct urls properly
 			if err != nil {
 				errs <- err
@@ -132,12 +126,10 @@ func RunKava() error {
 				errs <- err
 				return
 			}
-			fmt.Println("account resp: ", string(bz))
 			var res restResponse
 			cdc.MustUnmarshalJSON(bz, &res)
 			var account authexported.Account
 			cdc.MustUnmarshalJSON(res.Result, &account)
-			fmt.Println("account: ", account)
 			signMsg := authtypes.StdSignMsg{
 				ChainID:       kavaChainID,
 				AccountNumber: account.GetAccountNumber(),
@@ -148,11 +140,15 @@ func RunKava() error {
 			}
 			txBz, err := kavaKeyM.Sign(signMsg, cdc)
 			if err != nil {
-				errs <- err
+
 				return
 			}
 			var tx authtypes.StdTx
-			cdc.UnmarshalBinaryLengthPrefixed(txBz, &tx) // TODO
+			err = cdc.UnmarshalBinaryLengthPrefixed(txBz, &tx) // TODO
+			if err != nil {
+				errs <- err
+				return
+			}
 			// broadcast tx to chain
 			req := restPostTxRequest{
 				Tx:   tx,
@@ -163,18 +159,16 @@ func RunKava() error {
 				errs <- err
 				return
 			}
-			fmt.Println("post req: ", string(reqBz))
 			resp, err = http.Post(kavaRestURL+"/txs", "application/json", bytes.NewBuffer(reqBz))
 			if err != nil {
 				errs <- err
 				return
 			}
 			defer resp.Body.Close()
-			body, _ := ioutil.ReadAll(resp.Body)
-			fmt.Println(string(body))
-			// TODO unmarshal and check error code was 0
-			// TODO wait until tx in block, rather than just waiting
-			time.Sleep(5 * time.Second)
+			// TODO unmarshal body and check error code was 0
+			// body, _ := ioutil.ReadAll(resp.Body)
+
+			time.Sleep(5 * time.Second) // TODO wait until tx in block, rather than just sleeping
 		}(i, r)
 	}
 
@@ -182,7 +176,7 @@ func RunKava() error {
 	if err := sem.Acquire(ctx, int64(len(claimerMnemonics))); err != nil {
 		return err
 	}
-	// TODO look for "proper" way of handling errors from many goroutines
+	// TODO look for "proper" way of handling errors from many goroutines (sync/errgroup?)
 	var finalErr string
 	close(errs)
 	for e := range errs {
