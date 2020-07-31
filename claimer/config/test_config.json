@@ -1,0 +1,10 @@
+{
+    "kava_config": {
+        "endpoint": "tcp://localhost:26657",
+        "mnemonics": [ "secret words one", "private phrase two", "", "", ""]
+    },
+    "binance_chain_config": {
+        "endpoint": "http://dataseed1.binance.org:80",
+        "mnemonic": "secret words go here"
+    }
+}
