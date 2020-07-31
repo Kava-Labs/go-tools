@@ -10,6 +10,4 @@ require (
 	github.com/gorilla/mux v1.7.4
 	github.com/kava-labs/cosmos-sdk v0.38.3-stable.0.20200520223313-bfbe25d175da
 	github.com/kava-labs/go-sdk v0.1.6
-	github.com/kava-labs/tendermint v0.33.4-0.20200520221629-77480532c622
-	github.com/tendermint/go-amino v0.15.1
 )
