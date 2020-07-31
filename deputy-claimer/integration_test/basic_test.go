@@ -1,4 +1,5 @@
-// notabuildcmd+build integration
+// +build integration
+
 package main
 
 import (
@@ -17,6 +18,7 @@ import (
 	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kava-labs/go-tools/deputy-claimer/claim"
 	"github.com/kava-labs/go-tools/deputy-claimer/integration_test/common"
 )
 
@@ -74,7 +76,7 @@ func TestBasic(t *testing.T) {
 
 	// run thing
 	time.Sleep(5 * time.Second)
-	err = RunKava("http://localhost:1317", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2])
+	err = claim.RunKava("http://localhost:1317", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2])
 	require.NoError(t, err)
 
 	// check kava claims were claimed
