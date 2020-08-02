@@ -16,11 +16,13 @@ type Config struct {
 }
 
 type KavaConfig struct {
+	ChainID   string   `toml:"chain_id" json:"chain_id"`
 	Endpoint  string   `toml:"endpoint" json:"endpoint"`
 	Mnemonics []string `toml:"mnemonics" json:"mnemonics"`
 }
 
 type BinanceChainConfig struct {
+	ChainID  string `toml:"chain_id" json:"chain_id"`
 	Endpoint string `toml:"endpoint" json:"endpoint"`
 	Mnemonic string `toml:"mnemonic" json:"mnemonic"`
 }
@@ -76,6 +78,9 @@ func loadConfig(file string, config *Config) error {
 }
 
 func (c *Config) validate() error {
+	if c.Kava.ChainID == "" {
+		return fmt.Errorf("required field Kava.ChainID is empty")
+	}
 	if c.Kava.Endpoint == "" {
 		return fmt.Errorf("required field Kava.Endpoint is empty")
 	}
@@ -87,6 +92,9 @@ func (c *Config) validate() error {
 	}
 	if c.BinanceChain.Mnemonic == "" {
 		return fmt.Errorf("required field BinanceChain.Mnemonic is empty")
+	}
+	if c.BinanceChain.ChainID == "" {
+		return fmt.Errorf("required field BinanceChain.ChainID is empty")
 	}
 	return nil
 }

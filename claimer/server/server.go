@@ -2,10 +2,11 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -54,6 +55,11 @@ func (s Server) claim(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("%s is required", RestTargetChain), http.StatusInternalServerError)
 		return
 	}
+	targetChainUpper := strings.ToUpper(targetChain)
+	if targetChainUpper != "KAVA" && targetChainUpper != "BINANCE" && targetChainUpper != "BINANCE CHAIN" {
+		http.Error(w, fmt.Sprintf("%s must be kava, binance, or binance chain", RestTargetChain), http.StatusInternalServerError)
+		return
+	}
 
 	swapID := r.URL.Query().Get(RestSwapID)
 	if len(swapID) == 0 {
@@ -69,6 +75,7 @@ func (s Server) claim(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte(fmt.Sprintf(`{"message": "request submitted"}`)))
 
+	log.Info(fmt.Sprintf("Received claim request for %s on %s", swapID, targetChain))
 	claimJob := NewClaimJob(targetChain, swapID, randomNumber)
 	s.Claims <- claimJob
 }
