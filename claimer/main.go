@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 	bkeys "github.com/binance-chain/go-sdk/keys"
 	log "github.com/sirupsen/logrus"
 	amino "github.com/tendermint/go-amino"
-	// "golang.org/x/sync/semaphore"
+	"golang.org/x/sync/semaphore"
 
 	sdk "github.com/kava-labs/cosmos-sdk/types"
 	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
@@ -29,10 +30,10 @@ import (
 	"github.com/kava-labs/go-tools/claimer/server"
 )
 
+// KavaClaimer is a worker that sends claim transactions on Kava
 type KavaClaimer struct {
-	Keybase      keys.KeyManager
-	LastBlockNum int64
-	Status       bool
+	Keybase keys.KeyManager
+	Status  bool
 }
 
 func main() {
@@ -53,21 +54,23 @@ func main() {
 		kavaClaimer := KavaClaimer{}
 		keyManager, err := keys.NewMnemonicKeyManager(kavaMnemonic, kava.Bip44CoinType)
 		if err != nil {
-			fmt.Println(err)
+			log.Error(err)
 		}
 		kavaClaimer.Keybase = keyManager
-		kavaClaimer.LastBlockNum = 0
 		kavaClaimer.Status = true
 		kavaClaimers = append(kavaClaimers, kavaClaimer)
 	}
 
-	// Set up Kava HTTP client
-	// TODO: kava3.data.kava.io:26657
+	// Start Kava HTTP client
 	http, err := rpcclient.NewHTTP(c.Kava.Endpoint, "/websocket")
 	if err != nil {
 		panic(err)
 	}
 	http.Logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
+	err = http.Start()
+	if err != nil {
+		panic(err)
+	}
 
 	// Set up Binance Chain client
 	bncNetwork := btypes.TestNetwork
@@ -81,34 +84,39 @@ func main() {
 	}
 	bnbClient.SetKeyManager(bnbKeyManager)
 
-	fmt.Println("Starting server...")
+	log.Info("Starting server...")
 	claims := make(chan server.ClaimJob, 1000)
-	server := server.NewServer(claims)
-	go server.StartServer()
+	s := server.NewServer(claims)
+	go s.StartServer()
 
-	// TODO:
-	// sem := semaphore.NewWeighted(int64(len(mnemonics)))
-	// ctx := context.TODO()
+	sem := semaphore.NewWeighted(int64(len(kavaClaimers)))
+	ctx := context.TODO()
 
 	for {
 		select {
 		case claim := <-claims:
 			switch strings.ToUpper(claim.TargetChain) {
-			case "KAVA":
-				Retry(6, 10*time.Second, func() (err ClaimError) {
-					err = claimOnKava(c.Kava, http, claim, cdc, kavaClaimers)
+			case server.TargetKava:
+				if err := sem.Acquire(ctx, 1); err != nil {
+					log.Error(err)
 					return
-				})
+				}
+
+				go func() {
+					defer sem.Release(1)
+					Retry(6, 10*time.Second, func() (err ClaimError) {
+						err = claimOnKava(c.Kava, http, claim, cdc, kavaClaimers)
+						return
+					})
+				}()
 				break
-			case "BINANCE", "BINANCE CHAIN":
+			case server.TargetBinance, server.TargetBinanceChain:
 				Retry(5, 10*time.Second, func() (err ClaimError) {
 					err = claimOnBinanceChain(bnbClient, claim)
 					return
 				})
 				break
 			}
-
-			// TODO: release semapohre
 		}
 	}
 }
@@ -124,7 +132,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError 
 		if strings.Contains(err.Error(), "zero records") {
 			return NewErrorRetryable(fmt.Errorf("swap %s not found in state", claim.SwapID))
 		}
-		return NewErrorFailed(err) // TODO: is this correct?
+		return NewErrorFailed(err)
 	}
 
 	status, err := bnbHTTP.Status()
@@ -150,19 +158,12 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError 
 		return NewErrorFailed(errors.New(res.Log))
 	}
 
-	log.Info("Claim tx sent to Binance Chain:", res.Hash.String())
+	log.Info("Claim tx sent to Binance Chain: ", res.Hash.String())
 	return nil
 }
 
 func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.ClaimJob,
 	cdc *amino.Codec, kavaClaimers []KavaClaimer) ClaimError {
-	// Get current chain height
-	abciInfo, err := http.ABCIInfo()
-	if err != nil {
-		return NewErrorFailed(err)
-	}
-	lastBlockHeight := abciInfo.Response.LastBlockHeight
-
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
@@ -180,7 +181,7 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		r := rand.New(source)
 		randNumb := r.Intn(len(kavaClaimers))
 		randClaimer := kavaClaimers[randNumb%len(kavaClaimers)]
-		if randClaimer.Status && randClaimer.LastBlockNum <= lastBlockHeight {
+		if randClaimer.Status {
 			selectedClaimer = true
 			claimer = randClaimer
 		}
@@ -230,14 +231,12 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		return NewErrorFailed(err)
 	}
 
-	// Update block height to prevent this claimer from being used again this block
-	claimer.LastBlockNum = lastBlockHeight + 1
-
 	if res.Code != 0 {
 		return NewErrorFailed(errors.New(res.Log))
 	}
 
-	log.Info("Claim tx sent to Kava:", res.Hash.String())
+	log.Info("Claim tx sent to Kava: ", res.Hash.String())
+	time.Sleep(7 * time.Second) // After sending the transaction, wait a full block
 	return nil
 }
 

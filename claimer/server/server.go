@@ -10,17 +10,22 @@ import (
 )
 
 const (
-	RestTargetChain  = "target-chain"
-	RestSwapID       = "swap-id"
-	RestRandomNumber = "random-number"
+	RestTargetChain    = "target-chain"
+	RestSwapID         = "swap-id"
+	RestRandomNumber   = "random-number"
+	TargetKava         = "KAVA"
+	TargetBinance      = "BINANCE"
+	TargetBinanceChain = "BINANCE CHAIN"
 )
 
+// ClaimJob defines a claim request received by the server
 type ClaimJob struct {
 	TargetChain  string
 	SwapID       string
 	RandomNumber string
 }
 
+// NewClaimJob instantiates a new instance of ClaimJob
 func NewClaimJob(targetChain, swapID, randomNumber string) ClaimJob {
 	return ClaimJob{
 		TargetChain:  targetChain,
@@ -29,16 +34,19 @@ func NewClaimJob(targetChain, swapID, randomNumber string) ClaimJob {
 	}
 }
 
+// Server that accepts HTTP POST claim requests on '/claim' and passes them to the Claims channel
 type Server struct {
 	Claims chan<- ClaimJob
 }
 
+// NewServer instantiates a new instance of Server
 func NewServer(claims chan<- ClaimJob) Server {
 	return Server{
 		Claims: claims,
 	}
 }
 
+// StartServer starts the server
 func (s Server) StartServer() {
 	r := mux.NewRouter()
 	r.HandleFunc("/claim", s.claim).Methods(http.MethodPost)
@@ -56,7 +64,7 @@ func (s Server) claim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	targetChainUpper := strings.ToUpper(targetChain)
-	if targetChainUpper != "KAVA" && targetChainUpper != "BINANCE" && targetChainUpper != "BINANCE CHAIN" {
+	if targetChainUpper != TargetKava && targetChainUpper != TargetBinance && targetChainUpper != TargetBinanceChain {
 		http.Error(w, fmt.Sprintf("%s must be kava, binance, or binance chain", RestTargetChain), http.StatusInternalServerError)
 		return
 	}
@@ -73,7 +81,7 @@ func (s Server) claim(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte(fmt.Sprintf(`{"message": "request submitted"}`)))
+	w.Write([]byte(fmt.Sprintf(`{"message": "claim request received, attempting to process..."}`)))
 
 	log.Info(fmt.Sprintf("Received claim request for %s on %s", swapID, targetChain))
 	claimJob := NewClaimJob(targetChain, swapID, randomNumber)

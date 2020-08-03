@@ -14,4 +14,5 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/tendermint/go-amino v0.15.1
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 )

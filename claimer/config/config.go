@@ -5,22 +5,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const DefaultConfigPath = "./config/config.json"
 
-// Config ...
+// Config defines chain connections and mnemonics
 type Config struct {
 	Kava         KavaConfig         `toml:"kava_config" json:"kava_config"`
 	BinanceChain BinanceChainConfig `toml:"binance_chain_config" json:"binance_chain_config"`
 }
 
+// KavaConfig defines information required for Kava blockchain interaction
 type KavaConfig struct {
 	ChainID   string   `toml:"chain_id" json:"chain_id"`
 	Endpoint  string   `toml:"endpoint" json:"endpoint"`
 	Mnemonics []string `toml:"mnemonics" json:"mnemonics"`
 }
 
+// BinanceChainConfig defines information required for Binance Chain interaction
 type BinanceChainConfig struct {
 	ChainID  string `toml:"chain_id" json:"chain_id"`
 	Endpoint string `toml:"endpoint" json:"endpoint"`
@@ -35,6 +39,7 @@ func NewConfig() *Config {
 	}
 }
 
+// GetConfig loads and validates the default configuration file, returning the Config struct if valid
 func GetConfig() (*Config, error) {
 	var config Config
 
@@ -63,7 +68,7 @@ func loadConfig(file string, config *Config) error {
 	}
 
 	fpClean := filepath.Clean(fp)
-	fmt.Println("Loading configuration", "path", fpClean)
+	log.Info("Loading configuration", "path", fpClean)
 
 	f, err := os.Open(fpClean)
 	if err != nil {
