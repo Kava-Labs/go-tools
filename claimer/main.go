@@ -85,7 +85,7 @@ func main() {
 	bnbClient.SetKeyManager(bnbKeyManager)
 
 	log.Info("Starting server...")
-	claims := make(chan server.ClaimJob, 1000)
+	claims := make(chan server.ClaimJob, 0)
 	s := server.NewServer(claims)
 	go s.StartServer()
 
@@ -104,14 +104,14 @@ func main() {
 
 				go func() {
 					defer sem.Release(1)
-					Retry(6, 10*time.Second, func() (err ClaimError) {
+					Retry(5, 12*time.Second, func() (err ClaimError) {
 						err = claimOnKava(c.Kava, http, claim, cdc, kavaClaimers)
 						return
 					})
 				}()
 				break
 			case server.TargetBinance, server.TargetBinanceChain:
-				Retry(5, 10*time.Second, func() (err ClaimError) {
+				Retry(5, 4*time.Second, func() (err ClaimError) {
 					err = claimOnBinanceChain(bnbClient, claim)
 					return
 				})
@@ -140,7 +140,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError 
 		return NewErrorRetryable(err)
 	}
 
-	if swap.Status != btypes.Open && status.SyncInfo.LatestBlockHeight >= swap.ExpireHeight {
+	if swap.Status != btypes.Open || status.SyncInfo.LatestBlockHeight >= swap.ExpireHeight {
 		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", claim.SwapID, swap.Status))
 	}
 
@@ -203,7 +203,7 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		ChainID:       config.ChainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           authtypes.NewStdFee(200000, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(250000)))),
+		Fee:           authtypes.NewStdFee(250000, sdk.Coins{}),
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
