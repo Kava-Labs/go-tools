@@ -32,6 +32,7 @@ func main() {
 	}
 
 	for {
+		log.Println("finding available deputy claims for kava")
 		err := claim.RunKava(cfg.KavaRestURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
 		if err != nil {
 			log.Println(err)

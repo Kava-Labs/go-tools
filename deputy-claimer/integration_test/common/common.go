@@ -3,7 +3,6 @@ package common
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/binance-chain/go-sdk/common/types"
@@ -54,7 +53,6 @@ func init() {
 	kava.SetBech32AddressPrefixes(kavaConfig)
 
 	BnbDeputyAddr = BnbAddressFromMnemonic(BnbDeputyMnemonic)
-	fmt.Println("bnb dep", BnbDeputyAddr.String())
 	for _, m := range BnbUserMnemonics {
 		BnbUserAddrs = append(BnbUserAddrs, BnbAddressFromMnemonic(m))
 	}

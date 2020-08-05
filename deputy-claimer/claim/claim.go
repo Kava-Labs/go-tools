@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"time"
 
@@ -78,6 +79,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 		}
 		rndNums = append(rndNums, tmbytes.HexBytes(bnbSwap.RandomNumber))
 	}
+	log.Printf("found %d claimable kava HTLTs\n", len(rndNums))
 
 	// Get the chain id
 	infoResp, err := http.Get(kavaRestURL + "/node_info")
@@ -102,6 +104,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 			return err
 		}
 		go func(i int, r tmbytes.HexBytes) {
+			log.Printf("sending claim for kava swap id %s", filteredSwaps[i].GetSwapID())
 			defer sem.Release(1)
 
 			// choose private key
@@ -138,7 +141,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 			}
 			txBz, err := kavaKeyM.Sign(signMsg, cdc)
 			if err != nil {
-
+				errs <- err
 				return
 			}
 			var tx authtypes.StdTx
@@ -166,7 +169,7 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 			// TODO unmarshal body and check error code was 0
 			// body, _ := ioutil.ReadAll(resp.Body)
 
-			time.Sleep(5 * time.Second) // TODO wait until tx in block, rather than just sleeping
+			time.Sleep(7 * time.Second) // TODO wait until tx in block, rather than just sleeping
 		}(i, r)
 	}
 
