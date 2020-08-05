@@ -35,11 +35,8 @@ type restPostTxRequest struct {
 
 func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) error {
 
-	// setup kava codec and config
+	// setup kava codec
 	cdc := kava.MakeCodec()
-	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig)
-	kavaConfig.Seal()
 
 	// query kava swaps (via rest)
 	resp, err := http.Get(kavaRestURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")

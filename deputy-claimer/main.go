@@ -6,6 +6,9 @@ import (
 	"os"
 	"time"
 
+	sdk "github.com/kava-labs/cosmos-sdk/types"
+	"github.com/kava-labs/go-sdk/kava"
+
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
 )
 
@@ -30,6 +33,11 @@ func main() {
 		}
 		cfg.KavaMnemonics = append(cfg.KavaMnemonics, mnemonic)
 	}
+
+	// Set global address prefixes
+	kavaConfig := sdk.GetConfig()
+	kava.SetBech32AddressPrefixes(kavaConfig)
+	kavaConfig.Seal()
 
 	for {
 		log.Println("finding available deputy claims for kava")
