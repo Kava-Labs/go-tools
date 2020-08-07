@@ -50,6 +50,7 @@ func NewServer(claims chan<- ClaimJob) Server {
 func (s Server) StartServer() {
 	r := mux.NewRouter()
 	r.HandleFunc("/claim", s.claim).Methods(http.MethodPost)
+	r.HandleFunc("/status", s.status)
 	r.HandleFunc("/", s.notFound)
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
@@ -92,4 +93,10 @@ func (s Server) notFound(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
 	w.Write([]byte(`{"message": "page not found"}`))
+}
+
+func (s Server) status(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status": "healthy"}`))
 }
