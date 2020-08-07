@@ -104,17 +104,19 @@ func main() {
 
 				go func() {
 					defer sem.Release(1)
-					Retry(5, 12*time.Second, func() (err ClaimError) {
+					Retry(10, 20*time.Second, func() (err ClaimError) {
 						err = claimOnKava(c.Kava, http, claim, cdc, kavaClaimers)
 						return
 					})
 				}()
 				break
 			case server.TargetBinance, server.TargetBinanceChain:
-				Retry(5, 4*time.Second, func() (err ClaimError) {
-					err = claimOnBinanceChain(bnbClient, claim)
-					return
-				})
+				go func() {
+					Retry(10, 15*time.Second, func() (err ClaimError) {
+						err = claimOnBinanceChain(bnbClient, claim)
+						return
+					})
+				}()
 				break
 			}
 		}
