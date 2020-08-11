@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -107,10 +108,12 @@ func TestBasic(t *testing.T) {
 	_, err = bnbClient.ClaimHTLT(bnbID, rndNum, bnbRpc.Sync)
 	require.NoError(t, err)
 
-	// run thing
-	time.Sleep(5 * time.Second)
-	err = claim.RunKava("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2])
-	require.NoError(t, err)
+	// run
+	time.Sleep(5 * time.Second) // TODO replace with wait func
+	ctx, shutdownClaimer := context.WithCancel(context.Background())
+	claim.NewKavaClaimer("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2]).Run(ctx)
+	defer shutdownClaimer()
+	time.Sleep(8 * time.Second)
 
 	// check the first kava claim was claimed
 	kavaSwapID := bep3.CalculateSwapID(rndHash, kavaKeyM.GetAddr(), common.BnbDeputyAddr.String())

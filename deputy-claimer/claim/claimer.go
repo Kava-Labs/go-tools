@@ -2,78 +2,99 @@ package claim
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"time"
 
 	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
 	"github.com/binance-chain/go-sdk/common/types"
 	bnbmsg "github.com/binance-chain/go-sdk/types/msg"
-	"github.com/kava-labs/cosmos-sdk/client/rpc"
-	"github.com/kava-labs/cosmos-sdk/codec"
 	sdk "github.com/kava-labs/cosmos-sdk/types"
-	authexported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
 	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
-	kavaRpc "github.com/kava-labs/go-sdk/client"
 	"github.com/kava-labs/go-sdk/kava"
 	"github.com/kava-labs/go-sdk/kava/bep3"
 	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	tmbytes "github.com/kava-labs/tendermint/libs/bytes"
-	tmRPCTypes "github.com/kava-labs/tendermint/rpc/core/types"
 	tmtypes "github.com/kava-labs/tendermint/types"
-	"golang.org/x/sync/semaphore"
 )
 
-func RunKava(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) error {
+type KavaClaimer struct {
+	kavaClient    kavaChainClient
+	bnbClient     *bnbRpc.HTTP
+	mnemonics     []string
+	bnbDeputyAddr types.AccAddress
+}
 
-	// setup
+func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) KavaClaimer {
 	cdc := kava.MakeCodec()
-	kavaClient := NewKavaChainClient(kavaRestURL, kavaRPCURL, cdc)
-	bnbClient := bnbRpc.NewRPCClient(bnbRPCURL, types.ProdNetwork)
-
 	bnbDeputyAddr, err := types.AccAddressFromBech32(bnbDeputyAddrString)
 	if err != nil {
-		return err
+		panic(err)
 	}
+	return KavaClaimer{
+		kavaClient:    newKavaChainClient(kavaRestURL, kavaRPCURL, cdc),
+		bnbClient:     bnbRpc.NewRPCClient(bnbRPCURL, types.ProdNetwork),
+		mnemonics:     mnemonics,
+		bnbDeputyAddr: bnbDeputyAddr,
+	}
+}
+func (kc KavaClaimer) Run(ctx context.Context) {
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				log.Println("finding available deputy claims for kava")
+				err := kc.fetchAndClaimSwaps()
+				if err != nil {
+					log.Println(err)
+				}
+				time.Sleep(5 * time.Minute)
+				continue
+			}
+		}
+	}(ctx)
+}
 
-	claimableSwaps, err := getClaimableKavaSwaps(kavaClient, bnbClient, bnbDeputyAddr)
+func (kc KavaClaimer) fetchAndClaimSwaps() error {
+
+	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.bnbDeputyAddr)
 	if err != nil {
 		return err
 	}
 	log.Printf("found %d claimable kava HTLTs\n", len(claimableSwaps))
 
 	// create and submit claim txs, distributing work over several addresses to avoid sequence number problems
-	sem := semaphore.NewWeighted(int64(len(mnemonics)))
-	ctx := context.TODO()
+	availableMnemonics := make(chan string, len(kc.mnemonics))
+	for _, m := range kc.mnemonics {
+		availableMnemonics <- m
+	}
 	errs := make(chan error, len(claimableSwaps))
-	for i, swap := range claimableSwaps {
-		if err := sem.Acquire(ctx, 1); err != nil {
-			return err
-		}
-		go func(i int, swap claimableSwap) {
-			log.Printf("sending claim for kava swap id %s", swap.swapID)
-			defer sem.Release(1)
+	for _, swap := range claimableSwaps {
+		mnemonic := <-availableMnemonics
 
-			// FIXME semaphore releases not synced with choosing mnemonics, don't know which mnemonic is free
-			txHash, err := constructAndSendClaim(kavaClient, mnemonics[i%len(mnemonics)], swap.swapID, swap.randomNumber)
+		go func(mnemonic string, mnemonics chan string, swap claimableSwap) {
+
+			log.Printf("sending claim for kava swap id %s", swap.swapID)
+			defer func() { mnemonics <- mnemonic }()
+
+			txHash, err := constructAndSendClaim(kc.kavaClient, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
 				errs <- err
 				return
 			}
-			err = waitWithTimeoutForTxSuccess(kavaClient, 15*time.Second, txHash)
+			err = waitWithTimeoutForTxSuccess(kc.kavaClient, 15*time.Second, txHash)
 			if err != nil {
 				errs <- err
 				return
 			}
-		}(i, swap)
+		}(mnemonic, availableMnemonics, swap)
 	}
 
 	// wait for all go routines to finish
-	if err := sem.Acquire(ctx, int64(len(mnemonics))); err != nil {
-		return err
+	for i := 0; i > len(kc.mnemonics); i++ {
+		<-availableMnemonics
 	}
 	// report any errors
 	var concatenatedErrs string
@@ -161,6 +182,7 @@ func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, 
 	}
 	return tmtypes.Tx(txBz).Hash(), nil
 }
+
 func waitWithTimeoutForTxSuccess(kavaClient kavaChainClient, timeout time.Duration, txHash []byte) error {
 	endTime := time.Now().Add(timeout)
 	for {
@@ -179,90 +201,4 @@ func waitWithTimeoutForTxSuccess(kavaClient kavaChainClient, timeout time.Durati
 		}
 		return nil
 	}
-}
-
-type kavaChainClient struct {
-	restURL, rpcURL string
-	codec           *codec.Codec
-	kavaSDKClient   *kavaRpc.KavaClient
-}
-
-func NewKavaChainClient(restURL, rpcURL string, cdc *codec.Codec) kavaChainClient {
-	// use a fake mnemonic as we're not using the kava client for signing
-	dummyMnemonic := "adult stem bus people vast riot eager faith sponsor unlock hold lion sport drop eyebrow loud angry couch panic east three credit grain talk"
-	return kavaChainClient{
-		restURL:       restURL,
-		codec:         cdc,
-		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, kava.Bip44CoinType, rpcURL, kavaRpc.ProdNetwork), // TODO what is network type for?
-	}
-}
-
-type restResponse struct {
-	Height int             `json:"height"`
-	Result json.RawMessage `json:"result"`
-}
-
-func (kc kavaChainClient) getOpenSwaps() (bep3.AtomicSwaps, error) {
-	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	bz, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var res restResponse
-	kc.codec.MustUnmarshalJSON(bz, &res)
-	var swaps bep3.AtomicSwaps
-	kc.codec.MustUnmarshalJSON(res.Result, &swaps)
-	return swaps, nil
-}
-
-func (kc kavaChainClient) getAccount(address sdk.AccAddress) (authexported.Account, error) {
-	resp, err := http.Get(kc.restURL + "/auth/accounts/" + address.String()) // TODO construct urls properly
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	bz, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var res restResponse
-	kc.codec.MustUnmarshalJSON(bz, &res)
-	var account authexported.Account
-	kc.codec.MustUnmarshalJSON(res.Result, &account)
-	return account, nil
-}
-
-func (kc kavaChainClient) getTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error) {
-	return kc.kavaSDKClient.HTTP.Tx(txHash, false)
-}
-
-func (kc kavaChainClient) broadcastTx(tx tmtypes.Tx) error {
-	res, err := kc.kavaSDKClient.BroadcastTxSync(tx)
-	if err != nil {
-		return err
-	}
-	if res.Code != 0 { // tx failed to be submitted to the mempool
-		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log)
-	}
-	return nil
-}
-
-func (kc kavaChainClient) getChainID() (string, error) {
-	infoResp, err := http.Get(kc.restURL + "/node_info")
-	if err != nil {
-		return "", err
-	}
-	defer infoResp.Body.Close()
-	infoBz, err := ioutil.ReadAll(infoResp.Body)
-	if err != nil {
-		return "", err
-	}
-	var nodeInfo rpc.NodeInfoResponse
-	kc.codec.MustUnmarshalJSON(infoBz, &nodeInfo)
-	return nodeInfo.Network, nil
 }

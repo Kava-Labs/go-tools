@@ -1,10 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"os"
-	"time"
 
 	sdk "github.com/kava-labs/cosmos-sdk/types"
 	"github.com/kava-labs/go-sdk/kava"
@@ -41,13 +40,11 @@ func main() {
 	kava.SetBech32AddressPrefixes(kavaConfig)
 	kavaConfig.Seal()
 
-	for {
-		log.Println("finding available deputy claims for kava")
-		err := claim.RunKava(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
-		if err != nil {
-			log.Println(err)
-		}
-		time.Sleep(5 * time.Minute)
-	}
+	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
+	ctx := context.Background()
+	kavaClaimer.Run(ctx)
+
 	// repeat for bnb
+
+	select {}
 }
