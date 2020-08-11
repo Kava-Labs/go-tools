@@ -65,18 +65,10 @@ func RunKava(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString stri
 	log.Printf("found %d claimable kava HTLTs\n", len(rndNums))
 
 	// Get the chain id
-	infoResp, err := http.Get(kavaRestURL + "/node_info")
+	chainID, err := kavaClient.getChainID()
 	if err != nil {
 		return err
 	}
-	defer infoResp.Body.Close()
-	infoBz, err := ioutil.ReadAll(infoResp.Body)
-	if err != nil {
-		return err
-	}
-	var nodeInfo rpc.NodeInfoResponse
-	cdc.MustUnmarshalJSON(infoBz, &nodeInfo)
-	chainID := nodeInfo.Network
 
 	// create and submit claim txs, distributing work over several addresses to avoid sequence number problems
 	sem := semaphore.NewWeighted(int64(len(mnemonics)))
@@ -236,4 +228,19 @@ func (kc kavaChainClient) broadcastTx(tx tmtypes.Tx) error {
 		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log)
 	}
 	return nil
+}
+
+func (kc kavaChainClient) getChainID() (string, error) {
+	infoResp, err := http.Get(kc.restURL + "/node_info")
+	if err != nil {
+		return "", err
+	}
+	defer infoResp.Body.Close()
+	infoBz, err := ioutil.ReadAll(infoResp.Body)
+	if err != nil {
+		return "", err
+	}
+	var nodeInfo rpc.NodeInfoResponse
+	kc.codec.MustUnmarshalJSON(infoBz, &nodeInfo)
+	return nodeInfo.Network, nil
 }
