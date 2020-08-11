@@ -59,8 +59,10 @@ func RunKava(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString stri
 		if err != nil {
 			return err
 		}
-		// TODO check the bnb swap status is closed and has random number - ie it has been claimed
-		rndNums = append(rndNums, tmbytes.HexBytes(bnbSwap.RandomNumber))
+		// check the bnb swap status is closed and has random number - ie it has been claimed
+		if len(bnbSwap.RandomNumber) != 0 {
+			rndNums = append(rndNums, tmbytes.HexBytes(bnbSwap.RandomNumber))
+		}
 	}
 	log.Printf("found %d claimable kava HTLTs\n", len(rndNums))
 
