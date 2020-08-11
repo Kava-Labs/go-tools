@@ -15,6 +15,7 @@ import (
 type Config struct {
 	BnbRPCURL        string
 	KavaRestURL      string
+	KavaRPCURL       string
 	BnbDeputyAddress string
 	KavaMnemonics    []string
 }
@@ -23,7 +24,8 @@ func main() {
 
 	cfg := Config{
 		BnbRPCURL:        os.Getenv("BNB_RPC_URL"),
-		KavaRestURL:      os.Getenv("BNB_REST_URL"),
+		KavaRestURL:      os.Getenv("KAVA_REST_URL"),
+		KavaRPCURL:       os.Getenv("KAVA_RPC_URL"),
 		BnbDeputyAddress: os.Getenv("BNB_DEPUTY_ADDRESS"),
 	}
 	for i := 0; ; i++ {
@@ -41,7 +43,7 @@ func main() {
 
 	for {
 		log.Println("finding available deputy claims for kava")
-		err := claim.RunKava(cfg.KavaRestURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
+		err := claim.RunKava(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
 		if err != nil {
 			log.Println(err)
 		}

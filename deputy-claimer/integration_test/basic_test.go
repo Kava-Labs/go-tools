@@ -76,9 +76,11 @@ func TestBasic(t *testing.T) {
 
 	// run thing
 	time.Sleep(5 * time.Second)
-	err = claim.RunKava("http://localhost:1317", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2])
+	err = claim.RunKava("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2])
 	require.NoError(t, err)
 
 	// check kava claims were claimed
-	// TODO
+	kavaSwapID := bep3.CalculateSwapID(rndHash, kavaKeyM.GetAddr(), common.BnbDeputyAddr.String())
+	_, err = kavaClient.GetSwapByID(kavaSwapID)
+	require.NoError(t, err)
 }

@@ -1,7 +1,6 @@
 package claim
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,46 +13,33 @@ import (
 	"github.com/binance-chain/go-sdk/common/types"
 	bnbmsg "github.com/binance-chain/go-sdk/types/msg"
 	"github.com/kava-labs/cosmos-sdk/client/rpc"
+	"github.com/kava-labs/cosmos-sdk/codec"
 	sdk "github.com/kava-labs/cosmos-sdk/types"
 	authexported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
 	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
+	kavaRpc "github.com/kava-labs/go-sdk/client"
 	"github.com/kava-labs/go-sdk/kava"
 	"github.com/kava-labs/go-sdk/kava/bep3"
 	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	tmbytes "github.com/kava-labs/tendermint/libs/bytes"
+	tmRPCTypes "github.com/kava-labs/tendermint/rpc/core/types"
+	tmtypes "github.com/kava-labs/tendermint/types"
 	"golang.org/x/sync/semaphore"
 )
 
-type restResponse struct {
-	Height int             `json:"height"`
-	Result json.RawMessage `json:"result"`
-}
-type restPostTxRequest struct {
-	Tx   authtypes.StdTx `json:"tx"`
-	Mode string          `json:"mode"`
-}
+func RunKava(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) error {
 
-func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) error {
-
-	// setup kava codec
+	// setup
 	cdc := kava.MakeCodec()
+	kavaClient := NewKavaChainClient(kavaRestURL, kavaRPCURL, cdc)
+	bnbClient := bnbRpc.NewRPCClient(bnbRPCURL, types.ProdNetwork)
 
-	// query kava swaps (via rest)
-	resp, err := http.Get(kavaRestURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
+	swaps, err := kavaClient.getOpenSwaps()
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	bz, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	var res restResponse
-	cdc.MustUnmarshalJSON(bz, &res)
-	var swaps bep3.AtomicSwaps
-	cdc.MustUnmarshalJSON(res.Result, &swaps)
-	// filter out swaps to
+	// filter out new swaps
 	var filteredSwaps bep3.AtomicSwaps
 	for _, s := range swaps {
 		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
@@ -66,14 +52,14 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 	if err != nil {
 		return err
 	}
-	bnbClient := bnbRpc.NewRPCClient(bnbRPCURL, types.ProdNetwork)
 	var rndNums []tmbytes.HexBytes
-	for _, s := range filteredSwaps { // TODO could be concurrent
+	for _, s := range filteredSwaps {
 		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
 		bnbSwap, err := bnbClient.GetSwapByID(bID)
 		if err != nil {
 			return err
 		}
+		// TODO check the bnb swap status is closed and has random number - ie it has been claimed
 		rndNums = append(rndNums, tmbytes.HexBytes(bnbSwap.RandomNumber))
 	}
 	log.Printf("found %d claimable kava HTLTs\n", len(rndNums))
@@ -113,21 +99,11 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 			}
 			// construct and sign tx
 			msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), filteredSwaps[i].GetSwapID(), r)
-			resp, err := http.Get(kavaRestURL + "/auth/accounts/" + kavaKeyM.GetAddr().String()) // TODO construct urls properly
+			account, err := kavaClient.getAccount(kavaKeyM.GetAddr())
 			if err != nil {
 				errs <- err
 				return
 			}
-			defer resp.Body.Close()
-			bz, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				errs <- err
-				return
-			}
-			var res restResponse
-			cdc.MustUnmarshalJSON(bz, &res)
-			var account authexported.Account
-			cdc.MustUnmarshalJSON(res.Result, &account)
 			signMsg := authtypes.StdSignMsg{
 				ChainID:       chainID,
 				AccountNumber: account.GetAccountNumber(),
@@ -141,32 +117,16 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 				errs <- err
 				return
 			}
-			var tx authtypes.StdTx
-			err = cdc.UnmarshalBinaryLengthPrefixed(txBz, &tx) // TODO
+			// broadcast tx to mempool
+			if err = kavaClient.broadcastTx(txBz); err != nil {
+				errs <- err
+				return
+			}
+			err = waitWithTimeoutForTxSuccess(kavaClient, 15*time.Second, tmtypes.Tx(txBz).Hash())
 			if err != nil {
 				errs <- err
 				return
 			}
-			// broadcast tx to chain
-			req := restPostTxRequest{
-				Tx:   tx,
-				Mode: "block",
-			}
-			reqBz, err := cdc.MarshalJSON(req)
-			if err != nil {
-				errs <- err
-				return
-			}
-			resp, err = http.Post(kavaRestURL+"/txs", "application/json", bytes.NewBuffer(reqBz))
-			if err != nil {
-				errs <- err
-				return
-			}
-			defer resp.Body.Close()
-			// TODO unmarshal body and check error code was 0
-			// body, _ := ioutil.ReadAll(resp.Body)
-
-			time.Sleep(7 * time.Second) // TODO wait until tx in block, rather than just sleeping
 		}(i, r)
 	}
 
@@ -174,14 +134,106 @@ func RunKava(kavaRestURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonic
 	if err := sem.Acquire(ctx, int64(len(mnemonics))); err != nil {
 		return err
 	}
-	// TODO look for "proper" way of handling errors from many goroutines (sync/errgroup?)
-	var finalErr string
+	// report any errors
+	var concatenatedErrs string
 	close(errs)
 	for e := range errs {
-		finalErr += e.Error()
+		concatenatedErrs += e.Error()
+		concatenatedErrs += "\n"
 	}
-	if finalErr != "" {
-		return fmt.Errorf("sending claims produced some errors: %s", finalErr)
+	if concatenatedErrs != "" {
+		return fmt.Errorf("sending claims produced some errors: \n%s", concatenatedErrs)
+	}
+	return nil
+}
+
+func waitWithTimeoutForTxSuccess(kavaClient kavaChainClient, timeout time.Duration, txHash []byte) error {
+	endTime := time.Now().Add(timeout)
+	for {
+		res, err := kavaClient.getTxConfirmation(txHash)
+		if err != nil {
+			// TODO parse error to see if the was found or not
+			if time.Now().After(endTime) {
+				return fmt.Errorf("timeout reached")
+			} else {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+		}
+		if res.TxResult.Code != 0 {
+			return fmt.Errorf("tx rejected from chain: %s", res.TxResult.Log)
+		}
+		return nil
+	}
+}
+
+type kavaChainClient struct {
+	restURL, rpcURL string
+	codec           *codec.Codec
+	kavaSDKClient   *kavaRpc.KavaClient
+}
+
+func NewKavaChainClient(restURL, rpcURL string, cdc *codec.Codec) kavaChainClient {
+	// use a fake mnemonic as we're not using the kava client for signing
+	dummyMnemonic := "adult stem bus people vast riot eager faith sponsor unlock hold lion sport drop eyebrow loud angry couch panic east three credit grain talk"
+	return kavaChainClient{
+		restURL:       restURL,
+		codec:         cdc,
+		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, kava.Bip44CoinType, rpcURL, kavaRpc.ProdNetwork), // TODO what is network type for?
+	}
+}
+
+type restResponse struct {
+	Height int             `json:"height"`
+	Result json.RawMessage `json:"result"`
+}
+
+func (kc kavaChainClient) getOpenSwaps() (bep3.AtomicSwaps, error) {
+	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bz, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var res restResponse
+	kc.codec.MustUnmarshalJSON(bz, &res)
+	var swaps bep3.AtomicSwaps
+	kc.codec.MustUnmarshalJSON(res.Result, &swaps)
+	return swaps, nil
+}
+
+func (kc kavaChainClient) getAccount(address sdk.AccAddress) (authexported.Account, error) {
+	resp, err := http.Get(kc.restURL + "/auth/accounts/" + address.String()) // TODO construct urls properly
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	bz, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var res restResponse
+	kc.codec.MustUnmarshalJSON(bz, &res)
+	var account authexported.Account
+	kc.codec.MustUnmarshalJSON(res.Result, &account)
+	return account, nil
+}
+
+func (kc kavaChainClient) getTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error) {
+	return kc.kavaSDKClient.HTTP.Tx(txHash, false)
+}
+
+func (kc kavaChainClient) broadcastTx(tx tmtypes.Tx) error {
+	res, err := kc.kavaSDKClient.BroadcastTxSync(tx)
+	if err != nil {
+		return err
+	}
+	if res.Code != 0 { // tx failed to be submitted to the mempool
+		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log)
 	}
 	return nil
 }
