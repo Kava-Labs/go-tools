@@ -34,94 +34,41 @@ func RunKava(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString stri
 	kavaClient := NewKavaChainClient(kavaRestURL, kavaRPCURL, cdc)
 	bnbClient := bnbRpc.NewRPCClient(bnbRPCURL, types.ProdNetwork)
 
-	swaps, err := kavaClient.getOpenSwaps()
-	if err != nil {
-		return err
-	}
-
-	// filter out new swaps
-	var filteredSwaps bep3.AtomicSwaps
-	for _, s := range swaps {
-		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
-			filteredSwaps = append(filteredSwaps, s)
-		}
-	}
-
-	// parse out swap ids, query those txs on bnb, extract random numbers
 	bnbDeputyAddr, err := types.AccAddressFromBech32(bnbDeputyAddrString)
 	if err != nil {
 		return err
 	}
-	var rndNums []tmbytes.HexBytes
-	for _, s := range filteredSwaps {
-		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
-		bnbSwap, err := bnbClient.GetSwapByID(bID)
-		if err != nil {
-			return err
-		}
-		// check the bnb swap status is closed and has random number - ie it has been claimed
-		if len(bnbSwap.RandomNumber) != 0 {
-			rndNums = append(rndNums, tmbytes.HexBytes(bnbSwap.RandomNumber))
-		}
-	}
-	log.Printf("found %d claimable kava HTLTs\n", len(rndNums))
 
-	// Get the chain id
-	chainID, err := kavaClient.getChainID()
+	claimableSwaps, err := getClaimableKavaSwaps(kavaClient, bnbClient, bnbDeputyAddr)
 	if err != nil {
 		return err
 	}
+	log.Printf("found %d claimable kava HTLTs\n", len(claimableSwaps))
 
 	// create and submit claim txs, distributing work over several addresses to avoid sequence number problems
 	sem := semaphore.NewWeighted(int64(len(mnemonics)))
 	ctx := context.TODO()
-	errs := make(chan error, len(rndNums))
-	for i, r := range rndNums {
+	errs := make(chan error, len(claimableSwaps))
+	for i, swap := range claimableSwaps {
 		if err := sem.Acquire(ctx, 1); err != nil {
 			return err
 		}
-		go func(i int, r tmbytes.HexBytes) {
-			log.Printf("sending claim for kava swap id %s", filteredSwaps[i].GetSwapID())
+		go func(i int, swap claimableSwap) {
+			log.Printf("sending claim for kava swap id %s", swap.swapID)
 			defer sem.Release(1)
 
-			// choose private key
-			mnemonic := mnemonics[i%len(mnemonics)]
-			kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
+			// FIXME semaphore releases not synced with choosing mnemonics, don't know which mnemonic is free
+			txHash, err := constructAndSendClaim(kavaClient, mnemonics[i%len(mnemonics)], swap.swapID, swap.randomNumber)
 			if err != nil {
 				errs <- err
 				return
 			}
-			// construct and sign tx
-			msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), filteredSwaps[i].GetSwapID(), r)
-			account, err := kavaClient.getAccount(kavaKeyM.GetAddr())
+			err = waitWithTimeoutForTxSuccess(kavaClient, 15*time.Second, txHash)
 			if err != nil {
 				errs <- err
 				return
 			}
-			signMsg := authtypes.StdSignMsg{
-				ChainID:       chainID,
-				AccountNumber: account.GetAccountNumber(),
-				Sequence:      account.GetSequence(),
-				Fee:           authtypes.NewStdFee(250000, nil),
-				Msgs:          []sdk.Msg{msg},
-				Memo:          "",
-			}
-			txBz, err := kavaKeyM.Sign(signMsg, cdc)
-			if err != nil {
-				errs <- err
-				return
-			}
-			// broadcast tx to mempool
-			if err = kavaClient.broadcastTx(txBz); err != nil {
-				errs <- err
-				return
-			}
-			err = waitWithTimeoutForTxSuccess(kavaClient, 15*time.Second, tmtypes.Tx(txBz).Hash())
-			if err != nil {
-				errs <- err
-				return
-			}
-		}(i, r)
+		}(i, swap)
 	}
 
 	// wait for all go routines to finish
@@ -141,6 +88,79 @@ func RunKava(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString stri
 	return nil
 }
 
+type claimableSwap struct {
+	swapID       tmbytes.HexBytes
+	randomNumber tmbytes.HexBytes
+}
+
+func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
+	swaps, err := kavaClient.getOpenSwaps()
+	if err != nil {
+		return nil, err
+	}
+
+	// filter out new swaps
+	var filteredSwaps bep3.AtomicSwaps
+	for _, s := range swaps {
+		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
+			filteredSwaps = append(filteredSwaps, s)
+		}
+	}
+
+	// parse out swap ids, query those txs on bnb, extract random numbers
+	var claimableSwaps []claimableSwap
+	for _, s := range filteredSwaps {
+		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
+		bnbSwap, err := bnbClient.GetSwapByID(bID)
+		if err != nil {
+			return nil, err // TODO should probably just continue rather than stopping, or parse not found error
+		}
+		// check the bnb swap status is closed and has random number - ie it has been claimed
+		if len(bnbSwap.RandomNumber) != 0 {
+			claimableSwaps = append(
+				claimableSwaps,
+				claimableSwap{
+					swapID:       s.GetSwapID(),
+					randomNumber: tmbytes.HexBytes(bnbSwap.RandomNumber),
+				})
+		}
+	}
+	return claimableSwaps, nil
+}
+
+func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
+	if err != nil {
+		return nil, err
+	}
+	// construct and sign tx
+	msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), swapID, randNum)
+	chainID, err := kavaClient.getChainID()
+	if err != nil {
+		return nil, err
+	}
+	account, err := kavaClient.getAccount(kavaKeyM.GetAddr())
+	if err != nil {
+		return nil, err
+	}
+	signMsg := authtypes.StdSignMsg{
+		ChainID:       chainID,
+		AccountNumber: account.GetAccountNumber(),
+		Sequence:      account.GetSequence(),
+		Fee:           authtypes.NewStdFee(250000, nil),
+		Msgs:          []sdk.Msg{msg},
+		Memo:          "",
+	}
+	txBz, err := kavaKeyM.Sign(signMsg, kavaClient.codec)
+	if err != nil {
+		return nil, err
+	}
+	// broadcast tx to mempool
+	if err = kavaClient.broadcastTx(txBz); err != nil {
+		return nil, err
+	}
+	return tmtypes.Tx(txBz).Hash(), nil
+}
 func waitWithTimeoutForTxSuccess(kavaClient kavaChainClient, timeout time.Duration, txHash []byte) error {
 	endTime := time.Now().Add(timeout)
 	for {
