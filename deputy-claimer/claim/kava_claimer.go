@@ -91,7 +91,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 					return false, nil
 				}
 				if res.TxResult.Code != 0 {
-					return true, fmt.Errorf("tx rejected from chain: %s", res.TxResult.Log)
+					return true, fmt.Errorf("kava tx rejected from chain: %s", res.TxResult.Log)
 				}
 				return true, nil
 			})
@@ -114,7 +114,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 		concatenatedErrs += "\n"
 	}
 	if concatenatedErrs != "" {
-		return fmt.Errorf("sending claims produced some errors: \n%s", concatenatedErrs)
+		return fmt.Errorf("sending kava claims produced some errors: \n%s", concatenatedErrs)
 	}
 	return nil
 }
@@ -129,6 +129,7 @@ func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, b
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("found %d open kava swaps", len(swaps))
 
 	// filter out new swaps
 	var filteredSwaps bep3.AtomicSwaps
@@ -194,6 +195,7 @@ func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, 
 }
 
 // Wait will poll the provided function until either:
+//
 // - it returns true
 // - it returns an error
 // - the timeout passes

@@ -88,7 +88,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 					return false, nil
 				}
 				if res.TxResult.Code != 0 {
-					return true, fmt.Errorf("tx rejected from chain: %s", res.TxResult.Log)
+					return true, fmt.Errorf("bnb tx rejected from chain: %s", res.TxResult.Log)
 				}
 				return true, nil
 			})
@@ -111,7 +111,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 		concatenatedErrs += "\n"
 	}
 	if concatenatedErrs != "" {
-		return fmt.Errorf("sending claims produced some errors: \n%s", concatenatedErrs)
+		return fmt.Errorf("sending bnb claims produced some errors: \n%s", concatenatedErrs)
 	}
 	return nil
 }
@@ -121,6 +121,7 @@ func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, 
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("found %d open bnb swaps", len(swaps))
 
 	// filter out new swaps
 	var filteredSwaps []types.AtomicSwap
