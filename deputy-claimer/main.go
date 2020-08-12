@@ -12,28 +12,42 @@ import (
 )
 
 type Config struct {
-	BnbRPCURL        string
-	KavaRestURL      string
-	KavaRPCURL       string
-	BnbDeputyAddress string
-	KavaMnemonics    []string
+	BnbRPCURL         string
+	KavaRestURL       string
+	KavaRPCURL        string
+	BnbDeputyAddress  string
+	KavaDeputyAddress string
+	BnbMnemonics      []string
+	KavaMnemonics     []string
+}
+
+func loadConfig() Config {
+	return Config{
+		BnbRPCURL:         os.Getenv("BNB_RPC_URL"),
+		KavaRestURL:       os.Getenv("KAVA_REST_URL"),
+		KavaRPCURL:        os.Getenv("KAVA_RPC_URL"),
+		BnbDeputyAddress:  os.Getenv("BNB_DEPUTY_ADDRESS"),
+		KavaDeputyAddress: os.Getenv("KAVA_DEPUTY_ADDRESS"),
+		KavaMnemonics:     getSequentialEnvVars("KAVA_MNEMONIC_"),
+		BnbMnemonics:      getSequentialEnvVars("BNB_MNEMONIC_"),
+	}
+}
+
+func getSequentialEnvVars(prefix string) []string {
+	var envVars []string
+	for i := 0; ; i++ {
+		envVar, found := os.LookupEnv(fmt.Sprintf("%s%d", prefix, i))
+		if !found {
+			break
+		}
+		envVars = append(envVars, envVar)
+	}
+	return envVars
 }
 
 func main() {
 
-	cfg := Config{
-		BnbRPCURL:        os.Getenv("BNB_RPC_URL"),
-		KavaRestURL:      os.Getenv("KAVA_REST_URL"),
-		KavaRPCURL:       os.Getenv("KAVA_RPC_URL"),
-		BnbDeputyAddress: os.Getenv("BNB_DEPUTY_ADDRESS"),
-	}
-	for i := 0; ; i++ {
-		mnemonic, found := os.LookupEnv(fmt.Sprintf("KAVA_MNEMONIC_%d", i))
-		if !found {
-			break
-		}
-		cfg.KavaMnemonics = append(cfg.KavaMnemonics, mnemonic)
-	}
+	cfg := loadConfig()
 
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
@@ -41,10 +55,11 @@ func main() {
 	kavaConfig.Seal()
 
 	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
+	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.KavaDeputyAddress, cfg.BnbDeputyAddress, cfg.BnbMnemonics)
+
 	ctx := context.Background()
 	kavaClaimer.Run(ctx)
-
-	// repeat for bnb
+	bnbClaimer.Run(ctx)
 
 	select {}
 }

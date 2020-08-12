@@ -23,7 +23,7 @@ import (
 	"github.com/kava-labs/go-tools/deputy-claimer/integration_test/common"
 )
 
-func TestBasic(t *testing.T) {
+func TestClaimKava(t *testing.T) {
 	// setup clients
 	cdc := kava.MakeCodec()
 	kavaClient := client.NewKavaClient(cdc, common.KavaUserMnemonics[0], kava.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
@@ -115,8 +115,109 @@ func TestBasic(t *testing.T) {
 	defer shutdownClaimer()
 	time.Sleep(8 * time.Second)
 
-	// check the first kava claim was claimed
+	// check the first kava swap was claimed
 	kavaSwapID := bep3.CalculateSwapID(rndHash, kavaKeyM.GetAddr(), common.BnbDeputyAddr.String())
-	_, err = kavaClient.GetSwapByID(kavaSwapID)
+	s, err := kavaClient.GetSwapByID(kavaSwapID)
 	require.NoError(t, err)
+	require.Equal(t, bep3.Completed, s.Status)
+}
+
+func TestClaimBnb(t *testing.T) {
+	// setup clients
+	cdc := kava.MakeCodec()
+	kavaClient := client.NewKavaClient(cdc, common.KavaDeputyMnemonic, kava.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
+	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(common.BnbUserMnemonics[0])
+	require.NoError(t, err)
+	bnbClient := bnbRpc.NewRPCClient(common.BnbNodeURL, types.ProdNetwork)
+	bnbClient.SetKeyManager(bnbKeyM)
+
+	// Create a swap on each chain
+	rndNum, err := bep3.GenerateSecureRandomNumber()
+	require.NoError(t, err)
+	timestamp := time.Now().Unix() - 10*60 - 1 // set the timestamp to be in the past
+	rndHash := bep3.CalculateRandomHash(rndNum, timestamp)
+	_, err = bnbClient.HTLT(
+		common.BnbDeputyAddr,             // recipient
+		common.KavaUserAddrs[0].String(), // recipient other chain
+		common.KavaDeputyAddr.String(),   // other chain sender
+		rndHash,
+		timestamp,
+		types.Coins{{Denom: "BNB", Amount: 100_000_000}}, //{Denom: "BNB", Amount: 100_000_000}},
+		"",  // expected income
+		360, // heightspan
+		true,
+		bnbRpc.Commit,
+	)
+	require.NoError(t, err)
+	createMsg := bep3.NewMsgCreateAtomicSwap(
+		common.KavaDeputyAddr,           // sender
+		common.KavaUserAddrs[0],         // recipient
+		common.BnbDeputyAddr.String(),   // recipient other chain
+		common.BnbUserAddrs[0].String(), // sender other chain
+		rndHash,
+		timestamp,
+		sdk.NewCoins(sdk.NewInt64Coin("bnb", 100_000_000)),
+		250,
+	)
+	require.NoError(t, createMsg.ValidateBasic())
+	res, err := kavaClient.Broadcast(createMsg, client.Commit)
+	require.NoError(t, err)
+	require.EqualValues(t, res.Code, 0)
+
+	// Create another pair of swaps
+	rndNum2, err := bep3.GenerateSecureRandomNumber()
+	require.NoError(t, err)
+	rndHash2 := bep3.CalculateRandomHash(rndNum2, timestamp)
+	_, err = bnbClient.HTLT(
+		common.BnbDeputyAddr,             // recipient
+		common.KavaUserAddrs[0].String(), // recipient other chain
+		common.KavaDeputyAddr.String(),   // other chain sender
+		rndHash2,
+		timestamp,
+		types.Coins{{Denom: "BNB", Amount: 100_000_000}}, //{Denom: "BNB", Amount: 100_000_000}},
+		"",  // expected income
+		360, // heightspan
+		true,
+		bnbRpc.Commit,
+	)
+	require.NoError(t, err)
+	createMsg2 := bep3.NewMsgCreateAtomicSwap(
+		common.KavaDeputyAddr,           // sender
+		common.KavaUserAddrs[0],         // recipient
+		common.BnbDeputyAddr.String(),   // recipient other chain
+		common.BnbUserAddrs[0].String(), // sender other chain
+		rndHash2,
+		timestamp,
+		sdk.NewCoins(sdk.NewInt64Coin("bnb", 100_000_000)),
+		250,
+	)
+	require.NoError(t, createMsg2.ValidateBasic())
+	res, err = kavaClient.Broadcast(createMsg2, client.Commit)
+	require.EqualValues(t, res.Code, 0)
+	require.NoError(t, err)
+
+	// claim first kava htlt
+	time.Sleep(3 * time.Second)
+	kavaID := bep3.CalculateSwapID(rndHash, common.KavaDeputyAddr, common.BnbUserAddrs[0].String())
+	claimMsg := bep3.NewMsgClaimAtomicSwap(
+		common.KavaDeputyAddr,
+		kavaID,
+		rndNum,
+	)
+	res, err = kavaClient.Broadcast(claimMsg, client.Commit)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, res.Code)
+
+	// run
+	time.Sleep(5 * time.Second) // TODO replace with wait func
+	ctx, shutdownClaimer := context.WithCancel(context.Background())
+	claim.NewBnbClaimer("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", common.KavaDeputyAddr.String(), common.BnbDeputyAddr.String(), common.BnbUserMnemonics[:2]).Run(ctx)
+	defer shutdownClaimer()
+	time.Sleep(8 * time.Second)
+
+	// check the first bnb swap was claimed
+	bnbSwapID := msg.CalculateSwapID(rndHash, common.BnbUserAddrs[0], common.KavaDeputyAddr.String())
+	s, err := bnbClient.GetSwapByID(bnbSwapID)
+	require.NoError(t, err)
+	require.Equal(t, types.Completed, s.Status)
 }

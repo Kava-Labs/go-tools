@@ -1,18 +1,22 @@
 package claim
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/kava-labs/cosmos-sdk/client/rpc"
 	"github.com/kava-labs/cosmos-sdk/codec"
 	sdk "github.com/kava-labs/cosmos-sdk/types"
 	authexported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
+	authTypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
 	kavaRpc "github.com/kava-labs/go-sdk/client"
 	"github.com/kava-labs/go-sdk/kava"
 	"github.com/kava-labs/go-sdk/kava/bep3"
+	tmbytes "github.com/kava-labs/tendermint/libs/bytes"
 	tmRPCTypes "github.com/kava-labs/tendermint/rpc/core/types"
 	tmtypes "github.com/kava-labs/tendermint/types"
 )
@@ -29,7 +33,7 @@ func newKavaChainClient(restURL, rpcURL string, cdc *codec.Codec) kavaChainClien
 	return kavaChainClient{
 		restURL:       restURL,
 		codec:         cdc,
-		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, kava.Bip44CoinType, rpcURL, kavaRpc.ProdNetwork), // TODO what is network type for?
+		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, kava.Bip44CoinType, rpcURL, kavaRpc.ProdNetwork),
 	}
 }
 
@@ -101,4 +105,30 @@ func (kc kavaChainClient) getChainID() (string, error) {
 	var nodeInfo rpc.NodeInfoResponse
 	kc.codec.MustUnmarshalJSON(infoBz, &nodeInfo)
 	return nodeInfo.Network, nil
+}
+
+func (kc kavaChainClient) getSwapByID(id tmbytes.HexBytes) (bep3.AtomicSwap, error) {
+	return kc.kavaSDKClient.GetSwapByID(id)
+}
+
+func (kc kavaChainClient) getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error) {
+	strID := strings.ToLower(hex.EncodeToString(id))
+	query := fmt.Sprintf(`claim_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
+	res, err := kc.kavaSDKClient.HTTP.TxSearch(query, false, 1, 1000, "")
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Txs) < 1 {
+		return nil, fmt.Errorf("no claim txs found")
+	}
+	var stdTx authTypes.StdTx
+	err = kc.codec.UnmarshalBinaryLengthPrefixed(res.Txs[0].Tx, &stdTx) // TODO handle case of there being more than one tx
+	if err != nil {
+		return nil, err
+	}
+	claim, ok := stdTx.Msgs[0].(bep3.MsgClaimAtomicSwap) // TODO handle the case of multiple messages
+	if !ok {
+		return nil, fmt.Errorf("unable to decode msg into MsgClaimAtomicSwap")
+	}
+	return claim.RandomNumber, nil
 }

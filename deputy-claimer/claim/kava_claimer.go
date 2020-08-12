@@ -2,6 +2,7 @@ package claim
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -84,7 +85,16 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 				errs <- err
 				return
 			}
-			err = waitWithTimeoutForTxSuccess(kc.kavaClient, 15*time.Second, txHash)
+			err = Wait(15*time.Second, func() (bool, error) {
+				res, err := kc.kavaClient.getTxConfirmation(txHash)
+				if err != nil {
+					return false, nil
+				}
+				if res.TxResult.Code != 0 {
+					return true, fmt.Errorf("tx rejected from chain: %s", res.TxResult.Log)
+				}
+				return true, nil
+			})
 			if err != nil {
 				errs <- err
 				return
@@ -134,7 +144,7 @@ func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, b
 		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
 		bnbSwap, err := bnbClient.GetSwapByID(bID)
 		if err != nil {
-			return nil, err // TODO should probably just continue rather than stopping, or parse not found error
+			return nil, err // TODO should not return on not found error
 		}
 		// check the bnb swap status is closed and has random number - ie it has been claimed
 		if len(bnbSwap.RandomNumber) != 0 {
@@ -183,22 +193,21 @@ func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, 
 	return tmtypes.Tx(txBz).Hash(), nil
 }
 
-func waitWithTimeoutForTxSuccess(kavaClient kavaChainClient, timeout time.Duration, txHash []byte) error {
+// Wait will poll the provided function until either:
+// - it returns true
+// - it returns an error
+// - the timeout passes
+func Wait(timeout time.Duration, shouldStop func() (bool, error)) error {
 	endTime := time.Now().Add(timeout)
+
 	for {
-		res, err := kavaClient.getTxConfirmation(txHash)
-		if err != nil {
-			// TODO parse error to see if the was found or not
-			if time.Now().After(endTime) {
-				return fmt.Errorf("timeout reached")
-			} else {
-				time.Sleep(1 * time.Second)
-				continue
-			}
+		stop, err := shouldStop()
+		switch {
+		case err != nil || stop:
+			return err
+		case time.Now().After(endTime):
+			return errors.New("waiting timed out")
 		}
-		if res.TxResult.Code != 0 {
-			return fmt.Errorf("tx rejected from chain: %s", res.TxResult.Log)
-		}
-		return nil
+		time.Sleep(1 * time.Millisecond)
 	}
 }
