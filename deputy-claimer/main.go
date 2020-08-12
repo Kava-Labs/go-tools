@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	_ "github.com/envkey/envkeygo"
 	sdk "github.com/kava-labs/cosmos-sdk/types"
 	"github.com/kava-labs/go-sdk/kava"
 
