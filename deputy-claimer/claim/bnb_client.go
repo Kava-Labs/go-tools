@@ -29,6 +29,9 @@ func (bc bnbChainClient) getOpenSwaps() ([]types.AtomicSwap, error) {
 		if err != nil {
 			return nil, err // TODO should probably retry on failure
 		}
+		if s.Status != types.Open {
+			continue
+		}
 		swaps = append(swaps, s)
 	}
 	return swaps, nil

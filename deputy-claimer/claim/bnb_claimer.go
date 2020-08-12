@@ -136,14 +136,15 @@ func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, 
 		kID := bep3.CalculateSwapID(s.RandomNumberHash, kavaDeputyAddr, s.From.String())
 		// get the random number for a claim transaction for the kava swap
 		randNum, err := kavaClient.getRandomNumberFromSwap(kID)
-		if err == nil {
-			claimableSwaps = append(
-				claimableSwaps,
-				claimableSwap{
-					swapID:       msg.CalculateSwapID(s.RandomNumberHash, s.From, kavaDeputyAddr.String()),
-					randomNumber: randNum,
-				})
+		if err != nil {
+			continue
 		}
+		claimableSwaps = append(
+			claimableSwaps,
+			claimableSwap{
+				swapID:       msg.CalculateSwapID(s.RandomNumberHash, s.From, kavaDeputyAddr.String()),
+				randomNumber: randNum,
+			})
 	}
 	return claimableSwaps, nil
 }
