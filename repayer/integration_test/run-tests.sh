@@ -21,7 +21,7 @@ echo "done"
 # run tests
 # don't exit on error, just capture exit code (https://stackoverflow.com/questions/11231937/bash-ignoring-error-for-a-particular-command)
 # use -count=1 to disable test result caching
-go test .. -count=1 -tags integration -v && exitStatus=$? || exitStatus=$?
+go test ../... -count=1 -tags integration -v && exitStatus=$? || exitStatus=$?
 
 # remove the deputy and chains
 docker-compose down
