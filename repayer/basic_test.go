@@ -21,12 +21,20 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestGetAccount(t *testing.T) {
+	client := NewClient(common.KavaRestURL)
+
+	account, err := client.getAccount(common.KavaUserAddrs[0])
+	require.NoError(t, err)
+
+	require.Equal(t, account.GetAddress(), common.KavaUserAddrs[0])
+}
 func TestGetCDP(t *testing.T) {
 	client := NewClient(common.KavaRestURL)
 	owner := common.KavaUserAddrs[0]
 	denom := "bnb"
 
-	cdp, err := client.GetCDP(owner, denom)
+	cdp, err := client.getCDP(owner, denom)
 	require.NoError(t, err)
 
 	require.Equal(t, uint64(1), cdp.ID)
