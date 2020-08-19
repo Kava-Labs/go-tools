@@ -14,19 +14,7 @@ const (
 	stableCoinDenom = "usdx"
 	kavaDenom       = "ukava"
 	defaultGas      = 300_000
-	waitPeriod      = 2 * time.Second // TODO make configurable
 )
-
-type Config struct {
-	RestURL          string
-	CdpOwnerMnemonic string
-	CdpDenom         string
-	ChainID          string
-	FeeDenom         string
-	Period           time.Duration
-	LowerTrigger     sdk.Dec
-	UpperTrigger     sdk.Dec
-}
 
 type App struct {
 	client       Client
@@ -35,24 +23,40 @@ type App struct {
 	chainID      string
 	lowerTrigger sdk.Dec
 	upperTrigger sdk.Dec
+	waitPeriod   time.Duration
 }
 
-func NewApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec) App {
+func NewApp(client Client, signer TxSigner, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec, waitPeriod time.Duration) App {
 	return App{
-		client:       NewClient(restURL),
-		signer:       NewDefaultTxSigner(cdpOwnerMnemonic),
+		client:       client,
+		signer:       signer,
 		cdpDenom:     cdpDenom,
 		chainID:      chainID,
 		lowerTrigger: lowerTrigger,
 		upperTrigger: upperTrigger,
+		waitPeriod:   waitPeriod,
 	}
 }
+
+func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec) App {
+	return NewApp(
+		NewClient(restURL),
+		NewDefaultTxSigner(cdpOwnerMnemonic),
+		cdpDenom,
+		chainID,
+		lowerTrigger,
+		upperTrigger,
+		2*time.Second,
+	)
+}
+
 func (app App) Run() {
+	// TODO add app validation to ensure params and full node are compatible
 	for {
 		if err := app.RunOnce(); err != nil {
 			log.Println(err)
 		}
-		time.Sleep(waitPeriod)
+		time.Sleep(app.waitPeriod)
 	}
 }
 func (app App) RunOnce() error {

@@ -4,18 +4,35 @@ import (
 	"log"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/spf13/viper"
+
 	"github.com/kava-labs/go-tools/sentinel/app"
 )
 
+type Config struct {
+	RestURL          string
+	CdpOwnerMnemonic string
+	CdpDenom         string
+	ChainID          string
+	LowerTrigger     sdk.Dec
+	UpperTrigger     sdk.Dec
+}
+
 func main() {
-	// TODO add to a config
-	restURL := "http://kava3.data.kava.io"
-	cdpOwnerMnemonic := "" // TODO
-	cdpDenom := "bnb"
-	chainID := "kava-3"
-	lowerTrigger := sdk.MustNewDecFromStr("2.00")
-	upperTrigger := sdk.MustNewDecFromStr("2.50")
+	viper.SetConfigName("config")
+	viper.AddConfigPath("$HOME/.sentinel")
+	viper.AddConfigPath(".")
+	err := viper.ReadInConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	var cfg Config
+	err = viper.Unmarshal(&cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Println("starting app")
-	app.NewApp(restURL, cdpOwnerMnemonic, cdpDenom, chainID, lowerTrigger, upperTrigger).Run()
+	app := app.NewDefaultApp(cfg.RestURL, cfg.CdpOwnerMnemonic, cfg.CdpDenom, cfg.ChainID, cfg.LowerTrigger, cfg.UpperTrigger)
+	app.Run()
 }

@@ -10,6 +10,7 @@ require (
 	github.com/onsi/ginkgo v1.12.0 // indirect
 	github.com/onsi/gomega v1.9.0 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
+	github.com/spf13/viper v1.6.3
 	github.com/stretchr/testify v1.6.1
 	github.com/tendermint/tendermint v0.33.6
 	go.etcd.io/bbolt v1.3.4 // indirect

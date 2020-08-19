@@ -69,7 +69,7 @@ func TestBroadcastAndGetTx(t *testing.T) {
 func TestApp_Run(t *testing.T) {
 	cdpOwner := common.KavaUserMnemonics[0]
 	cdpDenom := "bnb"
-	app := NewApp(common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
+	app := NewDefaultApp(common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
 
 	// cdp is at certain ratio
 	augmentedCDP, _, err := app.client.getAugmentedCDP(app.cdpOwner(), cdpDenom)
