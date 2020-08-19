@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/stretchr/testify/require"
 
@@ -70,7 +69,7 @@ func TestBroadcastAndGetTx(t *testing.T) {
 func TestApp_Run(t *testing.T) {
 	cdpOwner := common.KavaUserMnemonics[0]
 	cdpDenom := "bnb"
-	app := NewApp(common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID)
+	app := NewApp(common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
 
 	// cdp is at certain ratio
 	augmentedCDP, _, err := app.client.getAugmentedCDP(app.cdpOwner(), cdpDenom)
@@ -86,12 +85,12 @@ func TestApp_Run(t *testing.T) {
 	augmentedCDP, _, err = app.client.getAugmentedCDP(app.cdpOwner(), cdpDenom)
 	require.NoError(t, err)
 	t.Log(augmentedCDP)
-	targetRatio := sdk.MustNewDecFromStr("2.25") // TODO
+
 	// check cdp has been repayed to within a percentage of the target rate
 	acceptableError := d("0.01")
 	require.Truef(t,
-		targetRatio.Sub(augmentedCDP.CollateralizationRatio).Abs().LTE(acceptableError),
+		app.targetRatio().Sub(augmentedCDP.CollateralizationRatio).Abs().LTE(acceptableError),
 		"difference between target ratio (%s) and actual ratio (%s) is > %s",
-		targetRatio, augmentedCDP.CollateralizationRatio, acceptableError,
+		app.targetRatio(), augmentedCDP.CollateralizationRatio, acceptableError,
 	)
 }

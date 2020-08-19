@@ -24,7 +24,13 @@ func TestCalculateDebtAdjustment(t *testing.T) {
 
 	require.Equal(t, i(-20_000_000_000), adjustment)
 }
-
+func TestTargetRatio(t *testing.T) {
+	app := App{
+		lowerTrigger: d("2.0"),
+		upperTrigger: d("2.5"),
+	}
+	require.Equal(t, d("2.25"), app.targetRatio())
+}
 func TestTxSigner_Sign(t *testing.T) {
 	// 1) setup
 	testMnemonic := "very health column only surface project output absent outdoor siren reject era legend legal twelve setup roast lion rare tunnel devote style random food"
