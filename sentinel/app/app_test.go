@@ -34,7 +34,8 @@ func TestTargetRatio(t *testing.T) {
 func TestTxSigner_Sign(t *testing.T) {
 	// 1) setup
 	testMnemonic := "very health column only surface project output absent outdoor siren reject era legend legal twelve setup roast lion rare tunnel devote style random food"
-	signer := NewDefaultTxSigner(testMnemonic)
+	signer, err := NewDefaultTxSigner(testMnemonic)
+	require.NoError(t, err)
 
 	var stdTx authtypes.StdTx
 	var sequence, accountNumber uint64
@@ -58,7 +59,8 @@ func TestTxSigner_GetAddress(t *testing.T) {
 	testMnemonic := "very health column only surface project output absent outdoor siren reject era legend legal twelve setup roast lion rare tunnel devote style random food"
 	testAddress, err := sdk.AccAddressFromBech32("kava1ypjp0m04pyp73hwgtc0dgkx0e9rrydecm054da")
 	require.NoError(t, err)
-	signer := NewDefaultTxSigner(testMnemonic)
+	signer, err := NewDefaultTxSigner(testMnemonic)
+	require.NoError(t, err)
 
 	address := signer.GetAddress()
 

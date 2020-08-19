@@ -17,7 +17,8 @@ import (
 var distantFuture = time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func TestGetAccount(t *testing.T) {
-	client := NewClient(common.KavaRestURL)
+	client, err := NewClient(common.KavaRestURL)
+	require.NoError(t, err)
 
 	account, _, err := client.getAccount(common.KavaUserAddrs[0])
 	require.NoError(t, err)
@@ -25,7 +26,8 @@ func TestGetAccount(t *testing.T) {
 	require.Equal(t, account.GetAddress(), common.KavaUserAddrs[0])
 }
 func TestGetAugmentedCDP(t *testing.T) {
-	client := NewClient(common.KavaRestURL)
+	client, err := NewClient(common.KavaRestURL)
+	require.NoError(t, err)
 	owner := common.KavaUserAddrs[0]
 	denom := "bnb"
 
@@ -36,7 +38,8 @@ func TestGetAugmentedCDP(t *testing.T) {
 }
 
 func TestGetChainID(t *testing.T) {
-	client := NewClient(common.KavaRestURL)
+	client, err := NewClient(common.KavaRestURL)
+	require.NoError(t, err)
 
 	chainID, err := client.getChainID()
 	require.NoError(t, err)
@@ -45,13 +48,15 @@ func TestGetChainID(t *testing.T) {
 }
 
 func TestBroadcastAndGetTx(t *testing.T) {
-	client := NewClient(common.KavaRestURL)
+	client, err := NewClient(common.KavaRestURL)
+	require.NoError(t, err)
 
-	msg := bank.NewMsgSend(common.KavaUserAddrs[0], common.KavaUserAddrs[1], cs(c(kavaDenom, 1)))
+	msg := bank.NewMsgSend(common.KavaUserAddrs[0], common.KavaUserAddrs[1], cs(c(common.KavaGovDenom, 1)))
 	account, _, err := client.getAccount(common.KavaUserAddrs[0])
 	require.NoError(t, err)
-	signer := NewDefaultTxSigner(common.KavaUserMnemonics[0])
-	stdTx, err := constructSignedStdTx(signer, msg, account.GetAccountNumber(), account.GetSequence(), common.KavaChainID)
+	signer, err := NewDefaultTxSigner(common.KavaUserMnemonics[0])
+	require.NoError(t, err)
+	stdTx, err := constructSignedStdTx(signer, msg, account.GetAccountNumber(), account.GetSequence(), common.KavaChainID, defaultFee)
 	require.NoError(t, err)
 
 	err = client.broadcastTx(stdTx)
@@ -69,7 +74,8 @@ func TestBroadcastAndGetTx(t *testing.T) {
 func TestApp_Run(t *testing.T) {
 	cdpOwner := common.KavaUserMnemonics[0]
 	cdpDenom := "bnb"
-	app := NewDefaultApp(common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
+	app, err := NewDefaultApp(common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
+	require.NoError(t, err)
 
 	// cdp is at certain ratio
 	augmentedCDP, _, err := app.client.getAugmentedCDP(app.cdpOwner(), cdpDenom)

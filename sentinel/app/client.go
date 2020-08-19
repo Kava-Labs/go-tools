@@ -26,15 +26,15 @@ type Client struct {
 	codec   *codec.Codec
 }
 
-func NewClient(restURL string) Client {
+func NewClient(restURL string) (Client, error) {
 	parsedURL, err := url.Parse(restURL)
 	if err != nil {
-		panic(err)
+		return Client{}, err
 	}
 	return Client{
 		restURL: parsedURL,
 		codec:   app.MakeCodec(),
-	}
+	}, nil
 }
 
 func (c Client) getAccount(address sdk.AccAddress) (authexported.Account, int64, error) {

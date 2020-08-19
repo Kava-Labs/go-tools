@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	KavaNodeURL = "tcp://localhost:26657"
-	KavaRestURL = "http://localhost:1317"
-	KavaChainID = "testing"
+	KavaNodeURL  = "tcp://localhost:26657"
+	KavaRestURL  = "http://localhost:1317"
+	KavaChainID  = "testing"
+	KavaGovDenom = "ukava"
 )
 
 var (

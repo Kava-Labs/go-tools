@@ -12,24 +12,24 @@ type TxSigner struct {
 	keybaseKeyPassword string
 }
 
-func NewDefaultTxSigner(mnemonic string) TxSigner {
+func NewDefaultTxSigner(mnemonic string) (TxSigner, error) {
 	hdPath := keys.CreateHDPath(0, 0).String()
 	return NewTxSigner(mnemonic, hdPath, keys.Secp256k1)
 }
-func NewTxSigner(mnemonic, hdPath string, signingAlgo keys.SigningAlgo) TxSigner {
+func NewTxSigner(mnemonic, hdPath string, signingAlgo keys.SigningAlgo) (TxSigner, error) {
 	keybase := keys.NewInMemory()
 	bip39Password := ""
 	keyPassword := "password"
 	keyName := "key-name"
 	_, err := keybase.CreateAccount(keyName, mnemonic, bip39Password, keyPassword, hdPath, signingAlgo)
 	if err != nil {
-		panic(err) // TODO return error?
+		return TxSigner{}, err
 	}
 	return TxSigner{
 		keybase:            keybase,
 		keybaseKeyName:     keyName,
 		keybaseKeyPassword: keyPassword,
-	}
+	}, nil
 }
 func (txSigner TxSigner) Sign(stdTx authtypes.StdTx, accountNumber, sequence uint64, chainID string) (authtypes.StdSignature, error) {
 	// find the raw bytes to sign

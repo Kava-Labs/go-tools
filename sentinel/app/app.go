@@ -10,48 +10,86 @@ import (
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 )
 
-const (
-	stableCoinDenom = "usdx"
-	kavaDenom       = "ukava"
-	defaultGas      = 300_000
+const defaultWaitPeriod = 2 * time.Second
+
+var defaultFee = authtypes.NewStdFee(
+	300_000,
+	sdk.NewCoins(sdk.NewCoin("ukava", sdk.ZeroInt())),
 )
 
 type App struct {
 	client       Client
 	signer       TxSigner
 	cdpDenom     string
-	chainID      string
 	lowerTrigger sdk.Dec
 	upperTrigger sdk.Dec
 	waitPeriod   time.Duration
+	chainID      string
+	txFee        authtypes.StdFee
 }
 
-func NewApp(client Client, signer TxSigner, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec, waitPeriod time.Duration) App {
+func NewApp(client Client, signer TxSigner, cdpDenom string, lowerTrigger, upperTrigger sdk.Dec, waitPeriod time.Duration, chainID string, fee authtypes.StdFee) (App, error) {
+	if err := sdk.ValidateDenom(cdpDenom); err != nil {
+		return App{}, err
+	}
+	if lowerTrigger.IsNil() || lowerTrigger.IsNegative() {
+		return App{}, fmt.Errorf("lower trigger is invalid")
+	}
+	if upperTrigger.IsNil() || upperTrigger.IsNegative() {
+		return App{}, fmt.Errorf("upper trigger is invalid")
+	}
+	if upperTrigger.LT(lowerTrigger) {
+		return App{}, fmt.Errorf("upper trigger lower than lower trigger")
+	}
+	if waitPeriod < 0 {
+		return App{}, fmt.Errorf("invalid wait period")
+	}
 	return App{
 		client:       client,
 		signer:       signer,
 		cdpDenom:     cdpDenom,
-		chainID:      chainID,
 		lowerTrigger: lowerTrigger,
 		upperTrigger: upperTrigger,
 		waitPeriod:   waitPeriod,
-	}
+		chainID:      chainID,
+		txFee:        fee,
+	}, nil
 }
 
-func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec) App {
+func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec) (App, error) {
+	client, err := NewClient(restURL)
+	if err != nil {
+		return App{}, err
+	}
+	signer, err := NewDefaultTxSigner(cdpOwnerMnemonic)
+	if err != nil {
+		return App{}, err
+	}
 	return NewApp(
-		NewClient(restURL),
-		NewDefaultTxSigner(cdpOwnerMnemonic),
+		client,
+		signer,
 		cdpDenom,
-		chainID,
 		lowerTrigger,
 		upperTrigger,
-		2*time.Second,
+		defaultWaitPeriod,
+		chainID,
+		defaultFee,
 	)
 }
 
+// Validate
+func (app App) PreFlightCheck() error {
+	// check cdp exists - already checked in RunOnce
+
+	// check fee balance - how many txs can it send
+	// check usdx balance - how big a price movement can this sustain
+	// Check chain id
+	// check lower trigger is not within dangerous of liquidation ratio - assumptions about block time
+	// params, err := app.client.getCDPParams()
+	return nil
+}
+
 func (app App) Run() {
-	// TODO add app validation to ensure params and full node are compatible
 	for {
 		if err := app.RunOnce(); err != nil {
 			log.Println(err)
@@ -59,6 +97,8 @@ func (app App) Run() {
 		time.Sleep(app.waitPeriod)
 	}
 }
+
+// TODO AdjustCDP
 func (app App) RunOnce() error {
 	augmentedCDP, heightCDP, err := app.client.getAugmentedCDP(app.cdpOwner(), app.cdpDenom)
 	if err != nil {
@@ -84,9 +124,9 @@ func (app App) RunOnce() error {
 		return fmt.Errorf("amount to send is 0, skipping")
 	}
 
-	msg := app.constructMsg(desiredDebtChange)
+	msg := app.constructMsg(desiredDebtChange, augmentedCDP.Principal.Denom)
 
-	stdTx, err := constructSignedStdTx(app.signer, msg, account.GetAccountNumber(), account.GetSequence(), app.chainID)
+	stdTx, err := constructSignedStdTx(app.signer, msg, account.GetAccountNumber(), account.GetSequence(), app.chainID, app.txFee)
 	if err != nil {
 		return err
 	}
@@ -105,7 +145,7 @@ func (app App) targetRatio() sdk.Dec {
 	return calculateMidPoint(app.lowerTrigger, app.upperTrigger)
 }
 
-func (app App) constructMsg(desiredDebtChange sdk.Int) sdk.Msg {
+func (app App) constructMsg(desiredDebtChange sdk.Int, stableCoinDenom string) sdk.Msg {
 	if desiredDebtChange.IsNegative() {
 		desiredDebtChange = desiredDebtChange.MulRaw(-1) // get positive amount
 		return cdptypes.NewMsgRepayDebt(app.cdpOwner(), app.cdpDenom, sdk.NewCoin(stableCoinDenom, desiredDebtChange))
@@ -114,13 +154,10 @@ func (app App) constructMsg(desiredDebtChange sdk.Int) sdk.Msg {
 	}
 }
 
-func constructSignedStdTx(signer TxSigner, msg sdk.Msg, accountNumber, sequence uint64, chainID string) (authtypes.StdTx, error) {
+func constructSignedStdTx(signer TxSigner, msg sdk.Msg, accountNumber, sequence uint64, chainID string, fee authtypes.StdFee) (authtypes.StdTx, error) {
 	stdTx := authtypes.StdTx{
 		Msgs: []sdk.Msg{msg},
-		Fee: authtypes.NewStdFee(
-			defaultGas,
-			sdk.NewCoins(sdk.NewCoin(kavaDenom, sdk.ZeroInt())),
-		),
+		Fee:  fee,
 		Memo: "",
 	}
 	sig, err := signer.Sign(stdTx, accountNumber, sequence, chainID)
