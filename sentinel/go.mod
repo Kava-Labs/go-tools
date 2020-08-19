@@ -1,4 +1,4 @@
-module github.com/kava-labs/go-tools/repayer
+module github.com/kava-labs/go-tools/sentinel
 
 go 1.13
 

@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/kava-labs/go-tools/repayer/app"
+	"github.com/kava-labs/go-tools/sentinel/app"
 )
 
 func main() {

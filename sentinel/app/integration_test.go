@@ -12,7 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kava-labs/go-tools/repayer/integration_test/common"
+	"github.com/kava-labs/go-tools/sentinel/integration_test/common"
 )
 
 var distantFuture = time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC)
