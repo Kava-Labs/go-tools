@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -13,6 +14,7 @@ const (
 	stableCoinDenom = "usdx"
 	kavaDenom       = "ukava"
 	defaultGas      = 300_000
+	waitPeriod      = 2 * time.Second // TODO make configurable
 )
 
 type App struct {
@@ -30,7 +32,15 @@ func NewApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string) App {
 		chainID:  chainID,
 	}
 }
-func (app App) Run() error {
+func (app App) Run() {
+	for {
+		if err := app.RunOnce(); err != nil {
+			log.Println(err)
+		}
+		time.Sleep(waitPeriod)
+	}
+}
+func (app App) RunOnce() error {
 	augmentedCDP, heightCDP, err := app.client.getAugmentedCDP(app.cdpOwner(), app.cdpDenom)
 	if err != nil {
 		return err
@@ -40,7 +50,7 @@ func (app App) Run() error {
 		return err
 	}
 	if heightCDP != heightAcc {
-		return fmt.Errorf("mismatched queried state") // TODO above errors are immediate retry
+		return fmt.Errorf("mismatched queried state")
 	}
 
 	desiredDebtChange := calculateDebtAdjustment(
@@ -49,32 +59,17 @@ func (app App) Run() error {
 		sdk.MustNewDecFromStr("2.25"),
 	)
 	// TODO only submit tx if debt change is large enough
-	fmt.Println("change: ", desiredDebtChange)
 
 	msg := app.constructMsg(desiredDebtChange)
 
 	stdTx, err := constructSignedStdTx(app.signer, msg, account.GetAccountNumber(), account.GetSequence(), app.chainID)
 	if err != nil {
-		return err // TODO log, something has gone wrong, untemporarily
+		return err
 	}
-	fmt.Println("tx: ", stdTx)
 	err = app.client.broadcastTx(stdTx)
 	if err != nil {
-		return err // TODO expect errors about tx being rejected, log fatal errors, other wise retry after timeout
-	}
-
-	time.Sleep(8 * time.Second)
-	hash, err := txHash(app.client.codec, stdTx)
-	if err != nil {
 		return err
 	}
-	res, err := app.client.getTx(hash)
-	if err != nil {
-		return err
-	}
-	fmt.Println("result: ", res)
-	// TODO add loop, basic integration test, tidy up
-
 	return nil
 }
 
@@ -90,6 +85,7 @@ func (app App) constructMsg(desiredDebtChange sdk.Int) sdk.Msg {
 		return cdptypes.NewMsgDrawDebt(app.cdpOwner(), app.cdpDenom, sdk.NewCoin(stableCoinDenom, desiredDebtChange))
 	}
 }
+
 func constructSignedStdTx(signer TxSigner, msg sdk.Msg, accountNumber, sequence uint64, chainID string) (authtypes.StdTx, error) {
 	stdTx := authtypes.StdTx{
 		Msgs: []sdk.Msg{msg},
@@ -112,7 +108,7 @@ func totalPrinciple(cdp cdptypes.CDP) sdk.Coin {
 	return cdp.Principal.Add(cdp.AccumulatedFees)
 }
 func calculateDebtAdjustment(currentCollatRatio sdk.Dec, currentDebt sdk.Int, targetCollatRatio sdk.Dec) sdk.Int {
-	// currentRatio*currentDebt == desiredRatio * desiredDebt
+	// currentRatio * currentDebt == desiredRatio * desiredDebt
 	preciseDesiredDebt := currentCollatRatio.MulInt(currentDebt).Quo(targetCollatRatio)
 	// round the debt down so that it will never result in a ratio lower than target
 	desiredDebt := preciseDesiredDebt.TruncateInt()

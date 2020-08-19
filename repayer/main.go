@@ -7,12 +7,12 @@ import (
 )
 
 func main() {
+	// TODO add to a config
 	restURL := "http://kava3.data.kava.io"
-	cdpOwner := "kava12lsjquv3xrzyu27gyzuxtsmydk8akufznj8qsc"
+	cdpOwnerMnemonic := "" // TODO
 	cdpDenom := "bnb"
 	chainID := "kava-3"
 
-	if err := app.NewApp(restURL, cdpOwner, cdpDenom, chainID).Run(); err != nil {
-		log.Fatal(err)
-	}
+	log.Println("starting app")
+	app.NewApp(restURL, cdpOwnerMnemonic, cdpDenom, chainID).Run()
 }

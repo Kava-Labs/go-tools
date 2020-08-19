@@ -9,7 +9,6 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/stretchr/testify/require"
 
@@ -46,8 +45,7 @@ func TestGetChainID(t *testing.T) {
 	require.Equal(t, common.KavaChainID, chainID)
 }
 
-func TestGetTx(t *testing.T) {
-	t.Skip()
+func TestBroadcastAndGetTx(t *testing.T) {
 	client := NewClient(common.KavaRestURL)
 
 	msg := bank.NewMsgSend(common.KavaUserAddrs[0], common.KavaUserAddrs[1], cs(c(kavaDenom, 1)))
@@ -69,17 +67,6 @@ func TestGetTx(t *testing.T) {
 	require.Equal(t, strings.ToUpper(fmt.Sprintf("%x", hash)), txResponse.TxHash)
 }
 
-func TestBroadcastTx(t *testing.T) {
-	t.Skip()
-	client := NewClient(common.KavaRestURL)
-	stdTx := authtypes.StdTx{}
-
-	err := client.broadcastTx(stdTx)
-	require.Error(t, err)
-
-	// TODO query tx hash to check it was included on chain
-}
-
 func TestApp_Run(t *testing.T) {
 	cdpOwner := common.KavaUserMnemonics[0]
 	cdpDenom := "bnb"
@@ -88,22 +75,12 @@ func TestApp_Run(t *testing.T) {
 	// cdp is at certain ratio
 	augmentedCDP, _, err := app.client.getAugmentedCDP(app.cdpOwner(), cdpDenom)
 	require.NoError(t, err)
-	t.Log(augmentedCDP)
-
-	// submit tx to change price, to change ratio
-	// msg := pricefeedtypes.NewMsgPostPrice(common.KavaOracleAddr, "bnb:usd:30", d("10"), distantFuture) // TODO price: "",
-	// account, _, err := app.client.getAccount(common.KavaOracleAddr)
-	// require.NoError(t, err)
-	// signer := NewDefaultTxSigner(common.KavaOracleMnemonic)
-	// stdTx, err := constructSignedStdTx(signer, msg, account.GetAccountNumber(), account.GetSequence(), common.KavaChainID)
-	// require.NoError(t, err)
-	// err = app.client.broadcastTx(stdTx)
-	// require.NoError(t, err)
-	// time.Sleep(5 * time.Second) // TODO wait for tx to be included rather than sleeping
+	t.Log(augmentedCDP) // TODO verify cdp is not at target ratio
 
 	// run app
-	err = app.Run()
+	err = app.RunOnce()
 	require.NoError(t, err)
+	time.Sleep(6 * time.Second) // wait until tx is in block
 
 	// check cdp is at desired ratio
 	augmentedCDP, _, err = app.client.getAugmentedCDP(app.cdpOwner(), cdpDenom)
