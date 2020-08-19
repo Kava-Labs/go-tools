@@ -83,7 +83,7 @@ func TestApp_Run(t *testing.T) {
 	t.Log(augmentedCDP) // TODO verify cdp is not at target ratio
 
 	// run app
-	err = app.RunOnce()
+	err = app.RebalanceCDP()
 	require.NoError(t, err)
 	time.Sleep(6 * time.Second) // wait until tx is in block
 

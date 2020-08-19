@@ -13,7 +13,7 @@ import (
 const defaultWaitPeriod = 2 * time.Second
 
 var defaultFee = authtypes.NewStdFee(
-	300_000,
+	500_000,
 	sdk.NewCoins(sdk.NewCoin("ukava", sdk.ZeroInt())),
 )
 
@@ -79,8 +79,6 @@ func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, l
 
 // Validate
 func (app App) PreFlightCheck() error {
-	// check cdp exists - already checked in RunOnce
-
 	// check fee balance - how many txs can it send
 	// check usdx balance - how big a price movement can this sustain
 	// Check chain id
@@ -91,29 +89,28 @@ func (app App) PreFlightCheck() error {
 
 func (app App) Run() {
 	for {
-		if err := app.RunOnce(); err != nil {
-			log.Println(err)
+		if err := app.RebalanceCDP(); err != nil {
+			log.Println("did not rebalance cdp:", err)
 		}
 		time.Sleep(app.waitPeriod)
 	}
 }
 
-// TODO AdjustCDP
-func (app App) RunOnce() error {
+func (app App) RebalanceCDP() error {
 	augmentedCDP, heightCDP, err := app.client.getAugmentedCDP(app.cdpOwner(), app.cdpDenom)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not fetch cdp: %w", err)
 	}
 	account, heightAcc, err := app.client.getAccount(app.cdpOwner())
 	if err != nil {
-		return err
+		return fmt.Errorf("could not fetch cdp owner account: %w", err)
 	}
 	if heightCDP != heightAcc {
-		return fmt.Errorf("mismatched queried state")
+		return fmt.Errorf("unmatched query height, cannot ensure no race condition")
 	}
 
 	if isWithinRange(augmentedCDP.CollateralizationRatio, app.lowerTrigger, app.upperTrigger) {
-		return fmt.Errorf("ratio has not deviated enough from target, skipping")
+		return fmt.Errorf("collateral ratio (%s) has not deviated enough from target (%s)", augmentedCDP.CollateralizationRatio, app.targetRatio())
 	}
 	desiredDebtChange := calculateDebtAdjustment(
 		augmentedCDP.CollateralizationRatio,
@@ -121,18 +118,18 @@ func (app App) RunOnce() error {
 		app.targetRatio(),
 	)
 	if desiredDebtChange.Equal(sdk.ZeroInt()) {
-		return fmt.Errorf("amount to send is 0, skipping")
+		return fmt.Errorf("amount to rebalance is 0")
 	}
 
 	msg := app.constructMsg(desiredDebtChange, augmentedCDP.Principal.Denom)
 
 	stdTx, err := constructSignedStdTx(app.signer, msg, account.GetAccountNumber(), account.GetSequence(), app.chainID, app.txFee)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create tx: %w", err)
 	}
 	err = app.client.broadcastTx(stdTx)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not send tx: %w", err)
 	}
 	return nil
 }
