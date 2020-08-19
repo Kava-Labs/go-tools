@@ -13,10 +13,12 @@ import (
 const (
 	KavaNodeURL = "tcp://localhost:26657"
 	KavaRestURL = "http://localhost:1317"
+	KavaChainID = "testing"
 )
 
 var (
-	// these are the same as the mnemonics in the chains and deputy configs
+	// these are the same as the mnemonics in the chain config
+	KavaOracleMnemonic = "law assault face proud fan slim genius boring portion delay team rude vapor timber noble absorb laugh dilemma patch actress brisk tissue drift flock"
 	KavaDeputyMnemonic = "equip town gesture square tomorrow volume nephew minute witness beef rich gadget actress egg sing secret pole winter alarm law today check violin uncover"
 
 	KavaUserMnemonics = []string{
@@ -28,6 +30,7 @@ var (
 		"flavor print loyal canyon expand salmon century field say frequent human dinosaur frame claim bridge affair web way direct win become merry crash frequent",
 	}
 
+	KavaOracleAddr sdk.AccAddress
 	KavaDeputyAddr sdk.AccAddress
 	KavaUserAddrs  []sdk.AccAddress
 )
@@ -39,6 +42,7 @@ func init() {
 	app.SetBech32AddressPrefixes(kavaConfig)
 	app.SetBip44CoinType(kavaConfig)
 
+	KavaOracleAddr = KavaAddressFromMnemonic(KavaOracleMnemonic)
 	KavaDeputyAddr = KavaAddressFromMnemonic(KavaDeputyMnemonic)
 	for _, m := range KavaUserMnemonics {
 		KavaUserAddrs = append(KavaUserAddrs, KavaAddressFromMnemonic(m))
@@ -75,10 +79,4 @@ func KavaAddressFromMnemonic(mnemonic string) sdk.AccAddress {
 		panic(err)
 	}
 	return info.GetAddress()
-
-	// manager, err := keys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
-	// if err != nil {
-	// 	panic(err.Error())
-	// }
-	// return manager.GetAddr()
 }

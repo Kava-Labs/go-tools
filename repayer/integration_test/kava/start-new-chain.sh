@@ -48,7 +48,7 @@ printf "$coldWalletMnemonic\n" | kvcli keys add cold-wallet --recover
 for i in {0..5}
 do
     printf "${testUserMnemonics[$i]}\n" | kvcli keys add test-user$i --recover
-    kvd add-genesis-account $(kvcli keys show test-user$i -a) 10000000ukava,100000000000bnb
+    kvd add-genesis-account $(kvcli keys show test-user$i -a) 10000000ukava,100000000000bnb,10000000000usdx # TODO setup cdps and distribute usdx by submitting configuration txs
 done
 
 # Create a delegation tx for the validator and add to genesis
@@ -60,5 +60,3 @@ kvd validate-genesis
 
 # start the blockchain, and set rpc to listen to connections from outside the container
 kvd start --pruning nothing --rpc.laddr "tcp://0.0.0.0:26657"
-
-sleep 100

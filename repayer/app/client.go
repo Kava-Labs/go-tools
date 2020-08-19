@@ -1,17 +1,24 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/rest"
+	authrest "github.com/cosmos/cosmos-sdk/x/auth/client/rest"
 	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/kava-labs/kava/app"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 type Client struct {
@@ -30,86 +37,126 @@ func NewClient(restURL string) Client {
 	}
 }
 
-func (c Client) getAccount(address sdk.AccAddress) (authexported.Account, error) {
-
-	queryPath, err := url.Parse(fmt.Sprintf("auth/accounts/%s", address))
-	if err != nil {
-		return nil, err
-	}
-	fullURL := c.restURL.ResolveReference(queryPath)
-
-	resp, err := http.Get(fullURL.String())
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed") // TODO better msg, rest.ErrorResponse
-	}
-
-	bz, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var res rest.ResponseWithHeight
-	c.codec.MustUnmarshalJSON(bz, &res)
+func (c Client) getAccount(address sdk.AccAddress) (authexported.Account, int64, error) {
 	var account authexported.Account
-	c.codec.MustUnmarshalJSON(res.Result, &account)
-	return account, nil
+	var sdkResp rest.ResponseWithHeight
+	err := c.fetchEndpoint(fmt.Sprintf("auth/accounts/%s", address), &sdkResp)
+	if err != nil {
+		return account, 0, err
+	}
+	err = c.codec.UnmarshalJSON(sdkResp.Result, &account)
+	if err != nil {
+		return account, 0, err
+	}
+	return account, sdkResp.Height, nil
 }
 
-// func (c Client) broadcastTx(tx tmtypes.Tx) error {
-// 	res, err := kc.kavaSDKClient.BroadcastTxSync(tx)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if res.Code != 0 { // tx failed to be submitted to the mempool
-// 		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log)
-// 	}
-// 	return nil
-// }
-
-// func (c Client) getChainID() (string, error) {
-// 	infoResp, err := http.Get(kc.restURL + "/node_info")
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	defer infoResp.Body.Close()
-// 	infoBz, err := ioutil.ReadAll(infoResp.Body)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	var nodeInfo rpc.NodeInfoResponse
-// 	kc.codec.MustUnmarshalJSON(infoBz, &nodeInfo)
-// 	return nodeInfo.Network, nil
-// }
-
-func (c Client) getCDP(owner sdk.AccAddress, denom string) (cdptypes.CDP, error) {
-	queryPath, err := url.Parse(fmt.Sprintf("cdp/cdps/cdp/%s/%s", owner, denom))
+func (c Client) getAugmentedCDP(owner sdk.AccAddress, denom string) (cdptypes.AugmentedCDP, int64, error) {
+	var augmentedCDP cdptypes.AugmentedCDP
+	var sdkResp rest.ResponseWithHeight
+	err := c.fetchEndpoint(fmt.Sprintf("cdp/cdps/cdp/%s/%s", owner, denom), &sdkResp)
 	if err != nil {
-		return cdptypes.CDP{}, err
+		return augmentedCDP, 0, err
+	}
+	err = c.codec.UnmarshalJSON(sdkResp.Result, &augmentedCDP)
+	if err != nil {
+		return augmentedCDP, 0, err
+	}
+	return augmentedCDP, sdkResp.Height, nil
+}
+
+func (c Client) getTx(txHash []byte) (sdk.TxResponse, error) {
+	var txResponse sdk.TxResponse
+	err := c.fetchEndpoint(fmt.Sprintf("txs/%x", txHash), &txResponse)
+	if err != nil {
+		return txResponse, err
+	}
+	return txResponse, nil
+}
+
+func (c Client) getChainID() (string, error) {
+	var nodeInfo rpc.NodeInfoResponse
+	err := c.fetchEndpoint("node_info", &nodeInfo)
+	if err != nil {
+		return "", err
+	}
+	return nodeInfo.Network, nil
+}
+
+func (c Client) broadcastTx(stdTx authtypes.StdTx) error {
+	// create post struct
+	req := authrest.BroadcastReq{
+		Tx:   stdTx,
+		Mode: flags.BroadcastSync,
+	}
+	bz, err := c.codec.MarshalJSON(req)
+	if err != nil {
+		return err
+	}
+	// post
+	postPath, err := url.Parse("txs")
+	if err != nil {
+		return err
+	}
+	fullURL := c.restURL.ResolveReference(postPath)
+
+	res, err := http.Post(fullURL.String(), "application/json", bytes.NewBuffer(bz))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	bz, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("request failed: %s", string(bz))
+	}
+
+	var txResponse sdk.TxResponse
+	err = c.codec.UnmarshalJSON(bz, &txResponse)
+	if err != nil {
+		return err
+	}
+	if txResponse.Code != sdkerrors.SuccessABCICode {
+		return fmt.Errorf("tx rejected from mempool: %s", txResponse.RawLog)
+	}
+	fmt.Println("tx resonse", txResponse)
+	return nil
+}
+
+func (c Client) fetchEndpoint(path string, fetchTypePtr interface{}) error {
+	queryPath, err := url.Parse(path)
+	if err != nil {
+		return err
 	}
 	fullURL := c.restURL.ResolveReference(queryPath)
 
 	resp, err := http.Get(fullURL.String())
 	if err != nil {
-		return cdptypes.CDP{}, err
+		return err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return cdptypes.CDP{}, fmt.Errorf("request failed") // TODO better msg, rest.ErrorResponse
-	}
 	bz, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return cdptypes.CDP{}, err
+		return err
 	}
 
-	var res rest.ResponseWithHeight
-	c.codec.MustUnmarshalJSON(bz, &res)
-	var augmentedCDP cdptypes.AugmentedCDP
-	c.codec.MustUnmarshalJSON(res.Result, &augmentedCDP)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("request failed: %s", string(bz))
+	}
 
-	return augmentedCDP.CDP, nil
+	err = c.codec.UnmarshalJSON(bz, fetchTypePtr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func txHash(codec *codec.Codec, stdTx authtypes.StdTx) ([]byte, error) {
+	bz, err := authtypes.DefaultTxEncoder(codec)(stdTx)
+	if err != nil {
+		return nil, err
+	}
+	return tmtypes.Tx(bz).Hash(), nil // TODO would this be neater without the tendermint dependency
 }
