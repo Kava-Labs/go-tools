@@ -1,0 +1,6 @@
+RestURL = "http://kava3.data.kava.io"         
+CdpOwnerMnemonic = "number law genre purse lion indoor frown child bid age possible ozone surprise worth toward toward grow language shoulder dune parent tell crew cliff"
+CdpDenom        = "bnb"
+LowerTrigger    = "0.2"
+UpperTrigger    = "0.25"
+ChainID         = "kava-3"

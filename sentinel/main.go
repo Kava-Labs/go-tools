@@ -11,12 +11,17 @@ import (
 )
 
 type Config struct {
-	RestURL          string
+	// RestURL the address of a kava node rest server
+	RestURL string
+	// CdpOwnerMnemonic is the mnemonic for an address of a CDP
 	CdpOwnerMnemonic string
-	CdpDenom         string
-	ChainID          string
-	LowerTrigger     string
-	UpperTrigger     string
+	// CdpDenom is the collateral type for the CDP, eg bnb
+	CdpDenom string
+	// LowerTrigger is collateral ratio under which the bot will repay debt
+	LowerTrigger string
+	// UpperTrigger is the collatereal ratio above which the bot will draw more debt
+	UpperTrigger string
+	ChainID      string
 }
 
 func loadConfig() (Config, error) {
