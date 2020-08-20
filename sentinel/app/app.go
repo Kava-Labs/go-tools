@@ -77,17 +77,73 @@ func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, l
 	)
 }
 
-// Validate
-func (app App) PreFlightCheck() error {
-	// check fee balance - how many txs can it send
-	// check usdx balance - how big a price movement can this sustain
-	// Check chain id
-	// check lower trigger is not within dangerous of liquidation ratio - assumptions about block time
-	// params, err := app.client.getCDPParams()
+func (app App) RunPreemptiveValidation() error {
+
+	// check chain id matches chain
+	chainID, err := app.client.getChainID()
+	if err != nil {
+		return fmt.Errorf("could not fetch chainID: %w", err)
+	}
+	if chainID != app.chainID {
+		return fmt.Errorf("config chain ID (%s) doesn't match node's chain ID (%s)", app.chainID, chainID)
+	}
+
+	// check account has enough stable coin
+	augmentedCDP, _, err := app.client.getAugmentedCDP(app.cdpOwner(), app.cdpDenom)
+	if err != nil {
+		return fmt.Errorf("could not fetch cdp: %w", err)
+	}
+	account, _, err := app.client.getAccount(app.cdpOwner())
+	if err != nil {
+		return fmt.Errorf("could not fetch cdp owner account: %w", err)
+	}
+	coins := account.SpendableCoins(time.Now()) // TODO fetch latest block time for more accuracy
+	stableCoinBalance := coins.AmountOf(augmentedCDP.Principal.Denom)
+	if !stableCoinBalance.IsPositive() { // TODO trigger error based on max price movement covered by stable balance
+		return fmt.Errorf("cdp owner account holds no stable coin")
+	}
+	// TODO check there is balance to pay fees, feeCoinBalance := coins.AmountOf(app.txFee.Fee.Denom)
+
+	// currentPrice, err := app.client.getPrice("bnb:usd:30")
+	// if err != nil {
+	// 	return err
+	// }
+	// liqPrice := calculateLiquidationPrice(cdp.Collateral.Amount, cdp.GetTotalDebt().Amount, collateralParams.LiquidationRatio)
+	// supportedPctPriceChange := sdk.OneDec.Sub(liqPrice.Quo(currentPrice))
+	// warningPriceChange := sdk.MustNewDecFromStr("0.25")
+	// if supportedPctPriceChange.LT(warningPriceChange) {
+	// 	return fmt.Errorf("balance only holds enough stable coin to cover a %s%% price change", supportedPctPriceChange)
+	// }
+
+	// check lower trigger is safe
+	params, _, err := app.client.getCDPParams()
+	if err != nil {
+		return fmt.Errorf("could not fetch cdp params: %w", err)
+	}
+	var collateralParam cdptypes.CollateralParam
+	for _, cp := range params.CollateralParams {
+		if cp.Denom == app.cdpDenom {
+			collateralParam = cp
+		}
+	}
+	maxPctPriceChangePerBlock := sdk.MustNewDecFromStr("0.1") // TODO check against historical price movements, and block times
+	minTriggerRatio := collateralParam.LiquidationRatio.Quo(sdk.OneDec().Sub(maxPctPriceChangePerBlock))
+	if app.lowerTrigger.LT(minTriggerRatio) {
+		return fmt.Errorf("lower trigger (%s) below safe limit (%s) based on historic price changes", app.lowerTrigger, minTriggerRatio)
+	}
+
 	return nil
 }
 
+// func calculateLiquidationPrice(collateral, totalDebt sdk.Int, liquidationRatio sdk.Dec) sdk.Dec {
+// 	return totalDebt.Quo(collateral).Mul(liquidationRatio)
+// }
+
 func (app App) Run() {
+	if err := app.RunPreemptiveValidation(); err != nil {
+		log.Fatal("could not validate app config:", err)
+	}
+
 	for {
 		if err := app.RebalanceCDP(); err != nil {
 			log.Println("did not rebalance cdp:", err)
@@ -108,6 +164,7 @@ func (app App) RebalanceCDP() error {
 	if heightCDP != heightAcc {
 		return fmt.Errorf("unmatched query height, cannot ensure no race condition")
 	}
+	// TODO ensure full node is not syncing
 
 	if isWithinRange(augmentedCDP.CollateralizationRatio, app.lowerTrigger, app.upperTrigger) {
 		return fmt.Errorf("collateral ratio (%s) has not deviated enough from target (%s)", augmentedCDP.CollateralizationRatio, app.targetRatio())

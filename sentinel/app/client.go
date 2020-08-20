@@ -65,6 +65,20 @@ func (c Client) getAugmentedCDP(owner sdk.AccAddress, denom string) (cdptypes.Au
 	return augmentedCDP, sdkResp.Height, nil
 }
 
+func (c Client) getCDPParams() (cdptypes.Params, int64, error) {
+	var cdpParams cdptypes.Params
+	var sdkResp rest.ResponseWithHeight
+	err := c.fetchEndpoint("cdp/parameters", &sdkResp)
+	if err != nil {
+		return cdpParams, 0, err
+	}
+	err = c.codec.UnmarshalJSON(sdkResp.Result, &cdpParams)
+	if err != nil {
+		return cdpParams, 0, err
+	}
+	return cdpParams, sdkResp.Height, nil
+}
+
 func (c Client) getTx(txHash []byte) (sdk.TxResponse, error) {
 	var txResponse sdk.TxResponse
 	err := c.fetchEndpoint(fmt.Sprintf("txs/%x", txHash), &txResponse)

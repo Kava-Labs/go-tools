@@ -36,6 +36,15 @@ func TestGetAugmentedCDP(t *testing.T) {
 
 	require.Equal(t, uint64(1), augmentedCDP.CDP.ID)
 }
+func TestGetCDPParams(t *testing.T) {
+	client, err := NewClient(common.KavaRestURL)
+	require.NoError(t, err)
+
+	params, _, err := client.getCDPParams()
+	require.NoError(t, err)
+
+	require.Equal(t, "bnb", params.CollateralParams[0].Denom)
+}
 
 func TestGetChainID(t *testing.T) {
 	client, err := NewClient(common.KavaRestURL)
