@@ -21,6 +21,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
+// Client handles querying data from and posting txs to a kava node.
 type Client struct {
 	restURL *url.URL
 	codec   *codec.Codec

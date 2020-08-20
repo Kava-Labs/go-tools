@@ -56,6 +56,7 @@ func NewApp(client Client, signer TxSigner, cdpDenom string, lowerTrigger, upper
 	}, nil
 }
 
+// NewDefaultApp is a convenience function that returns an app with some configuration filled in with defaults.
 func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec) (App, error) {
 	client, err := NewClient(restURL)
 	if err != nil {
@@ -77,6 +78,7 @@ func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, l
 	)
 }
 
+// Run is the main entrypoint for the App
 func (app App) Run() {
 	if err := app.RunPreemptiveValidation(); err != nil {
 		log.Fatal("could not validate app config:", err)
@@ -90,6 +92,7 @@ func (app App) Run() {
 	}
 }
 
+// RebalanceCDP performs one iteration of repaying or withdrawing debt from a cdp.
 func (app App) RebalanceCDP() error {
 	augmentedCDP, heightCDP, err := app.client.getAugmentedCDP(app.cdpOwner(), app.cdpDenom)
 	if err != nil {
@@ -129,6 +132,7 @@ func (app App) RebalanceCDP() error {
 	return nil
 }
 
+// RunPreemptiveValidation performs some checks to ensure errors will not occur at the critical point when debt needs to be repayed.
 func (app App) RunPreemptiveValidation() error {
 
 	// check chain id matches chain
@@ -180,6 +184,7 @@ func (app App) cdpOwner() sdk.AccAddress {
 	return app.signer.GetAddress()
 }
 
+// targetRatio is the collateral ratio that the CDP will be adjusted to.
 func (app App) targetRatio() sdk.Dec {
 	return calculateMidPoint(app.lowerTrigger, app.upperTrigger)
 }
@@ -212,6 +217,7 @@ func totalPrinciple(cdp cdptypes.CDP) sdk.Coin {
 	return cdp.Principal.Add(cdp.AccumulatedFees)
 }
 
+// calculateDebtAdjustment returns how much a CDPs debt should be changed to reach a target collateral ratio
 func calculateDebtAdjustment(currentCollatRatio sdk.Dec, currentDebt sdk.Int, targetCollatRatio sdk.Dec) sdk.Int {
 	// currentRatio * currentDebt == desiredRatio * desiredDebt
 	preciseDesiredDebt := currentCollatRatio.MulInt(currentDebt).Quo(targetCollatRatio)
@@ -221,10 +227,12 @@ func calculateDebtAdjustment(currentCollatRatio sdk.Dec, currentDebt sdk.Int, ta
 	return desiredDebt.Sub(currentDebt)
 }
 
+// isWithinRange checks if a number is between two values, excluding endpoints.
 func isWithinRange(number, rangeMin, rangeMax sdk.Dec) bool {
 	return number.GT(rangeMin) && number.LT(rangeMax)
 }
 
+// calculateMidPoint returns a number halfway between two numbers
 func calculateMidPoint(a, b sdk.Dec) sdk.Dec {
 	two := sdk.MustNewDecFromStr("2.0")
 	return a.Quo(two).Add(b.Quo(two))

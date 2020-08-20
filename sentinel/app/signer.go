@@ -6,6 +6,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
+// TxSigner holds a private key and calculates signatures for cosmos-sdk transactions.
 type TxSigner struct {
 	keybase            keys.Keybase
 	keybaseKeyName     string
@@ -16,6 +17,7 @@ func NewDefaultTxSigner(mnemonic string) (TxSigner, error) {
 	hdPath := keys.CreateHDPath(0, 0).String()
 	return NewTxSigner(mnemonic, hdPath, keys.Secp256k1)
 }
+
 func NewTxSigner(mnemonic, hdPath string, signingAlgo keys.SigningAlgo) (TxSigner, error) {
 	keybase := keys.NewInMemory()
 	bip39Password := ""
@@ -31,6 +33,8 @@ func NewTxSigner(mnemonic, hdPath string, signingAlgo keys.SigningAlgo) (TxSigne
 		keybaseKeyPassword: keyPassword,
 	}, nil
 }
+
+// Sign computes a standard signature for a standard transaction.
 func (txSigner TxSigner) Sign(stdTx authtypes.StdTx, accountNumber, sequence uint64, chainID string) (authtypes.StdSignature, error) {
 	// find the raw bytes to sign
 	signBytes := authtypes.StdSignBytes(chainID, accountNumber, sequence, stdTx.Fee, stdTx.Msgs, stdTx.Memo)
