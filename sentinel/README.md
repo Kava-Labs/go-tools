@@ -6,7 +6,7 @@ Sentinel will keep a CDP’s collateral ratio within a range by repaying (or wit
 
 ## Get Started
 
-Sentinel has been designed to be as reliable as possible. Operators should run more than one copies of sentinel on different servers, using different kava nodes.
+Sentinel has been designed to be as reliable as possible. To further increase reliability, operators can run more than one copy of sentinel on different servers, using different kava nodes.
 
   1) Install go
   2) Install sentinel with `git clone <this repo>`, `make install`  
