@@ -1,6 +1,6 @@
 # Sentinel - _keeping your CDPs safe_
 
-Sentinel is a bot that will watch over a CDP on the kava blockchain and try to prevent it being liquidated.
+Sentinel is a bot that will watch over a CDP on the kava blockchain and try to prevent it from being liquidated.
 
 Sentinel will keep a CDP’s collateral ratio within a range by repaying (or withdrawing) debt.
 
