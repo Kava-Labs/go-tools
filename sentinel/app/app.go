@@ -1,16 +1,20 @@
 package app
 
 import (
+	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 )
 
-const defaultWaitPeriod = 2 * time.Second
+const (
+	defaultWaitPeriod = 2 * time.Second
+	numFetchAttempts  = 2
+)
 
 var defaultFee = authtypes.NewStdFee(
 	500_000,
@@ -20,6 +24,7 @@ var defaultFee = authtypes.NewStdFee(
 type App struct {
 	client       Client
 	signer       TxSigner
+	logger       Logger
 	cdpDenom     string
 	lowerTrigger sdk.Dec
 	upperTrigger sdk.Dec
@@ -28,7 +33,7 @@ type App struct {
 	txFee        authtypes.StdFee
 }
 
-func NewApp(client Client, signer TxSigner, cdpDenom string, lowerTrigger, upperTrigger sdk.Dec, waitPeriod time.Duration, chainID string, fee authtypes.StdFee) (App, error) {
+func NewApp(client Client, signer TxSigner, logger Logger, cdpDenom string, lowerTrigger, upperTrigger sdk.Dec, waitPeriod time.Duration, chainID string, fee authtypes.StdFee) (App, error) {
 	if err := sdk.ValidateDenom(cdpDenom); err != nil {
 		return App{}, err
 	}
@@ -47,6 +52,7 @@ func NewApp(client Client, signer TxSigner, cdpDenom string, lowerTrigger, upper
 	return App{
 		client:       client,
 		signer:       signer,
+		logger:       logger,
 		cdpDenom:     cdpDenom,
 		lowerTrigger: lowerTrigger,
 		upperTrigger: upperTrigger,
@@ -57,7 +63,7 @@ func NewApp(client Client, signer TxSigner, cdpDenom string, lowerTrigger, upper
 }
 
 // NewDefaultApp is a convenience function that returns an app with some configuration filled in with defaults.
-func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec) (App, error) {
+func NewDefaultApp(logger Logger, restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, lowerTrigger, upperTrigger sdk.Dec) (App, error) {
 	client, err := NewClient(restURL)
 	if err != nil {
 		return App{}, err
@@ -69,6 +75,7 @@ func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, l
 	return NewApp(
 		client,
 		signer,
+		logger,
 		cdpDenom,
 		lowerTrigger,
 		upperTrigger,
@@ -81,55 +88,90 @@ func NewDefaultApp(restURL string, cdpOwnerMnemonic, cdpDenom, chainID string, l
 // Run is the main entrypoint for the App
 func (app App) Run() {
 	if err := app.RunPreemptiveValidation(); err != nil {
-		log.Fatal("could not validate app config:", err)
+		app.logger.Fatalf("could not validate app config:", err) // fatal
 	}
 
 	for {
-		if err := app.RebalanceCDP(); err != nil {
-			log.Println("did not rebalance cdp:", err)
+		if err := app.AttemptRebalanceCDP(); err != nil {
+			app.logger.Printf("unexpected error rebalancing cdp:", err) // send alert
 		}
 		time.Sleep(app.waitPeriod)
 	}
 }
 
-// RebalanceCDP performs one iteration of repaying or withdrawing debt from a cdp.
-func (app App) RebalanceCDP() error {
-	augmentedCDP, heightCDP, err := app.client.getAugmentedCDP(app.cdpOwner(), app.cdpDenom)
-	if err != nil {
-		return fmt.Errorf("could not fetch cdp: %w", err)
-	}
-	account, heightAcc, err := app.client.getAccount(app.cdpOwner())
-	if err != nil {
-		return fmt.Errorf("could not fetch cdp owner account: %w", err)
-	}
-	if heightCDP != heightAcc {
-		return fmt.Errorf("unmatched query height, cannot ensure no race condition")
-	}
+// AttemptRebalanceCDP performs tries to move a cdp to the target collateral ratio by repaying or withdrawing debt.
+func (app App) AttemptRebalanceCDP() error {
 	// TODO ensure full node is not syncing
+	state, err := app.fetchChainState()
+	if err != nil {
+		return err
+	}
 
-	if isWithinRange(augmentedCDP.CollateralizationRatio, app.lowerTrigger, app.upperTrigger) {
-		return fmt.Errorf("collateral ratio (%s) has not deviated enough from target (%s)", augmentedCDP.CollateralizationRatio, app.targetRatio())
+	if isWithinRange(state.cdp.CollateralizationRatio, app.lowerTrigger, app.upperTrigger) {
+		app.logger.Printf("collateral ratio (%s) has not deviated enough from target (%s)", state.cdp.CollateralizationRatio, app.targetRatio())
+		return nil
 	}
 	desiredDebtChange := calculateDebtAdjustment(
-		augmentedCDP.CollateralizationRatio,
-		totalPrinciple(augmentedCDP.CDP).Amount,
+		state.cdp.CollateralizationRatio,
+		totalPrinciple(state.cdp.CDP).Amount,
 		app.targetRatio(),
 	)
 	if desiredDebtChange.Equal(sdk.ZeroInt()) {
-		return fmt.Errorf("amount to rebalance is 0")
+		app.logger.Println("amount to rebalance is 0")
+		return nil
 	}
 
-	msg := app.constructMsg(desiredDebtChange, augmentedCDP.Principal.Denom)
+	msg := app.constructMsg(desiredDebtChange, state.cdp.Principal.Denom)
 
-	stdTx, err := constructSignedStdTx(app.signer, msg, account.GetAccountNumber(), account.GetSequence(), app.chainID, app.txFee)
+	stdTx, err := constructSignedStdTx(app.signer, msg, state.account.GetAccountNumber(), state.account.GetSequence(), app.chainID, app.txFee)
 	if err != nil {
 		return fmt.Errorf("could not create tx: %w", err)
 	}
 	err = app.client.broadcastTx(stdTx)
-	if err != nil {
-		return fmt.Errorf("could not send tx: %w", err)
+	var e *MempoolRejectionError
+	if errors.As(err, &e) {
+		app.logger.Println(e.Error())
+		return nil
 	}
+	if err != nil {
+		return fmt.Errorf("could not broadcast tx: %w", err)
+	}
+
+	app.logger.Printf("successfully submitted tx %s for %s debt", msg.Type(), desiredDebtChange)
 	return nil
+}
+
+type chainState struct {
+	cdp     cdptypes.AugmentedCDP
+	account authexported.Account
+	height  int64
+}
+
+func (app App) fetchChainState() (chainState, error) {
+	fetch := func() (chainState, error) {
+		augmentedCDP, heightCDP, err := app.client.getAugmentedCDP(app.cdpOwner(), app.cdpDenom)
+		if err != nil {
+			return chainState{}, fmt.Errorf("could not fetch cdp: %w", err)
+		}
+		account, heightAcc, err := app.client.getAccount(app.cdpOwner())
+		if err != nil {
+			return chainState{}, fmt.Errorf("could not fetch cdp owner account: %w", err)
+		}
+		if heightCDP != heightAcc {
+			return chainState{}, fmt.Errorf("height mismatch")
+		}
+		return chainState{cdp: augmentedCDP, account: account, height: heightCDP}, nil
+	}
+
+	var state chainState
+	var err error
+	for attempts := numFetchAttempts; attempts > 0; attempts-- {
+		state, err = fetch()
+		if err == nil {
+			break
+		}
+	}
+	return state, err
 }
 
 // RunPreemptiveValidation performs some checks to ensure errors will not occur at the critical point when debt needs to be repayed.

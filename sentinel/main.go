@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	kavaapp "github.com/kava-labs/kava/app"
 	"github.com/spf13/viper"
@@ -41,9 +39,11 @@ func loadConfig() (Config, error) {
 }
 
 func main() {
+	logger := app.NewDefaultLogger()
+
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	config := sdk.GetConfig()
@@ -53,16 +53,16 @@ func main() {
 
 	lowerTrigger, err := sdk.NewDecFromStr(cfg.LowerTrigger)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	upperTrigger, err := sdk.NewDecFromStr(cfg.UpperTrigger)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
-	app, err := app.NewDefaultApp(cfg.RestURL, cfg.CdpOwnerMnemonic, cfg.CdpDenom, cfg.ChainID, lowerTrigger, upperTrigger)
+	app, err := app.NewDefaultApp(logger, cfg.RestURL, cfg.CdpOwnerMnemonic, cfg.CdpDenom, cfg.ChainID, lowerTrigger, upperTrigger)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
-	log.Println("starting app")
+	logger.Println("starting app")
 	app.Run()
 }

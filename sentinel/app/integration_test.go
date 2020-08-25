@@ -83,7 +83,7 @@ func TestBroadcastAndGetTx(t *testing.T) {
 func TestApp_Run(t *testing.T) {
 	cdpOwner := common.KavaUserMnemonics[0]
 	cdpDenom := "bnb"
-	app, err := NewDefaultApp(common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
+	app, err := NewDefaultApp(NewDefaultLogger(), common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
 	require.NoError(t, err)
 
 	// cdp is at certain ratio
@@ -92,7 +92,7 @@ func TestApp_Run(t *testing.T) {
 	t.Log(augmentedCDP) // TODO verify cdp is not at target ratio
 
 	// run app
-	err = app.RebalanceCDP()
+	err = app.AttemptRebalanceCDP()
 	require.NoError(t, err)
 	time.Sleep(6 * time.Second) // wait until tx is in block
 

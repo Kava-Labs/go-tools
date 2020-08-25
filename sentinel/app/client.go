@@ -134,9 +134,8 @@ func (c Client) broadcastTx(stdTx authtypes.StdTx) error {
 		return err
 	}
 	if txResponse.Code != sdkerrors.SuccessABCICode {
-		return fmt.Errorf("tx rejected from mempool: %s", txResponse.RawLog)
+		return NewMempoolRejectionError(txResponse.RawLog)
 	}
-	fmt.Println("tx resonse", txResponse)
 	return nil
 }
 
@@ -174,4 +173,16 @@ func txHash(codec *codec.Codec, stdTx authtypes.StdTx) ([]byte, error) {
 		return nil, err
 	}
 	return tmtypes.Tx(bz).Hash(), nil // TODO would this be neater without the tendermint dependency
+}
+
+type MempoolRejectionError struct {
+	txLog string
+}
+
+func NewMempoolRejectionError(txLog string) *MempoolRejectionError {
+	return &MempoolRejectionError{txLog: txLog}
+}
+
+func (mre *MempoolRejectionError) Error() string {
+	return fmt.Sprintf("tx rejected from mempool: %s", mre.txLog)
 }
