@@ -83,6 +83,23 @@
             "amount": "10000000000",
             "denom": "usdx"
           }
+        },
+        {
+          "accumulated_fees": {
+            "amount": "539",
+            "denom": "usdx"
+          },
+          "collateral": {
+            "amount": "100000000000",
+            "denom": "bnb"
+          },
+          "fees_updated": "2020-08-17T22:15:28.633665038Z",
+          "id": "2",
+          "owner": "kava1agcvt07tcw0tglu0hmwdecsnuxp2yd45f3avgm",
+          "principal": {
+            "amount": "10000000000",
+            "denom": "usdx"
+          }
         }
       ],
       "debt_denom": "debt",
@@ -94,6 +111,14 @@
           },
           "cdp_id": "1",
           "depositor": "kava1ypjp0m04pyp73hwgtc0dgkx0e9rrydecm054da"
+        },
+        {
+          "amount": {
+            "amount": "100000000000",
+            "denom": "bnb"
+          },
+          "cdp_id": "2",
+          "depositor": "kava1agcvt07tcw0tglu0hmwdecsnuxp2yd45f3avgm"
         }
       ],
       "gov_denom": "ukava",
@@ -134,7 +159,7 @@
         "surplus_auction_threshold": "500000000000"
       },
       "previous_distribution_time": "1970-01-01T00:00:00Z",
-      "starting_cdp_id": "2"
+      "starting_cdp_id": "3"
     },
     "committee": {
       "committees": [],

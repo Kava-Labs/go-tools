@@ -5,6 +5,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -107,5 +108,49 @@ func TestApp_Run(t *testing.T) {
 		app.targetRatio().Sub(augmentedCDP.CollateralizationRatio).Abs().LTE(acceptableError),
 		"difference between target ratio (%s) and actual ratio (%s) is > %s",
 		app.targetRatio(), augmentedCDP.CollateralizationRatio, acceptableError,
+	)
+}
+
+func TestApp_Concurrent(t *testing.T) {
+	cdpOwner := common.KavaUserMnemonics[1]
+	cdpDenom := "bnb"
+	numReplicas := 100
+
+	// setup many copies of app
+	apps := make(chan App, numReplicas)
+	var wg sync.WaitGroup
+	for i := 0; i < numReplicas; i++ {
+		wg.Add(1)
+		go func(apps chan App) {
+			defer wg.Done()
+			app, err := NewDefaultApp(NewDefaultLogger(), common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
+			require.NoError(t, err)
+			apps <- app
+		}(apps)
+	}
+	wg.Wait()
+
+	// run all the apps at once
+	close(apps)
+	for a := range apps {
+		go func(a App) {
+			err := a.AttemptRebalanceCDP()
+			require.NoError(t, err)
+		}(a)
+	}
+	time.Sleep(8 * time.Second) // wait until tx is in block
+
+	// check cdp is at desired ratio
+	verificationApp, err := NewDefaultApp(NewDefaultLogger(), common.KavaRestURL, cdpOwner, cdpDenom, common.KavaChainID, d("2.00"), d("2.5"))
+	require.NoError(t, err)
+	augmentedCDP, _, err := verificationApp.client.getAugmentedCDP(verificationApp.cdpOwner(), cdpDenom)
+	require.NoError(t, err)
+
+	// check cdp has been repayed to within a percentage of the target rate
+	acceptableError := d("0.01")
+	require.Truef(t,
+		verificationApp.targetRatio().Sub(augmentedCDP.CollateralizationRatio).Abs().LTE(acceptableError),
+		"difference between target ratio (%s) and actual ratio (%s) is > %s",
+		verificationApp.targetRatio(), augmentedCDP.CollateralizationRatio, acceptableError,
 	)
 }

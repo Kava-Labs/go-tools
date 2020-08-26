@@ -134,7 +134,7 @@ func (c Client) broadcastTx(stdTx authtypes.StdTx) error {
 		return err
 	}
 	if txResponse.Code != sdkerrors.SuccessABCICode {
-		return NewMempoolRejectionError(txResponse.RawLog)
+		return NewMempoolRejectionError(fmt.Sprintf("code: '%d', logs: '%s'", txResponse.Code, txResponse.RawLog))
 	}
 	return nil
 }

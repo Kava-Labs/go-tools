@@ -137,7 +137,12 @@ func (app App) AttemptRebalanceCDP() error {
 		return fmt.Errorf("could not broadcast tx: %w", err)
 	}
 
-	app.logger.Printf("successfully submitted tx %s for %s debt", msg.Type(), desiredDebtChange)
+	txHash, err := txHash(app.client.codec, stdTx)
+	if err != nil {
+		app.logger.Printf("could not compute hash of tx: %v", err)
+	}
+
+	app.logger.Printf("successfully submitted tx %s for %s debt, hash '%x'", msg.Type(), desiredDebtChange, txHash)
 	return nil
 }
 
