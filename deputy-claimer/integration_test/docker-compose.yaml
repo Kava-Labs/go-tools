@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+    bnbnode:
+        build: "./bnbchain"
+        ports:
+            # open rpc port
+            - "26658:26657"
+        volumes:
+            - "./bnbchain/start-new-chain.sh:/root/scripts/start-new-chain.sh"
+        command: ["bash", "/root/scripts/start-new-chain.sh"]
+    kavanode:
+        image: "kava/kava:v0.9.1"
+        ports:
+            # open default kava rpc port
+            - "26657:26657"
+        volumes:
+            - "./kava/:/root/kava/config"
+        command: ["bash", "/root/kava/config/start-new-chain.sh"]
+    kavarest:
+        image: "kava/kava:v0.9.1"
+        ports:
+            # open default rest port
+            - "1317:1317"
+        command: ["kvcli", "rest-server", "--node=tcp://kavanode:26657", "--trust-node", "--laddr=tcp://0.0.0.0:1317"]
