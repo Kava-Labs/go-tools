@@ -5,6 +5,9 @@ import (
 	"github.com/binance-chain/go-sdk/common/types"
 )
 
+// querySwapsMaxPageSize is the maximum supported 'limit' parameter for querying swaps by recipient address
+const querySwapsMaxPageSize = 100
+
 type bnbChainClient struct {
 	deputyAddressString string
 	bnbSDKClient        *bnbRpc.HTTP
@@ -18,9 +21,19 @@ func newBnbChainClient(rpcURL string, deputyAddress string) bnbChainClient {
 }
 
 func (bc bnbChainClient) getOpenSwaps() ([]types.AtomicSwap, error) {
-	swapIDs, err := bc.bnbSDKClient.GetSwapByRecipient(bc.deputyAddressString, 0, 100) // TODO handle limits
-	if err != nil {
-		return nil, err
+	var swapIDs []types.SwapBytes
+	var queryOffset int64 = 0
+	for {
+		swapIDsPage, err := bc.bnbSDKClient.GetSwapByRecipient(bc.deputyAddressString, queryOffset, querySwapsMaxPageSize)
+		if err != nil {
+			return nil, err
+		}
+		swapIDs = append(swapIDs, swapIDsPage...)
+		if len(swapIDsPage) < querySwapsMaxPageSize {
+			// if less than a full page of swapIDs was returned, there is no more to query
+			break
+		}
+		queryOffset += querySwapsMaxPageSize
 	}
 
 	var swaps []types.AtomicSwap
