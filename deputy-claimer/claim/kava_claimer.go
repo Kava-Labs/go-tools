@@ -103,7 +103,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	}
 
 	// wait for all go routines to finish
-	for i := 0; i > len(kc.mnemonics); i++ {
+	for i := 0; i < len(kc.mnemonics); i++ {
 		<-availableMnemonics
 	}
 	// report any errors
