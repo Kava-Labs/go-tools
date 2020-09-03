@@ -46,7 +46,7 @@ func (bc BnbClaimer) Run(ctx context.Context) {
 				log.Println("finding available deputy claims for bnb")
 				err := bc.fetchAndClaimSwaps()
 				if err != nil {
-					log.Println(err)
+					log.Printf("error fetching and claiming bnb swaps: %v\n", err)
 				}
 				time.Sleep(5 * time.Minute)
 				continue
@@ -59,7 +59,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 
 	claimableSwaps, err := getClaimableBnbSwaps(bc.kavaClient, bc.bnbClient, bc.kavaDeputyAddr)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not fetch claimable swaps: %w", err)
 	}
 	log.Printf("found %d claimable bnb HTLTs\n", len(claimableSwaps))
 
@@ -79,7 +79,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 
 			txHash, err := constructAndSendBnbClaim(bc.bnbClient, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
-				errs <- err
+				errs <- fmt.Errorf("could not submit claim: %w", err)
 				return
 			}
 			err = Wait(15*time.Second, func() (bool, error) {
@@ -93,7 +93,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 				return true, nil
 			})
 			if err != nil {
-				errs <- err
+				errs <- fmt.Errorf("could not get claim tx confirmation: %w", err)
 				return
 			}
 		}(mnemonic, availableMnemonics, swap)
@@ -119,7 +119,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, kavaDeputyAddr sdk.AccAddress) ([]claimableSwap, error) {
 	swaps, err := bnbClient.getOpenSwaps()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
 	}
 	log.Printf("found %d open bnb swaps", len(swaps))
 
@@ -137,6 +137,7 @@ func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, 
 		// get the random number for a claim transaction for the kava swap
 		randNum, err := kavaClient.getRandomNumberFromSwap(kID)
 		if err != nil {
+			log.Printf("could not fetch random num from kava swap ID %x: %w\n", kID, err)
 			continue
 		}
 		claimableSwaps = append(
@@ -152,13 +153,13 @@ func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, 
 func constructAndSendBnbClaim(bnbClient bnbChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	keyManager, err := keys.NewMnemonicKeyManager(mnemonic)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create key manager: %w", err)
 	}
 	bnbClient.bnbSDKClient.SetKeyManager(keyManager)
 	defer bnbClient.bnbSDKClient.SetKeyManager(nil)
 	res, err := bnbClient.bnbSDKClient.ClaimHTLT(swapID, randNum, bnbRpc.Sync)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not submit claim: %w", err)
 	}
 	return res.Hash, nil
 }
