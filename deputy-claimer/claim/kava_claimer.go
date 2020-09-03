@@ -49,7 +49,7 @@ func (kc KavaClaimer) Run(ctx context.Context) {
 				log.Println("finding available deputy claims for kava")
 				err := kc.fetchAndClaimSwaps()
 				if err != nil {
-					log.Println(err)
+					log.Printf("error fetching and claiming bnb swaps: %v\n", err)
 				}
 				time.Sleep(5 * time.Minute)
 				continue
@@ -62,7 +62,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 
 	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.bnbDeputyAddr)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not fetch claimable swaps: %w", err)
 	}
 	log.Printf("found %d claimable kava HTLTs\n", len(claimableSwaps))
 
@@ -82,7 +82,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 
 			txHash, err := constructAndSendClaim(kc.kavaClient, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
-				errs <- err
+				errs <- fmt.Errorf("could not submit claim: %w", err)
 				return
 			}
 			err = Wait(15*time.Second, func() (bool, error) {
@@ -96,7 +96,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 				return true, nil
 			})
 			if err != nil {
-				errs <- err
+				errs <- fmt.Errorf("could not get claim tx confirmation: %w", err)
 				return
 			}
 		}(mnemonic, availableMnemonics, swap)
@@ -127,7 +127,7 @@ type claimableSwap struct {
 func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
 	swaps, err := kavaClient.getOpenSwaps()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
 	}
 	log.Printf("found %d open kava swaps", len(swaps))
 
@@ -145,7 +145,8 @@ func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, b
 		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
 		bnbSwap, err := bnbClient.GetSwapByID(bID)
 		if err != nil {
-			return nil, err // TODO should not return on not found error
+			log.Printf("could not fetch random num from bnb swap ID %x: %v\n", bID, err)
+			continue
 		}
 		// check the bnb swap status is closed and has random number - ie it has been claimed
 		if len(bnbSwap.RandomNumber) != 0 {
@@ -163,17 +164,17 @@ func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, b
 func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create key manager: %w", err)
 	}
 	// construct and sign tx
 	msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), swapID, randNum)
 	chainID, err := kavaClient.getChainID()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not fetch chain id: %w", err)
 	}
 	account, err := kavaClient.getAccount(kavaKeyM.GetAddr())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not fetch account: %w", err)
 	}
 	signMsg := authtypes.StdSignMsg{
 		ChainID:       chainID,
@@ -185,11 +186,11 @@ func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, 
 	}
 	txBz, err := kavaKeyM.Sign(signMsg, kavaClient.codec)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not sign: %w", err)
 	}
 	// broadcast tx to mempool
 	if err = kavaClient.broadcastTx(txBz); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not submit claim: %w", err)
 	}
 	return tmtypes.Tx(txBz).Hash(), nil
 }

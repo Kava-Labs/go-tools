@@ -1,6 +1,8 @@
 package claim
 
 import (
+	"fmt"
+
 	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
 	"github.com/binance-chain/go-sdk/common/types"
 )
@@ -26,7 +28,7 @@ func (bc bnbChainClient) getOpenSwaps() ([]types.AtomicSwap, error) {
 	for {
 		swapIDsPage, err := bc.bnbSDKClient.GetSwapByRecipient(bc.deputyAddressString, queryOffset, querySwapsMaxPageSize)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to fetch swaps by recipient (offset %d): %w", queryOffset, err)
 		}
 		swapIDs = append(swapIDs, swapIDsPage...)
 		if len(swapIDsPage) < querySwapsMaxPageSize {
@@ -40,7 +42,7 @@ func (bc bnbChainClient) getOpenSwaps() ([]types.AtomicSwap, error) {
 	for _, id := range swapIDs {
 		s, err := bc.getSwapByID(id)
 		if err != nil {
-			return nil, err // TODO should probably retry on failure
+			return nil, fmt.Errorf("couldn't find swap for ID %x: %w", id, err) // TODO should probably retry on failure
 		}
 		if s.Status != types.Open {
 			continue
