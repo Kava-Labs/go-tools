@@ -137,7 +137,7 @@ func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, 
 		// get the random number for a claim transaction for the kava swap
 		randNum, err := kavaClient.getRandomNumberFromSwap(kID)
 		if err != nil {
-			log.Printf("could not fetch random num from kava swap ID %x: %w\n", kID, err)
+			log.Printf("could not fetch random num from kava swap ID %x: %v\n", kID, err)
 			continue
 		}
 		claimableSwaps = append(
