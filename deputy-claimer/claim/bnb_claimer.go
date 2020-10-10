@@ -17,8 +17,8 @@ import (
 )
 
 type BnbClaimer struct {
-	kavaClient     kavaChainClient
-	bnbClient      bnbChainClient
+	kavaClient     mixedKavaClient
+	bnbClient      rcpBNBClient
 	mnemonics      []string
 	kavaDeputyAddr sdk.AccAddress
 }
@@ -30,8 +30,8 @@ func NewBnbClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, kavaDeputyAddrStri
 		panic(err)
 	}
 	return BnbClaimer{
-		kavaClient:     newKavaChainClient(kavaRestURL, kavaRPCURL, cdc),
-		bnbClient:      newBnbChainClient(bnbRPCURL, bnbDeputyAddrString),
+		kavaClient:     newMixedKavaClient(kavaRestURL, kavaRPCURL, cdc),
+		bnbClient:      newRpcBNBClient(bnbRPCURL, bnbDeputyAddrString),
 		mnemonics:      mnemonics,
 		kavaDeputyAddr: kavaDeputyAddr,
 	}
@@ -116,7 +116,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 	return nil
 }
 
-func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, kavaDeputyAddr sdk.AccAddress) ([]claimableSwap, error) {
+func getClaimableBnbSwaps(kavaClient mixedKavaClient, bnbClient rcpBNBClient, kavaDeputyAddr sdk.AccAddress) ([]claimableSwap, error) {
 	swaps, err := bnbClient.getOpenSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
@@ -150,7 +150,7 @@ func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, 
 	return claimableSwaps, nil
 }
 
-func constructAndSendBnbClaim(bnbClient bnbChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+func constructAndSendBnbClaim(bnbClient rcpBNBClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	keyManager, err := keys.NewMnemonicKeyManager(mnemonic)
 	if err != nil {
 		return nil, fmt.Errorf("could not create key manager: %w", err)

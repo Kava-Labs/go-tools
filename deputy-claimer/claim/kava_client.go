@@ -23,16 +23,21 @@ import (
 
 // XXX G11 inconsistency - why use rpc and rest?
 
-type kavaChainClient struct {
+type kavaChainClient interface {
+}
+
+var _ kavaChainClient = mixedKavaClient{}
+
+type mixedKavaClient struct {
 	restURL, rpcURL string
 	codec           *codec.Codec
 	kavaSDKClient   *kavaRpc.KavaClient
 }
 
-func newKavaChainClient(restURL, rpcURL string, cdc *codec.Codec) kavaChainClient {
+func newMixedKavaClient(restURL, rpcURL string, cdc *codec.Codec) mixedKavaClient {
 	// use a fake mnemonic as we're not using the kava client for signing
 	dummyMnemonic := "adult stem bus people vast riot eager faith sponsor unlock hold lion sport drop eyebrow loud angry couch panic east three credit grain talk"
-	return kavaChainClient{
+	return mixedKavaClient{
 		restURL:       restURL,
 		codec:         cdc,
 		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, kava.Bip44CoinType, rpcURL, kavaRpc.ProdNetwork),
@@ -44,7 +49,7 @@ type restResponse struct {
 	Result json.RawMessage `json:"result"`
 }
 
-func (kc kavaChainClient) getOpenSwaps() (bep3.AtomicSwaps, error) {
+func (kc mixedKavaClient) getOpenSwaps() (bep3.AtomicSwaps, error) {
 	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
 	if err != nil {
 		return nil, err
@@ -62,7 +67,7 @@ func (kc kavaChainClient) getOpenSwaps() (bep3.AtomicSwaps, error) {
 	return swaps, nil
 }
 
-func (kc kavaChainClient) getAccount(address sdk.AccAddress) (authexported.Account, error) {
+func (kc mixedKavaClient) getAccount(address sdk.AccAddress) (authexported.Account, error) {
 	resp, err := http.Get(kc.restURL + "/auth/accounts/" + address.String()) // TODO construct urls properly
 	if err != nil {
 		return nil, err
@@ -79,11 +84,11 @@ func (kc kavaChainClient) getAccount(address sdk.AccAddress) (authexported.Accou
 	return account, nil
 }
 
-func (kc kavaChainClient) getTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error) {
+func (kc mixedKavaClient) getTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error) {
 	return kc.kavaSDKClient.HTTP.Tx(txHash, false)
 }
 
-func (kc kavaChainClient) broadcastTx(tx tmtypes.Tx) error {
+func (kc mixedKavaClient) broadcastTx(tx tmtypes.Tx) error {
 	res, err := kc.kavaSDKClient.BroadcastTxSync(tx)
 	if err != nil {
 		return err
@@ -94,7 +99,7 @@ func (kc kavaChainClient) broadcastTx(tx tmtypes.Tx) error {
 	return nil
 }
 
-func (kc kavaChainClient) getChainID() (string, error) {
+func (kc mixedKavaClient) getChainID() (string, error) {
 	infoResp, err := http.Get(kc.restURL + "/node_info")
 	if err != nil {
 		return "", err
@@ -109,11 +114,11 @@ func (kc kavaChainClient) getChainID() (string, error) {
 	return nodeInfo.Network, nil
 }
 
-func (kc kavaChainClient) getSwapByID(id tmbytes.HexBytes) (bep3.AtomicSwap, error) {
+func (kc mixedKavaClient) getSwapByID(id tmbytes.HexBytes) (bep3.AtomicSwap, error) {
 	return kc.kavaSDKClient.GetSwapByID(id)
 }
 
-func (kc kavaChainClient) getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error) {
+func (kc mixedKavaClient) getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error) {
 	strID := strings.ToLower(hex.EncodeToString(id))
 	query := fmt.Sprintf(`claim_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
 	res, err := kc.kavaSDKClient.HTTP.TxSearch(query, false, 1, 1000, "")
@@ -133,4 +138,9 @@ func (kc kavaChainClient) getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, 
 		return nil, fmt.Errorf("unable to decode msg into MsgClaimAtomicSwap")
 	}
 	return claim.RandomNumber, nil
+}
+
+func (kc mixedKavaClient) getCodec() *codec.Codec { 
+	// TODO codec is passed in at creation, it shouldn't need to be pulled out again
+	return kc.codec
 }

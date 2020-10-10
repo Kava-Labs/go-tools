@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
 	"github.com/binance-chain/go-sdk/common/types"
 	bnbmsg "github.com/binance-chain/go-sdk/types/msg"
 	sdk "github.com/kava-labs/cosmos-sdk/types"
@@ -20,8 +19,8 @@ import (
 )
 
 type KavaClaimer struct {
-	kavaClient    kavaChainClient
-	bnbClient     *bnbRpc.HTTP
+	kavaClient    mixedKavaClient
+	bnbClient     rcpBNBClient
 	mnemonics     []string
 	bnbDeputyAddr types.AccAddress
 }
@@ -33,8 +32,8 @@ func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrStri
 		panic(err)
 	}
 	return KavaClaimer{
-		kavaClient:    newKavaChainClient(kavaRestURL, kavaRPCURL, cdc),
-		bnbClient:     bnbRpc.NewRPCClient(bnbRPCURL, types.ProdNetwork),
+		kavaClient:    newMixedKavaClient(kavaRestURL, kavaRPCURL, cdc), // XXX hard dependency makes testing hard
+		bnbClient:     newRpcBNBClient(bnbRPCURL, bnbDeputyAddrString),
 		mnemonics:     mnemonics,
 		bnbDeputyAddr: bnbDeputyAddr,
 	}
@@ -128,7 +127,7 @@ type claimableSwap struct {
 	randomNumber tmbytes.HexBytes
 }
 
-func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
+func getClaimableKavaSwaps(kavaClient mixedKavaClient, bnbClient rcpBNBClient, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
 	swaps, err := kavaClient.getOpenSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
@@ -147,7 +146,7 @@ func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, b
 	var claimableSwaps []claimableSwap
 	for _, s := range filteredSwaps {
 		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
-		bnbSwap, err := bnbClient.GetSwapByID(bID)
+		bnbSwap, err := bnbClient.getSwapByID(bID)
 		if err != nil {
 			log.Printf("could not fetch random num from bnb swap ID %x: %v\n", bID, err)
 			continue
@@ -165,7 +164,7 @@ func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, b
 	return claimableSwaps, nil
 }
 
-func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+func constructAndSendClaim(kavaClient mixedKavaClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
 	if err != nil {
 		return nil, fmt.Errorf("could not create key manager: %w", err)
@@ -188,7 +187,7 @@ func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, 
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
-	txBz, err := kavaKeyM.Sign(signMsg, kavaClient.codec)
+	txBz, err := kavaKeyM.Sign(signMsg, kavaClient.getCodec())
 	if err != nil {
 		return nil, fmt.Errorf("could not sign: %w", err)
 	}

@@ -10,19 +10,25 @@ import (
 // querySwapsMaxPageSize is the maximum supported 'limit' parameter for querying swaps by recipient address
 const querySwapsMaxPageSize = 100
 
-type bnbChainClient struct {
+type bnbChainClient interface {
+	// TODO
+}
+
+var _ bnbChainClient = rcpBNBClient{}
+
+type rcpBNBClient struct {
 	deputyAddressString string
 	bnbSDKClient        *bnbRpc.HTTP
 }
 
-func newBnbChainClient(rpcURL string, deputyAddress string) bnbChainClient {
-	return bnbChainClient{
+func newRpcBNBClient(rpcURL string, deputyAddress string) rcpBNBClient {
+	return rcpBNBClient{
 		deputyAddressString: deputyAddress,
 		bnbSDKClient:        bnbRpc.NewRPCClient(rpcURL, types.ProdNetwork),
 	}
 }
 
-func (bc bnbChainClient) getOpenSwaps() ([]types.AtomicSwap, error) {
+func (bc rcpBNBClient) getOpenSwaps() ([]types.AtomicSwap, error) {
 	var swapIDs []types.SwapBytes
 	var queryOffset int64 = 0
 	for {
@@ -52,14 +58,14 @@ func (bc bnbChainClient) getOpenSwaps() ([]types.AtomicSwap, error) {
 	return swaps, nil
 }
 
-func (bc bnbChainClient) getAccount(address types.AccAddress) (types.Account, error) {
+func (bc rcpBNBClient) getAccount(address types.AccAddress) (types.Account, error) {
 	return bc.bnbSDKClient.GetAccount(address)
 }
 
-func (bc bnbChainClient) getTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error) {
+func (bc rcpBNBClient) getTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error) {
 	return bc.bnbSDKClient.Tx(txHash, false)
 }
 
-func (bc bnbChainClient) getSwapByID(id types.SwapBytes) (types.AtomicSwap, error) {
+func (bc rcpBNBClient) getSwapByID(id types.SwapBytes) (types.AtomicSwap, error) {
 	return bc.bnbSDKClient.GetSwapByID(id)
 }
