@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/envkey/envkeygo"
+	_ "github.com/envkey/envkeygo" // XXX could do with comment
 	sdk "github.com/kava-labs/cosmos-sdk/types"
 	"github.com/kava-labs/go-sdk/kava"
 
@@ -34,6 +34,7 @@ func loadConfig() Config {
 	}
 }
 
+// XXX could use godoc
 func getSequentialEnvVars(prefix string) []string {
 	var envVars []string
 	for i := 0; ; i++ {
@@ -52,15 +53,19 @@ func main() {
 
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig)
+	kava.SetBech32AddressPrefixes(kavaConfig) // XXX G34 descend only one level of abstraction
 	kavaConfig.Seal()
 
+	// XXX G30 functions should do one thing
+
+	// XXX F1 too many arguements
+	// XXX G5 duplication
 	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
 	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.KavaDeputyAddress, cfg.BnbDeputyAddress, cfg.BnbMnemonics)
 
-	ctx := context.Background()
+	ctx := context.Background() // XXX G34 too many levels of abstraction
 	kavaClaimer.Run(ctx)
-	bnbClaimer.Run(ctx)
+	bnbClaimer.Run(ctx) // XXX G5 duplication
 
 	select {}
 }

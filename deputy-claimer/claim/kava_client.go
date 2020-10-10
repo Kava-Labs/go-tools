@@ -21,6 +21,8 @@ import (
 	tmtypes "github.com/kava-labs/tendermint/types"
 )
 
+// XXX G11 inconsistency - why use rpc and rest?
+
 type kavaChainClient struct {
 	restURL, rpcURL string
 	codec           *codec.Codec
@@ -66,7 +68,7 @@ func (kc kavaChainClient) getAccount(address sdk.AccAddress) (authexported.Accou
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bz, err := ioutil.ReadAll(resp.Body)
+	bz, err := ioutil.ReadAll(resp.Body) // XXX G5 Duplication between all these funcs
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +89,7 @@ func (kc kavaChainClient) broadcastTx(tx tmtypes.Tx) error {
 		return err
 	}
 	if res.Code != 0 { // tx failed to be submitted to the mempool
-		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log)
+		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log) // XXX should return a named error
 	}
 	return nil
 }

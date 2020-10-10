@@ -39,13 +39,14 @@ func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrStri
 		bnbDeputyAddr: bnbDeputyAddr,
 	}
 }
-func (kc KavaClaimer) Run(ctx context.Context) {
+func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate this starts a goroutine
 	go func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
+				// XXX G34 too many levels of abstraction
 				log.Println("finding available deputy claims for kava")
 				err := kc.fetchAndClaimSwaps()
 				if err != nil {
@@ -58,6 +59,9 @@ func (kc KavaClaimer) Run(ctx context.Context) {
 	}(ctx)
 }
 
+// XXX G30 functions should do one thing
+// XXX G34 descend only one level of abstraction, several times over
+// these also make it hard to test
 func (kc KavaClaimer) fetchAndClaimSwaps() error {
 
 	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.bnbDeputyAddr)
@@ -106,7 +110,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	for i := 0; i > len(kc.mnemonics); i++ {
 		<-availableMnemonics
 	}
-	// report any errors
+	// report any errors // XXX C1 inappropriate information
 	var concatenatedErrs string
 	close(errs)
 	for e := range errs {
@@ -120,7 +124,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 }
 
 type claimableSwap struct {
-	swapID       tmbytes.HexBytes
+	swapID       tmbytes.HexBytes // XXX should define my own byte type to abstract the different ones each chain uses
 	randomNumber tmbytes.HexBytes
 }
 
@@ -131,7 +135,7 @@ func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient *bnbRpc.HTTP, b
 	}
 	log.Printf("found %d open kava swaps", len(swaps))
 
-	// filter out new swaps
+	// filter out new swaps // XXX C1 inappropriate information // XXX G34 too many levels of abstraction
 	var filteredSwaps bep3.AtomicSwaps
 	for _, s := range swaps {
 		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
