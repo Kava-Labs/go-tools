@@ -19,8 +19,8 @@ import (
 )
 
 type KavaClaimer struct {
-	kavaClient    mixedKavaClient
-	bnbClient     rcpBNBClient
+	kavaClient    kavaChainClient
+	bnbClient     bnbChainClient
 	mnemonics     []string
 	bnbDeputyAddr types.AccAddress
 }
@@ -127,7 +127,7 @@ type claimableSwap struct {
 	randomNumber tmbytes.HexBytes
 }
 
-func getClaimableKavaSwaps(kavaClient mixedKavaClient, bnbClient rcpBNBClient, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
+func getClaimableKavaSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
 	swaps, err := kavaClient.getOpenSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
@@ -164,7 +164,7 @@ func getClaimableKavaSwaps(kavaClient mixedKavaClient, bnbClient rcpBNBClient, b
 	return claimableSwaps, nil
 }
 
-func constructAndSendClaim(kavaClient mixedKavaClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+func constructAndSendClaim(kavaClient kavaChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
 	if err != nil {
 		return nil, fmt.Errorf("could not create key manager: %w", err)

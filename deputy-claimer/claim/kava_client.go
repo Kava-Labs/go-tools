@@ -24,6 +24,14 @@ import (
 // XXX G11 inconsistency - why use rpc and rest?
 
 type kavaChainClient interface {
+	getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error)
+	getRPCClient() *kavaRpc.KavaClient
+	getTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
+	getOpenSwaps() (bep3.AtomicSwaps, error)
+	getAccount(address sdk.AccAddress) (authexported.Account, error)
+	getChainID() (string, error)
+	broadcastTx(tx tmtypes.Tx) error
+	getCodec() *codec.Codec
 }
 
 var _ kavaChainClient = mixedKavaClient{}
@@ -140,7 +148,11 @@ func (kc mixedKavaClient) getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, 
 	return claim.RandomNumber, nil
 }
 
-func (kc mixedKavaClient) getCodec() *codec.Codec { 
+func (kc mixedKavaClient) getCodec() *codec.Codec {
 	// TODO codec is passed in at creation, it shouldn't need to be pulled out again
 	return kc.codec
+}
+
+func (kc mixedKavaClient) getRPCClient() *kavaRpc.KavaClient {
+	return kc.kavaSDKClient
 }

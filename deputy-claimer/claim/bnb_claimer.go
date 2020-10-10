@@ -17,8 +17,8 @@ import (
 )
 
 type BnbClaimer struct {
-	kavaClient     mixedKavaClient
-	bnbClient      rcpBNBClient
+	kavaClient     kavaChainClient
+	bnbClient      bnbChainClient
 	mnemonics      []string
 	kavaDeputyAddr sdk.AccAddress
 }
@@ -116,7 +116,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 	return nil
 }
 
-func getClaimableBnbSwaps(kavaClient mixedKavaClient, bnbClient rcpBNBClient, kavaDeputyAddr sdk.AccAddress) ([]claimableSwap, error) {
+func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, kavaDeputyAddr sdk.AccAddress) ([]claimableSwap, error) {
 	swaps, err := bnbClient.getOpenSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
@@ -137,7 +137,7 @@ func getClaimableBnbSwaps(kavaClient mixedKavaClient, bnbClient rcpBNBClient, ka
 		// get the random number for a claim transaction for the kava swap
 		randNum, err := kavaClient.getRandomNumberFromSwap(kID)
 		if err != nil {
-			log.Printf("could not fetch random num from kava swap ID %x: %w\n", kID, err)
+			log.Printf("could not fetch random num from kava swap ID %x: %v\n", kID, err)
 			continue
 		}
 		claimableSwaps = append(
@@ -150,14 +150,14 @@ func getClaimableBnbSwaps(kavaClient mixedKavaClient, bnbClient rcpBNBClient, ka
 	return claimableSwaps, nil
 }
 
-func constructAndSendBnbClaim(bnbClient rcpBNBClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+func constructAndSendBnbClaim(bnbClient bnbChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	keyManager, err := keys.NewMnemonicKeyManager(mnemonic)
 	if err != nil {
 		return nil, fmt.Errorf("could not create key manager: %w", err)
 	}
-	bnbClient.bnbSDKClient.SetKeyManager(keyManager)
-	defer bnbClient.bnbSDKClient.SetKeyManager(nil)
-	res, err := bnbClient.bnbSDKClient.ClaimHTLT(swapID, randNum, bnbRpc.Sync)
+	bnbClient.getBNBSDKClient().SetKeyManager(keyManager) // XXX G14 feature envy
+	defer bnbClient.getBNBSDKClient().SetKeyManager(nil)
+	res, err := bnbClient.getBNBSDKClient().ClaimHTLT(swapID, randNum, bnbRpc.Sync)
 	if err != nil {
 		return nil, fmt.Errorf("could not submit claim: %w", err)
 	}
