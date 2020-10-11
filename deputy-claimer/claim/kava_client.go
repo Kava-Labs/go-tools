@@ -23,18 +23,20 @@ import (
 
 // XXX G11 inconsistency - why use rpc and rest?
 
-type kavaChainClient interface {
-	getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error)
-	getRPCClient() *kavaRpc.KavaClient
-	getTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
-	getOpenSwaps() (bep3.AtomicSwaps, error)
-	getAccount(address sdk.AccAddress) (authexported.Account, error)
-	getChainID() (string, error)
-	broadcastTx(tx tmtypes.Tx) error
-	getCodec() *codec.Codec
+//go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
+
+type KavaChainClient interface {
+	GetRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error)
+	GetRPCClient() *kavaRpc.KavaClient
+	GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
+	GetOpenSwaps() (bep3.AtomicSwaps, error)
+	GetAccount(address sdk.AccAddress) (authexported.Account, error)
+	GetChainID() (string, error)
+	BroadcastTx(tx tmtypes.Tx) error
+	GetCodec() *codec.Codec
 }
 
-var _ kavaChainClient = mixedKavaClient{}
+var _ KavaChainClient = mixedKavaClient{}
 
 type mixedKavaClient struct {
 	restURL, rpcURL string
@@ -42,7 +44,7 @@ type mixedKavaClient struct {
 	kavaSDKClient   *kavaRpc.KavaClient
 }
 
-func newMixedKavaClient(restURL, rpcURL string, cdc *codec.Codec) mixedKavaClient {
+func NewMixedKavaClient(restURL, rpcURL string, cdc *codec.Codec) mixedKavaClient {
 	// use a fake mnemonic as we're not using the kava client for signing
 	dummyMnemonic := "adult stem bus people vast riot eager faith sponsor unlock hold lion sport drop eyebrow loud angry couch panic east three credit grain talk"
 	return mixedKavaClient{
@@ -57,7 +59,7 @@ type restResponse struct {
 	Result json.RawMessage `json:"result"`
 }
 
-func (kc mixedKavaClient) getOpenSwaps() (bep3.AtomicSwaps, error) {
+func (kc mixedKavaClient) GetOpenSwaps() (bep3.AtomicSwaps, error) {
 	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
 	if err != nil {
 		return nil, err
@@ -75,7 +77,7 @@ func (kc mixedKavaClient) getOpenSwaps() (bep3.AtomicSwaps, error) {
 	return swaps, nil
 }
 
-func (kc mixedKavaClient) getAccount(address sdk.AccAddress) (authexported.Account, error) {
+func (kc mixedKavaClient) GetAccount(address sdk.AccAddress) (authexported.Account, error) {
 	resp, err := http.Get(kc.restURL + "/auth/accounts/" + address.String()) // TODO construct urls properly
 	if err != nil {
 		return nil, err
@@ -92,11 +94,11 @@ func (kc mixedKavaClient) getAccount(address sdk.AccAddress) (authexported.Accou
 	return account, nil
 }
 
-func (kc mixedKavaClient) getTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error) {
+func (kc mixedKavaClient) GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error) {
 	return kc.kavaSDKClient.HTTP.Tx(txHash, false)
 }
 
-func (kc mixedKavaClient) broadcastTx(tx tmtypes.Tx) error {
+func (kc mixedKavaClient) BroadcastTx(tx tmtypes.Tx) error {
 	res, err := kc.kavaSDKClient.BroadcastTxSync(tx)
 	if err != nil {
 		return err
@@ -107,7 +109,7 @@ func (kc mixedKavaClient) broadcastTx(tx tmtypes.Tx) error {
 	return nil
 }
 
-func (kc mixedKavaClient) getChainID() (string, error) {
+func (kc mixedKavaClient) GetChainID() (string, error) {
 	infoResp, err := http.Get(kc.restURL + "/node_info")
 	if err != nil {
 		return "", err
@@ -122,11 +124,11 @@ func (kc mixedKavaClient) getChainID() (string, error) {
 	return nodeInfo.Network, nil
 }
 
-func (kc mixedKavaClient) getSwapByID(id tmbytes.HexBytes) (bep3.AtomicSwap, error) {
+func (kc mixedKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3.AtomicSwap, error) {
 	return kc.kavaSDKClient.GetSwapByID(id)
 }
 
-func (kc mixedKavaClient) getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error) {
+func (kc mixedKavaClient) GetRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error) {
 	strID := strings.ToLower(hex.EncodeToString(id))
 	query := fmt.Sprintf(`claim_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
 	res, err := kc.kavaSDKClient.HTTP.TxSearch(query, false, 1, 1000, "")
@@ -148,11 +150,11 @@ func (kc mixedKavaClient) getRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, 
 	return claim.RandomNumber, nil
 }
 
-func (kc mixedKavaClient) getCodec() *codec.Codec {
+func (kc mixedKavaClient) GetCodec() *codec.Codec {
 	// TODO codec is passed in at creation, it shouldn't need to be pulled out again
 	return kc.codec
 }
 
-func (kc mixedKavaClient) getRPCClient() *kavaRpc.KavaClient {
+func (kc mixedKavaClient) GetRPCClient() *kavaRpc.KavaClient {
 	return kc.kavaSDKClient
 }

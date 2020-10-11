@@ -13,4 +13,5 @@ require (
 	github.com/kava-labs/go-sdk v0.1.6
 	github.com/kava-labs/tendermint v0.33.4-0.20200520221629-77480532c622
 	github.com/stretchr/testify v1.5.1
+	github.com/tendermint/go-amino v0.15.1
 )

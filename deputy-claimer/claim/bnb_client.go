@@ -10,28 +10,30 @@ import (
 // querySwapsMaxPageSize is the maximum supported 'limit' parameter for querying swaps by recipient address
 const querySwapsMaxPageSize = 100
 
-type bnbChainClient interface {
-	getTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error)
-	getOpenSwaps() ([]types.AtomicSwap, error)
-	getBNBSDKClient() *bnbRpc.HTTP
-	getSwapByID(id types.SwapBytes) (types.AtomicSwap, error)
+//go:generate mockgen -destination mock/bnb_client.go -package mock . BnbChainClient
+
+type BnbChainClient interface { // XXX should be defined in the claimer, not the client. Doesn't need to be exported?
+	GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error)
+	GetOpenSwaps() ([]types.AtomicSwap, error)
+	GetBNBSDKClient() *bnbRpc.HTTP
+	GetSwapByID(id types.SwapBytes) (types.AtomicSwap, error)
 }
 
-var _ bnbChainClient = rpcBNBClient{}
+var _ BnbChainClient = rpcBNBClient{}
 
 type rpcBNBClient struct {
 	deputyAddressString string
 	bnbSDKClient        *bnbRpc.HTTP
 }
 
-func newRpcBNBClient(rpcURL string, deputyAddress string) rpcBNBClient {
+func NewRpcBNBClient(rpcURL string, deputyAddress string) rpcBNBClient {
 	return rpcBNBClient{
 		deputyAddressString: deputyAddress,
 		bnbSDKClient:        bnbRpc.NewRPCClient(rpcURL, types.ProdNetwork),
 	}
 }
 
-func (bc rpcBNBClient) getOpenSwaps() ([]types.AtomicSwap, error) {
+func (bc rpcBNBClient) GetOpenSwaps() ([]types.AtomicSwap, error) {
 	var swapIDs []types.SwapBytes
 	var queryOffset int64 = 0
 	for {
@@ -49,7 +51,7 @@ func (bc rpcBNBClient) getOpenSwaps() ([]types.AtomicSwap, error) {
 
 	var swaps []types.AtomicSwap
 	for _, id := range swapIDs {
-		s, err := bc.getSwapByID(id)
+		s, err := bc.GetSwapByID(id)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't find swap for ID %x: %w", id, err) // TODO should probably retry on failure
 		}
@@ -61,18 +63,18 @@ func (bc rpcBNBClient) getOpenSwaps() ([]types.AtomicSwap, error) {
 	return swaps, nil
 }
 
-func (bc rpcBNBClient) getAccount(address types.AccAddress) (types.Account, error) {
+func (bc rpcBNBClient) GetAccount(address types.AccAddress) (types.Account, error) {
 	return bc.bnbSDKClient.GetAccount(address)
 }
 
-func (bc rpcBNBClient) getTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error) {
+func (bc rpcBNBClient) GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error) {
 	return bc.bnbSDKClient.Tx(txHash, false)
 }
 
-func (bc rpcBNBClient) getSwapByID(id types.SwapBytes) (types.AtomicSwap, error) {
+func (bc rpcBNBClient) GetSwapByID(id types.SwapBytes) (types.AtomicSwap, error) {
 	return bc.bnbSDKClient.GetSwapByID(id)
 }
 
-func (bc rpcBNBClient) getBNBSDKClient() *bnbRpc.HTTP {
+func (bc rpcBNBClient) GetBNBSDKClient() *bnbRpc.HTTP {
 	return bc.bnbSDKClient
 }
