@@ -7,6 +7,7 @@ require (
 	github.com/certifi/gocertifi v0.0.0-20200211180108-c7c1fbc02894 // indirect
 	github.com/envkey/envkey-fetch v1.2.8 // indirect
 	github.com/envkey/envkeygo v1.2.5
+	github.com/golang/mock v1.4.4
 	github.com/joho/godotenv v1.3.0 // indirect
 	github.com/kava-labs/cosmos-sdk v0.38.3-stable.0.20200520223313-bfbe25d175da
 	github.com/kava-labs/go-sdk v0.1.6

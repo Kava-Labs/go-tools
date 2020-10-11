@@ -5,6 +5,7 @@
 package mock_claim
 
 import (
+	rpc "github.com/binance-chain/go-sdk/client/rpc"
 	types "github.com/binance-chain/go-sdk/common/types"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -31,6 +32,50 @@ func NewMockbnbChainClient(ctrl *gomock.Controller) *MockbnbChainClient {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockbnbChainClient) EXPECT() *MockbnbChainClientMockRecorder {
 	return m.recorder
+}
+
+// getTxConfirmation mocks base method
+func (m *MockbnbChainClient) getTxConfirmation(txHash []byte) (*rpc.ResultTx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getTxConfirmation", txHash)
+	ret0, _ := ret[0].(*rpc.ResultTx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// getTxConfirmation indicates an expected call of getTxConfirmation
+func (mr *MockbnbChainClientMockRecorder) getTxConfirmation(txHash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getTxConfirmation", reflect.TypeOf((*MockbnbChainClient)(nil).getTxConfirmation), txHash)
+}
+
+// getOpenSwaps mocks base method
+func (m *MockbnbChainClient) getOpenSwaps() ([]types.AtomicSwap, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getOpenSwaps")
+	ret0, _ := ret[0].([]types.AtomicSwap)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// getOpenSwaps indicates an expected call of getOpenSwaps
+func (mr *MockbnbChainClientMockRecorder) getOpenSwaps() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getOpenSwaps", reflect.TypeOf((*MockbnbChainClient)(nil).getOpenSwaps))
+}
+
+// getBNBSDKClient mocks base method
+func (m *MockbnbChainClient) getBNBSDKClient() *rpc.HTTP {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getBNBSDKClient")
+	ret0, _ := ret[0].(*rpc.HTTP)
+	return ret0
+}
+
+// getBNBSDKClient indicates an expected call of getBNBSDKClient
+func (mr *MockbnbChainClientMockRecorder) getBNBSDKClient() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getBNBSDKClient", reflect.TypeOf((*MockbnbChainClient)(nil).getBNBSDKClient))
 }
 
 // getSwapByID mocks base method

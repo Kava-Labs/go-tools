@@ -9,7 +9,9 @@ import (
 	codec "github.com/kava-labs/cosmos-sdk/codec"
 	types "github.com/kava-labs/cosmos-sdk/types"
 	exported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
+	client "github.com/kava-labs/go-sdk/client"
 	bep3 "github.com/kava-labs/go-sdk/kava/bep3"
+	bytes "github.com/kava-labs/tendermint/libs/bytes"
 	coretypes "github.com/kava-labs/tendermint/rpc/core/types"
 	types0 "github.com/kava-labs/tendermint/types"
 	reflect "reflect"
@@ -36,6 +38,50 @@ func NewMockkavaChainClient(ctrl *gomock.Controller) *MockkavaChainClient {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockkavaChainClient) EXPECT() *MockkavaChainClientMockRecorder {
 	return m.recorder
+}
+
+// getRandomNumberFromSwap mocks base method
+func (m *MockkavaChainClient) getRandomNumberFromSwap(id []byte) (bytes.HexBytes, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getRandomNumberFromSwap", id)
+	ret0, _ := ret[0].(bytes.HexBytes)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// getRandomNumberFromSwap indicates an expected call of getRandomNumberFromSwap
+func (mr *MockkavaChainClientMockRecorder) getRandomNumberFromSwap(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getRandomNumberFromSwap", reflect.TypeOf((*MockkavaChainClient)(nil).getRandomNumberFromSwap), id)
+}
+
+// getRPCClient mocks base method
+func (m *MockkavaChainClient) getRPCClient() *client.KavaClient {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getRPCClient")
+	ret0, _ := ret[0].(*client.KavaClient)
+	return ret0
+}
+
+// getRPCClient indicates an expected call of getRPCClient
+func (mr *MockkavaChainClientMockRecorder) getRPCClient() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getRPCClient", reflect.TypeOf((*MockkavaChainClient)(nil).getRPCClient))
+}
+
+// getTxConfirmation mocks base method
+func (m *MockkavaChainClient) getTxConfirmation(txHash []byte) (*coretypes.ResultTx, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "getTxConfirmation", txHash)
+	ret0, _ := ret[0].(*coretypes.ResultTx)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// getTxConfirmation indicates an expected call of getTxConfirmation
+func (mr *MockkavaChainClientMockRecorder) getTxConfirmation(txHash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getTxConfirmation", reflect.TypeOf((*MockkavaChainClient)(nil).getTxConfirmation), txHash)
 }
 
 // getOpenSwaps mocks base method
@@ -68,19 +114,19 @@ func (mr *MockkavaChainClientMockRecorder) getAccount(address interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getAccount", reflect.TypeOf((*MockkavaChainClient)(nil).getAccount), address)
 }
 
-// getTxConfirmation mocks base method
-func (m *MockkavaChainClient) getTxConfirmation(txHash []byte) (*coretypes.ResultTx, error) {
+// getChainID mocks base method
+func (m *MockkavaChainClient) getChainID() (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getTxConfirmation", txHash)
-	ret0, _ := ret[0].(*coretypes.ResultTx)
+	ret := m.ctrl.Call(m, "getChainID")
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// getTxConfirmation indicates an expected call of getTxConfirmation
-func (mr *MockkavaChainClientMockRecorder) getTxConfirmation(txHash interface{}) *gomock.Call {
+// getChainID indicates an expected call of getChainID
+func (mr *MockkavaChainClientMockRecorder) getChainID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getTxConfirmation", reflect.TypeOf((*MockkavaChainClient)(nil).getTxConfirmation), txHash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getChainID", reflect.TypeOf((*MockkavaChainClient)(nil).getChainID))
 }
 
 // broadcastTx mocks base method
@@ -95,21 +141,6 @@ func (m *MockkavaChainClient) broadcastTx(tx types0.Tx) error {
 func (mr *MockkavaChainClientMockRecorder) broadcastTx(tx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "broadcastTx", reflect.TypeOf((*MockkavaChainClient)(nil).broadcastTx), tx)
-}
-
-// getChainID mocks base method
-func (m *MockkavaChainClient) getChainID() (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "getChainID")
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// getChainID indicates an expected call of getChainID
-func (mr *MockkavaChainClientMockRecorder) getChainID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getChainID", reflect.TypeOf((*MockkavaChainClient)(nil).getChainID))
 }
 
 // getCodec mocks base method
