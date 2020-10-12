@@ -10,21 +10,21 @@ import (
 	"strings"
 	"time"
 
-	brpc "github.com/binance-chain/go-sdk/client/rpc"
-	btypes "github.com/binance-chain/go-sdk/common/types"
-	bkeys "github.com/binance-chain/go-sdk/keys"
+	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
+	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
+	bkeys "github.com/kava-labs/binance-chain-go-sdk/keys"
 	log "github.com/sirupsen/logrus"
 	amino "github.com/tendermint/go-amino"
 	"golang.org/x/sync/semaphore"
 
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
-	"github.com/kava-labs/go-sdk/kava"
-	"github.com/kava-labs/go-sdk/kava/bep3"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/kava-labs/go-sdk/keys"
-	tmlog "github.com/kava-labs/tendermint/libs/log"
-	rpcclient "github.com/kava-labs/tendermint/rpc/client"
-	tmtypes "github.com/kava-labs/tendermint/types"
+	kava "github.com/kava-labs/kava/app"
+	bep3 "github.com/kava-labs/kava/x/bep3/types"
+	tmlog "github.com/tendermint/tendermint/libs/log"
+	rpcclient "github.com/tendermint/tendermint/rpc/client/http"
+	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
@@ -62,7 +62,7 @@ func main() {
 	}
 
 	// Start Kava HTTP client
-	http, err := rpcclient.NewHTTP(c.Kava.Endpoint, "/websocket")
+	http, err := rpcclient.New(c.Kava.Endpoint, "/websocket")
 	if err != nil {
 		panic(err)
 	}
