@@ -26,10 +26,10 @@ import (
 //go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
 
 type KavaChainClient interface {
-	GetRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error)
+	GetRandomNumberFromSwap(id []byte) ([]byte, error)
 	GetRPCClient() *kavaRpc.KavaClient
 	GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
-	GetOpenSwaps() (bep3.AtomicSwaps, error)
+	GetOpenOutgoingSwaps() (bep3.AtomicSwaps, error)
 	GetAccount(address sdk.AccAddress) (authexported.Account, error)
 	GetChainID() (string, error)
 	BroadcastTx(tx tmtypes.Tx) error
@@ -59,7 +59,7 @@ type restResponse struct {
 	Result json.RawMessage `json:"result"`
 }
 
-func (kc mixedKavaClient) GetOpenSwaps() (bep3.AtomicSwaps, error) {
+func (kc mixedKavaClient) GetOpenOutgoingSwaps() (bep3.AtomicSwaps, error) {
 	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
 	if err != nil {
 		return nil, err
@@ -128,7 +128,7 @@ func (kc mixedKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3.AtomicSwap, err
 	return kc.kavaSDKClient.GetSwapByID(id)
 }
 
-func (kc mixedKavaClient) GetRandomNumberFromSwap(id []byte) (tmbytes.HexBytes, error) {
+func (kc mixedKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	strID := strings.ToLower(hex.EncodeToString(id))
 	query := fmt.Sprintf(`claim_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
 	res, err := kc.kavaSDKClient.HTTP.TxSearch(query, false, 1, 1000, "")

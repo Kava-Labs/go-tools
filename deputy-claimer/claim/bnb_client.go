@@ -14,9 +14,9 @@ const querySwapsMaxPageSize = 100
 
 type BnbChainClient interface { // XXX should be defined in the claimer, not the client. Doesn't need to be exported?
 	GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error)
-	GetOpenSwaps() ([]types.AtomicSwap, error)
+	GetOpenOutgoingSwaps() ([]types.AtomicSwap, error)
+	GetRandomNumberFromSwap(id []byte) ([]byte, error)
 	GetBNBSDKClient() *bnbRpc.HTTP
-	GetSwapByID(id types.SwapBytes) (types.AtomicSwap, error)
 }
 
 var _ BnbChainClient = rpcBNBClient{}
@@ -33,7 +33,7 @@ func NewRpcBNBClient(rpcURL string, deputyAddress string) rpcBNBClient {
 	}
 }
 
-func (bc rpcBNBClient) GetOpenSwaps() ([]types.AtomicSwap, error) {
+func (bc rpcBNBClient) GetOpenOutgoingSwaps() ([]types.AtomicSwap, error) {
 	var swapIDs []types.SwapBytes
 	var queryOffset int64 = 0
 	for {
@@ -51,7 +51,7 @@ func (bc rpcBNBClient) GetOpenSwaps() ([]types.AtomicSwap, error) {
 
 	var swaps []types.AtomicSwap
 	for _, id := range swapIDs {
-		s, err := bc.GetSwapByID(id)
+		s, err := bc.bnbSDKClient.GetSwapByID(id)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't find swap for ID %x: %w", id, err) // TODO should probably retry on failure
 		}
@@ -71,8 +71,15 @@ func (bc rpcBNBClient) GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error
 	return bc.bnbSDKClient.Tx(txHash, false)
 }
 
-func (bc rpcBNBClient) GetSwapByID(id types.SwapBytes) (types.AtomicSwap, error) {
-	return bc.bnbSDKClient.GetSwapByID(id)
+func (bc rpcBNBClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
+	swap, err := bc.bnbSDKClient.GetSwapByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch swap: %w", err)
+	}
+	if len(swap.RandomNumber) == 0 {
+		return nil, fmt.Errorf("found swap without random number, status %s", swap.Status)
+	}
+	return swap.RandomNumber, nil
 }
 
 func (bc rpcBNBClient) GetBNBSDKClient() *bnbRpc.HTTP {

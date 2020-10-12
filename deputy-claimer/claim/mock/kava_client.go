@@ -10,7 +10,6 @@ import (
 	exported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
 	client "github.com/kava-labs/go-sdk/client"
 	bep3 "github.com/kava-labs/go-sdk/kava/bep3"
-	bytes "github.com/kava-labs/tendermint/libs/bytes"
 	coretypes "github.com/kava-labs/tendermint/rpc/core/types"
 	types0 "github.com/kava-labs/tendermint/types"
 	amino "github.com/tendermint/go-amino"
@@ -98,19 +97,19 @@ func (mr *MockKavaChainClientMockRecorder) GetCodec() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCodec", reflect.TypeOf((*MockKavaChainClient)(nil).GetCodec))
 }
 
-// GetOpenSwaps mocks base method
-func (m *MockKavaChainClient) GetOpenSwaps() (bep3.AtomicSwaps, error) {
+// GetOpenOutgoingSwaps mocks base method
+func (m *MockKavaChainClient) GetOpenOutgoingSwaps() (bep3.AtomicSwaps, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOpenSwaps")
+	ret := m.ctrl.Call(m, "GetOpenOutgoingSwaps")
 	ret0, _ := ret[0].(bep3.AtomicSwaps)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetOpenSwaps indicates an expected call of GetOpenSwaps
-func (mr *MockKavaChainClientMockRecorder) GetOpenSwaps() *gomock.Call {
+// GetOpenOutgoingSwaps indicates an expected call of GetOpenOutgoingSwaps
+func (mr *MockKavaChainClientMockRecorder) GetOpenOutgoingSwaps() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenSwaps", reflect.TypeOf((*MockKavaChainClient)(nil).GetOpenSwaps))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenOutgoingSwaps", reflect.TypeOf((*MockKavaChainClient)(nil).GetOpenOutgoingSwaps))
 }
 
 // GetRPCClient mocks base method
@@ -128,10 +127,10 @@ func (mr *MockKavaChainClientMockRecorder) GetRPCClient() *gomock.Call {
 }
 
 // GetRandomNumberFromSwap mocks base method
-func (m *MockKavaChainClient) GetRandomNumberFromSwap(arg0 []byte) (bytes.HexBytes, error) {
+func (m *MockKavaChainClient) GetRandomNumberFromSwap(arg0 []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRandomNumberFromSwap", arg0)
-	ret0, _ := ret[0].(bytes.HexBytes)
+	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

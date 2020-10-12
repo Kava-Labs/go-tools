@@ -48,34 +48,34 @@ func (mr *MockBnbChainClientMockRecorder) GetBNBSDKClient() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBNBSDKClient", reflect.TypeOf((*MockBnbChainClient)(nil).GetBNBSDKClient))
 }
 
-// GetOpenSwaps mocks base method
-func (m *MockBnbChainClient) GetOpenSwaps() ([]types.AtomicSwap, error) {
+// GetOpenOutgoingSwaps mocks base method
+func (m *MockBnbChainClient) GetOpenOutgoingSwaps() ([]types.AtomicSwap, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOpenSwaps")
+	ret := m.ctrl.Call(m, "GetOpenOutgoingSwaps")
 	ret0, _ := ret[0].([]types.AtomicSwap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetOpenSwaps indicates an expected call of GetOpenSwaps
-func (mr *MockBnbChainClientMockRecorder) GetOpenSwaps() *gomock.Call {
+// GetOpenOutgoingSwaps indicates an expected call of GetOpenOutgoingSwaps
+func (mr *MockBnbChainClientMockRecorder) GetOpenOutgoingSwaps() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenSwaps", reflect.TypeOf((*MockBnbChainClient)(nil).GetOpenSwaps))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenOutgoingSwaps", reflect.TypeOf((*MockBnbChainClient)(nil).GetOpenOutgoingSwaps))
 }
 
-// GetSwapByID mocks base method
-func (m *MockBnbChainClient) GetSwapByID(arg0 types.SwapBytes) (types.AtomicSwap, error) {
+// GetRandomNumberFromSwap mocks base method
+func (m *MockBnbChainClient) GetRandomNumberFromSwap(arg0 []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSwapByID", arg0)
-	ret0, _ := ret[0].(types.AtomicSwap)
+	ret := m.ctrl.Call(m, "GetRandomNumberFromSwap", arg0)
+	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetSwapByID indicates an expected call of GetSwapByID
-func (mr *MockBnbChainClientMockRecorder) GetSwapByID(arg0 interface{}) *gomock.Call {
+// GetRandomNumberFromSwap indicates an expected call of GetRandomNumberFromSwap
+func (mr *MockBnbChainClientMockRecorder) GetRandomNumberFromSwap(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSwapByID", reflect.TypeOf((*MockBnbChainClient)(nil).GetSwapByID), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRandomNumberFromSwap", reflect.TypeOf((*MockBnbChainClient)(nil).GetRandomNumberFromSwap), arg0)
 }
 
 // GetTxConfirmation mocks base method

@@ -117,7 +117,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 }
 
 func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, kavaDeputyAddr sdk.AccAddress) ([]claimableSwap, error) {
-	swaps, err := bnbClient.GetOpenSwaps()
+	swaps, err := bnbClient.GetOpenOutgoingSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
 	}
@@ -137,7 +137,7 @@ func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, 
 		// get the random number for a claim transaction for the kava swap
 		randNum, err := kavaClient.GetRandomNumberFromSwap(kID)
 		if err != nil {
-			log.Printf("could not fetch random num from kava swap ID %x: %v\n", kID, err)
+			log.Printf("could not fetch random num for kava swap ID %x: %v\n", kID, err)
 			continue
 		}
 		claimableSwaps = append(

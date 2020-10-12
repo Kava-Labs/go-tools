@@ -128,7 +128,7 @@ type claimableSwap struct {
 }
 
 func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
-	swaps, err := kavaClient.GetOpenSwaps()
+	swaps, err := kavaClient.GetOpenOutgoingSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
 	}
@@ -137,7 +137,7 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 	// filter out new swaps // XXX C1 inappropriate information // XXX G34 too many levels of abstraction
 	var filteredSwaps bep3.AtomicSwaps
 	for _, s := range swaps {
-		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
+		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) { // XXX should abstract time to allow for easier testing
 			filteredSwaps = append(filteredSwaps, s)
 		}
 	}
@@ -146,20 +146,17 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 	var claimableSwaps []claimableSwap
 	for _, s := range filteredSwaps {
 		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
-		bnbSwap, err := bnbClient.GetSwapByID(bID)
+		randNum, err := bnbClient.GetRandomNumberFromSwap(bID)
 		if err != nil {
-			log.Printf("could not fetch random num from bnb swap ID %x: %v\n", bID, err)
+			log.Printf("could not fetch random num for bnb swap ID %x: %v\n", bID, err)
 			continue
 		}
-		// check the bnb swap status is closed and has random number - ie it has been claimed
-		if len(bnbSwap.RandomNumber) != 0 {
-			claimableSwaps = append(
-				claimableSwaps,
-				claimableSwap{
-					swapID:       s.GetSwapID(),
-					randomNumber: tmbytes.HexBytes(bnbSwap.RandomNumber),
-				})
-		}
+		claimableSwaps = append(
+			claimableSwaps,
+			claimableSwap{
+				swapID:       s.GetSwapID(),
+				randomNumber: randNum,
+			})
 	}
 	return claimableSwaps, nil
 }
