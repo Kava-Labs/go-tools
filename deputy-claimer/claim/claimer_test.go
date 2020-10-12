@@ -67,20 +67,20 @@ func init() {
 			CrossChain:          true,
 			Direction:           bep3.Outgoing,
 		},
-		// { // TODO remove
-		// 	Amount:              sdk.NewCoins(sdk.NewInt64Coin("bnb", 1_00_000_000)),
-		// 	RandomNumberHash:    rndNumHash1,
-		// 	ExpireHeight:        1_000_000,
-		// 	Timestamp:           timestamp,
-		// 	Sender:              addressesKavaDeputy,
-		// 	Recipient:           addressesKavaUsers0,
-		// 	SenderOtherChain:    addressesBnbUsers0.String(),
-		// 	RecipientOtherChain: addressesBnbDeputy.String(),
-		// 	ClosedBlock:         0, // default for open swaps
-		// 	Status:              bep3.Open,
-		// 	CrossChain:          true,
-		// 	Direction:           bep3.Incoming,
-		// },
+		{
+			Amount:              sdk.NewCoins(sdk.NewInt64Coin("bnb", 1_00_000_000)),
+			RandomNumberHash:    rndNumHash1,
+			ExpireHeight:        1_000_000,
+			Timestamp:           timestamp,
+			Sender:              addressesKavaDeputy,
+			Recipient:           addressesKavaUsers0,
+			SenderOtherChain:    addressesBnbUsers0.String(),
+			RecipientOtherChain: addressesBnbDeputy.String(),
+			ClosedBlock:         0, // default for open swaps
+			Status:              bep3.Open,
+			CrossChain:          true,
+			Direction:           bep3.Incoming,
+		},
 	}
 	testBnbSwaps = []bnbtypes.AtomicSwap{
 		{
@@ -100,23 +100,23 @@ func init() {
 			ClosedTime:          9_999_000,
 			Status:              bnbtypes.Completed,
 		},
-		// { // TODO remove
-		// 	// bnb to kava swap
-		// 	From:                addressesBnbUsers0,
-		// 	To:                  addressesBnbDeputy,
-		// 	OutAmount:           bnbtypes.Coins{{Denom: "BNB", Amount: 1_00_000_000}},
-		// 	InAmount:            nil, // seems to always be nil
-		// 	ExpectedIncome:      "100000000:BNB",
-		// 	RecipientOtherChain: addressesKavaUsers0.String(),
-		// 	RandomNumberHash:    rndNumHash1,
-		// 	RandomNumber:        nil, // default for unclaimed swap
-		// 	Timestamp:           timestamp,
-		// 	CrossChain:          true,
-		// 	ExpireHeight:        10_000_000, // TODO
-		// 	Index:               1,          // TODO what is this?
-		// 	ClosedTime:          0,          // TODO default for open swaps?
-		// 	Status:              bnbtypes.Open,
-		// },
+		{
+			// bnb to kava swap
+			From:                addressesBnbUsers0,
+			To:                  addressesBnbDeputy,
+			OutAmount:           bnbtypes.Coins{{Denom: "BNB", Amount: 1_00_000_000}},
+			InAmount:            nil, // seems to always be nil
+			ExpectedIncome:      "100000000:BNB",
+			RecipientOtherChain: addressesKavaUsers0.String(),
+			RandomNumberHash:    rndNumHash1,
+			RandomNumber:        nil, // default for unclaimed swap
+			Timestamp:           timestamp,
+			CrossChain:          true,
+			ExpireHeight:        10_000_000, // TODO
+			Index:               1,          // TODO what is this?
+			ClosedTime:          0,          // TODO default for open swaps?
+			Status:              bnbtypes.Open,
+		},
 	}
 }
 func TestGetClaimableKavaSwaps(t *testing.T) {
@@ -129,7 +129,7 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 
 	kc.EXPECT().
 		GetOpenOutgoingSwaps().
-		Return(testKavaSwaps, nil)
+		Return(testKavaSwaps[:1], nil) // only return outgoing swaps
 
 	bc.EXPECT().
 		GetRandomNumberFromSwap([]byte(calcBnbSwapID(testBnbSwaps[0], addressesKavaUsers0.String()))).
@@ -142,6 +142,34 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 		{
 			swapID:       testKavaSwaps[0].GetSwapID(),
 			randomNumber: []byte(testBnbSwaps[0].RandomNumber),
+		},
+	}
+	require.Equal(t, expectedClaimableSwaps, swaps)
+}
+
+func TestGetClaimableBnbSwaps(t *testing.T) {
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	bc := mock.NewMockBnbChainClient(ctrl)
+	kc := mock.NewMockKavaChainClient(ctrl)
+
+	bc.EXPECT().
+		GetOpenOutgoingSwaps().
+		Return(testBnbSwaps[1:], nil) // return only outgoing swaps
+
+	kc.EXPECT().
+		GetRandomNumberFromSwap([]byte(testKavaSwaps[1].GetSwapID())).
+		Return(rndNum1, nil)
+
+	swaps, err := getClaimableBnbSwaps(kc, bc, addressesKavaDeputy)
+	require.NoError(t, err)
+
+	expectedClaimableSwaps := []claimableSwap{
+		{
+			swapID:       []byte(calcBnbSwapID(testBnbSwaps[1], addressesKavaDeputy.String())),
+			randomNumber: rndNum1,
 		},
 	}
 	require.Equal(t, expectedClaimableSwaps, swaps)
