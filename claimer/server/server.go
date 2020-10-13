@@ -51,7 +51,7 @@ func (s Server) StartServer() {
 	r := mux.NewRouter()
 	r.HandleFunc("/claim", s.claim).Methods(http.MethodPost)
 	r.HandleFunc("/", s.notFound)
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(":9090", r))
 }
 
 func (s Server) claim(w http.ResponseWriter, r *http.Request) {
