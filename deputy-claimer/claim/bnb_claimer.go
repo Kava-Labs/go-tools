@@ -6,14 +6,14 @@ import (
 	"log"
 	"time"
 
-	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
-	"github.com/binance-chain/go-sdk/common/types"
-	"github.com/binance-chain/go-sdk/keys"
-	"github.com/binance-chain/go-sdk/types/msg"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	"github.com/kava-labs/go-sdk/kava"
-	"github.com/kava-labs/go-sdk/kava/bep3"
-	tmbytes "github.com/kava-labs/tendermint/libs/bytes"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
+	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	"github.com/kava-labs/binance-chain-go-sdk/keys"
+	"github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	"github.com/kava-labs/kava/app"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
 type BnbClaimer struct {
@@ -24,7 +24,7 @@ type BnbClaimer struct {
 }
 
 func NewBnbClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, kavaDeputyAddrString, bnbDeputyAddrString string, mnemonics []string) BnbClaimer {
-	cdc := kava.MakeCodec()
+	cdc := app.MakeCodec()
 	kavaDeputyAddr, err := sdk.AccAddressFromBech32(kavaDeputyAddrString)
 	if err != nil {
 		panic(err)
@@ -133,7 +133,7 @@ func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, 
 	// parse out swap ids, query those txs on bnb, extract random numbers
 	var claimableSwaps []claimableSwap
 	for _, s := range filteredSwaps {
-		kID := bep3.CalculateSwapID(s.RandomNumberHash, kavaDeputyAddr, s.From.String())
+		kID := bep3types.CalculateSwapID(s.RandomNumberHash, kavaDeputyAddr, s.From.String())
 		// get the random number for a claim transaction for the kava swap
 		randNum, err := kavaClient.GetRandomNumberFromSwap(kID)
 		if err != nil {

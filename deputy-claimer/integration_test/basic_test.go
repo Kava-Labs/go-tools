@@ -7,15 +7,15 @@ import (
 	"testing"
 	"time"
 
-	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
-	"github.com/binance-chain/go-sdk/common/types"
+	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
+	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 
-	bnbKeys "github.com/binance-chain/go-sdk/keys"
-	"github.com/binance-chain/go-sdk/types/msg"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
+	bnbKeys "github.com/kava-labs/binance-chain-go-sdk/keys"
+	"github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-sdk/client"
-	"github.com/kava-labs/go-sdk/kava"
-	"github.com/kava-labs/go-sdk/kava/bep3"
+	"github.com/kava-labs/kava/app"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
 	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	"github.com/stretchr/testify/require"
 
@@ -25,9 +25,9 @@ import (
 
 func TestClaimKava(t *testing.T) {
 	// setup clients
-	cdc := kava.MakeCodec()
-	kavaClient := client.NewKavaClient(cdc, common.KavaUserMnemonics[0], kava.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
-	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(common.KavaUserMnemonics[0], kava.Bip44CoinType)
+	cdc := app.MakeCodec()
+	kavaClient := client.NewKavaClient(cdc, common.KavaUserMnemonics[0], app.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
+	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(common.KavaUserMnemonics[0], app.Bip44CoinType)
 	require.NoError(t, err)
 	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(common.BnbDeputyMnemonic)
 	require.NoError(t, err)
@@ -35,11 +35,11 @@ func TestClaimKava(t *testing.T) {
 	bnbClient.SetKeyManager(bnbKeyM)
 
 	// send htlt on kva
-	rndNum, err := bep3.GenerateSecureRandomNumber()
+	rndNum, err := bep3types.GenerateSecureRandomNumber()
 	require.NoError(t, err)
 	timestamp := time.Now().Unix() - 10*60 - 1 // set the timestamp to be in the past
-	rndHash := bep3.CalculateRandomHash(rndNum, timestamp)
-	createMsg := bep3.NewMsgCreateAtomicSwap(
+	rndHash := bep3types.CalculateRandomHash(rndNum, timestamp)
+	createMsg := bep3types.NewMsgCreateAtomicSwap(
 		kavaKeyM.GetAddr(),              // sender
 		common.KavaDeputyAddr,           // recipient
 		common.BnbUserAddrs[0].String(), // recipient other chain
@@ -55,10 +55,10 @@ func TestClaimKava(t *testing.T) {
 	require.NoError(t, err)
 
 	// send another htlt on kava
-	rndNum2, err := bep3.GenerateSecureRandomNumber()
+	rndNum2, err := bep3types.GenerateSecureRandomNumber()
 	require.NoError(t, err)
-	rndHash2 := bep3.CalculateRandomHash(rndNum2, timestamp)
-	createMsg2 := bep3.NewMsgCreateAtomicSwap(
+	rndHash2 := bep3types.CalculateRandomHash(rndNum2, timestamp)
+	createMsg2 := bep3types.NewMsgCreateAtomicSwap(
 		kavaKeyM.GetAddr(),              // sender
 		common.KavaDeputyAddr,           // recipient
 		common.BnbUserAddrs[0].String(), // recipient other chain
@@ -116,26 +116,26 @@ func TestClaimKava(t *testing.T) {
 	time.Sleep(8 * time.Second)
 
 	// check the first kava swap was claimed
-	kavaSwapID := bep3.CalculateSwapID(rndHash, kavaKeyM.GetAddr(), common.BnbDeputyAddr.String())
+	kavaSwapID := bep3types.CalculateSwapID(rndHash, kavaKeyM.GetAddr(), common.BnbDeputyAddr.String())
 	s, err := kavaClient.GetSwapByID(kavaSwapID)
 	require.NoError(t, err)
-	require.Equal(t, bep3.Completed, s.Status)
+	require.Equal(t, bep3types.Completed, s.Status)
 }
 
 func TestClaimBnb(t *testing.T) {
 	// setup clients
-	cdc := kava.MakeCodec()
-	kavaClient := client.NewKavaClient(cdc, common.KavaDeputyMnemonic, kava.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
+	cdc := app.MakeCodec()
+	kavaClient := client.NewKavaClient(cdc, common.KavaDeputyMnemonic, app.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
 	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(common.BnbUserMnemonics[0])
 	require.NoError(t, err)
 	bnbClient := bnbRpc.NewRPCClient(common.BnbNodeURL, types.ProdNetwork)
 	bnbClient.SetKeyManager(bnbKeyM)
 
 	// Create a swap on each chain
-	rndNum, err := bep3.GenerateSecureRandomNumber()
+	rndNum, err := bep3types.GenerateSecureRandomNumber()
 	require.NoError(t, err)
 	timestamp := time.Now().Unix() - 10*60 - 1 // set the timestamp to be in the past
-	rndHash := bep3.CalculateRandomHash(rndNum, timestamp)
+	rndHash := bep3types.CalculateRandomHash(rndNum, timestamp)
 	_, err = bnbClient.HTLT(
 		common.BnbDeputyAddr,             // recipient
 		common.KavaUserAddrs[0].String(), // recipient other chain
@@ -149,7 +149,7 @@ func TestClaimBnb(t *testing.T) {
 		bnbRpc.Commit,
 	)
 	require.NoError(t, err)
-	createMsg := bep3.NewMsgCreateAtomicSwap(
+	createMsg := bep3types.NewMsgCreateAtomicSwap(
 		common.KavaDeputyAddr,           // sender
 		common.KavaUserAddrs[0],         // recipient
 		common.BnbDeputyAddr.String(),   // recipient other chain
@@ -165,9 +165,9 @@ func TestClaimBnb(t *testing.T) {
 	require.EqualValues(t, res.Code, 0)
 
 	// Create another pair of swaps
-	rndNum2, err := bep3.GenerateSecureRandomNumber()
+	rndNum2, err := bep3types.GenerateSecureRandomNumber()
 	require.NoError(t, err)
-	rndHash2 := bep3.CalculateRandomHash(rndNum2, timestamp)
+	rndHash2 := bep3types.CalculateRandomHash(rndNum2, timestamp)
 	_, err = bnbClient.HTLT(
 		common.BnbDeputyAddr,             // recipient
 		common.KavaUserAddrs[0].String(), // recipient other chain
@@ -181,7 +181,7 @@ func TestClaimBnb(t *testing.T) {
 		bnbRpc.Commit,
 	)
 	require.NoError(t, err)
-	createMsg2 := bep3.NewMsgCreateAtomicSwap(
+	createMsg2 := bep3types.NewMsgCreateAtomicSwap(
 		common.KavaDeputyAddr,           // sender
 		common.KavaUserAddrs[0],         // recipient
 		common.BnbDeputyAddr.String(),   // recipient other chain
@@ -198,8 +198,8 @@ func TestClaimBnb(t *testing.T) {
 
 	// claim first kava htlt
 	time.Sleep(3 * time.Second)
-	kavaID := bep3.CalculateSwapID(rndHash, common.KavaDeputyAddr, common.BnbUserAddrs[0].String())
-	claimMsg := bep3.NewMsgClaimAtomicSwap(
+	kavaID := bep3types.CalculateSwapID(rndHash, common.KavaDeputyAddr, common.BnbUserAddrs[0].String())
+	claimMsg := bep3types.NewMsgClaimAtomicSwap(
 		common.KavaDeputyAddr,
 		kavaID,
 		rndNum,

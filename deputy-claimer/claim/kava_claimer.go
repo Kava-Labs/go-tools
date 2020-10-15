@@ -7,15 +7,15 @@ import (
 	"log"
 	"time"
 
-	"github.com/binance-chain/go-sdk/common/types"
-	bnbmsg "github.com/binance-chain/go-sdk/types/msg"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
-	"github.com/kava-labs/go-sdk/kava"
-	"github.com/kava-labs/go-sdk/kava/bep3"
+	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/kava-labs/kava/app"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
 	kavaKeys "github.com/kava-labs/go-sdk/keys"
-	tmbytes "github.com/kava-labs/tendermint/libs/bytes"
-	tmtypes "github.com/kava-labs/tendermint/types"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 type KavaClaimer struct {
@@ -26,7 +26,7 @@ type KavaClaimer struct {
 }
 
 func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) KavaClaimer {
-	cdc := kava.MakeCodec()
+	cdc := app.MakeCodec()
 	bnbDeputyAddr, err := types.AccAddressFromBech32(bnbDeputyAddrString)
 	if err != nil {
 		panic(err)
@@ -135,7 +135,7 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 	log.Printf("found %d open kava swaps", len(swaps))
 
 	// filter out new swaps // XXX C1 inappropriate information // XXX G34 too many levels of abstraction
-	var filteredSwaps bep3.AtomicSwaps
+	var filteredSwaps bep3types.AtomicSwaps
 	for _, s := range swaps {
 		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) { // XXX should abstract time to allow for easier testing
 			filteredSwaps = append(filteredSwaps, s)
@@ -162,12 +162,12 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 }
 
 func constructAndSendClaim(kavaClient KavaChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
-	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
+	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, app.Bip44CoinType)
 	if err != nil {
 		return nil, fmt.Errorf("could not create key manager: %w", err)
 	}
 	// construct and sign tx
-	msg := bep3.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), swapID, randNum)
+	msg := bep3types.NewMsgClaimAtomicSwap(kavaKeyM.GetAddr(), swapID, randNum)
 	chainID, err := kavaClient.GetChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch chain id: %w", err)

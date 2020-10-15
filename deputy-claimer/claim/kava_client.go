@@ -8,17 +8,17 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kava-labs/cosmos-sdk/client/rpc"
-	"github.com/kava-labs/cosmos-sdk/codec"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	authexported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
-	authTypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
+	"github.com/cosmos/cosmos-sdk/client/rpc"
+	"github.com/cosmos/cosmos-sdk/codec"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
+	authTypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	kavaRpc "github.com/kava-labs/go-sdk/client"
-	"github.com/kava-labs/go-sdk/kava"
-	"github.com/kava-labs/go-sdk/kava/bep3"
-	tmbytes "github.com/kava-labs/tendermint/libs/bytes"
-	tmRPCTypes "github.com/kava-labs/tendermint/rpc/core/types"
-	tmtypes "github.com/kava-labs/tendermint/types"
+	"github.com/kava-labs/kava/app"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+	tmRPCTypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 // XXX G11 inconsistency - why use rpc and rest?
@@ -29,7 +29,7 @@ type KavaChainClient interface {
 	GetRandomNumberFromSwap(id []byte) ([]byte, error)
 	GetRPCClient() *kavaRpc.KavaClient
 	GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
-	GetOpenOutgoingSwaps() (bep3.AtomicSwaps, error)
+	GetOpenOutgoingSwaps() (bep3types.AtomicSwaps, error)
 	GetAccount(address sdk.AccAddress) (authexported.Account, error)
 	GetChainID() (string, error)
 	BroadcastTx(tx tmtypes.Tx) error
@@ -50,7 +50,7 @@ func NewMixedKavaClient(restURL, rpcURL string, cdc *codec.Codec) mixedKavaClien
 	return mixedKavaClient{
 		restURL:       restURL,
 		codec:         cdc,
-		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, kava.Bip44CoinType, rpcURL, kavaRpc.ProdNetwork),
+		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, app.Bip44CoinType, rpcURL),
 	}
 }
 
@@ -59,7 +59,7 @@ type restResponse struct {
 	Result json.RawMessage `json:"result"`
 }
 
-func (kc mixedKavaClient) GetOpenOutgoingSwaps() (bep3.AtomicSwaps, error) {
+func (kc mixedKavaClient) GetOpenOutgoingSwaps() (bep3types.AtomicSwaps, error) {
 	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (kc mixedKavaClient) GetOpenOutgoingSwaps() (bep3.AtomicSwaps, error) {
 	}
 	var res restResponse
 	kc.codec.MustUnmarshalJSON(bz, &res)
-	var swaps bep3.AtomicSwaps
+	var swaps bep3types.AtomicSwaps
 	kc.codec.MustUnmarshalJSON(res.Result, &swaps)
 	return swaps, nil
 }
@@ -124,7 +124,7 @@ func (kc mixedKavaClient) GetChainID() (string, error) {
 	return nodeInfo.Network, nil
 }
 
-func (kc mixedKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3.AtomicSwap, error) {
+func (kc mixedKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3types.AtomicSwap, error) {
 	return kc.kavaSDKClient.GetSwapByID(id)
 }
 
@@ -143,7 +143,7 @@ func (kc mixedKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	claim, ok := stdTx.Msgs[0].(bep3.MsgClaimAtomicSwap) // TODO handle the case of multiple messages
+	claim, ok := stdTx.Msgs[0].(bep3types.MsgClaimAtomicSwap) // TODO handle the case of multiple messages
 	if !ok {
 		return nil, fmt.Errorf("unable to decode msg into MsgClaimAtomicSwap")
 	}

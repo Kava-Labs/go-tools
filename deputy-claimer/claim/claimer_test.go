@@ -5,16 +5,16 @@ import (
 	"testing"
 	"time"
 
-	bnbtypes "github.com/binance-chain/go-sdk/common/types"
-	bnbmsg "github.com/binance-chain/go-sdk/types/msg"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/golang/mock/gomock"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	authexported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
-	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
-	"github.com/kava-labs/go-sdk/kava"
-	"github.com/kava-labs/go-sdk/kava/bep3"
-	tmtypes "github.com/kava-labs/tendermint/types"
+	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
+	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	"github.com/kava-labs/kava/app"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
 	"github.com/stretchr/testify/require"
+	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim/mock"
 )
@@ -33,14 +33,14 @@ var (
 	rndNumHash0 []byte
 	rndNumHash1 []byte
 
-	testKavaSwaps bep3.AtomicSwaps
+	testKavaSwaps bep3types.AtomicSwaps
 	testBnbSwaps  []bnbtypes.AtomicSwap
 )
 
 func init() {
 
 	cfg := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(cfg)
+	app.SetBech32AddressPrefixes(cfg)
 	cfg.Seal()
 
 	// These addresses are copied from kvtool common addresses.
@@ -53,10 +53,10 @@ func init() {
 	rndNum0 = mustDecodeHex("52af03e28b32dc838c98936a7654996bd21bcc0d3da5277d5065cf242b26dfe5")
 	rndNum1 = mustDecodeHex("ed9895055b27771b8584de0e838a33d21b6b735de7fd6640770e877b1c23ae5f")
 
-	rndNumHash0 = bep3.CalculateRandomHash(rndNum0, timestamp)
-	rndNumHash1 = bep3.CalculateRandomHash(rndNum1, timestamp)
+	rndNumHash0 = bep3types.CalculateRandomHash(rndNum0, timestamp)
+	rndNumHash1 = bep3types.CalculateRandomHash(rndNum1, timestamp)
 
-	testKavaSwaps = bep3.AtomicSwaps{
+	testKavaSwaps = bep3types.AtomicSwaps{
 		{
 			// swap ID ac36859ba07ec81123f7d860ce2ca6a704385bd3ace6654601d43f84a235d306
 			Amount:              sdk.NewCoins(sdk.NewInt64Coin("bnb", 1_00_000_000)),
@@ -68,9 +68,9 @@ func init() {
 			SenderOtherChain:    addressesBnbDeputy.String(),
 			RecipientOtherChain: addressesBnbUsers0.String(),
 			ClosedBlock:         0, // default for open swaps
-			Status:              bep3.Open,
+			Status:              bep3types.Open,
 			CrossChain:          true,
-			Direction:           bep3.Outgoing,
+			Direction:           bep3types.Outgoing,
 		},
 		{
 			Amount:              sdk.NewCoins(sdk.NewInt64Coin("bnb", 1_00_000_000)),
@@ -82,9 +82,9 @@ func init() {
 			SenderOtherChain:    addressesBnbUsers0.String(),
 			RecipientOtherChain: addressesBnbDeputy.String(),
 			ClosedBlock:         0, // default for open swaps
-			Status:              bep3.Open,
+			Status:              bep3types.Open,
 			CrossChain:          true,
-			Direction:           bep3.Incoming,
+			Direction:           bep3types.Incoming,
 		},
 	}
 	testBnbSwaps = []bnbtypes.AtomicSwap{
@@ -187,7 +187,7 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 	kc := mock.NewMockKavaChainClient(ctrl)
 
 	// set endpoints to return testing data
-	cdc := kava.MakeCodec()
+	cdc := app.MakeCodec()
 	kc.EXPECT().
 		GetCodec().
 		Return(cdc).AnyTimes()

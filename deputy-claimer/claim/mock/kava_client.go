@@ -5,14 +5,14 @@
 package mock
 
 import (
+	types "github.com/cosmos/cosmos-sdk/types"
+	exported "github.com/cosmos/cosmos-sdk/x/auth/exported"
 	gomock "github.com/golang/mock/gomock"
-	types "github.com/kava-labs/cosmos-sdk/types"
-	exported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
 	client "github.com/kava-labs/go-sdk/client"
-	bep3 "github.com/kava-labs/go-sdk/kava/bep3"
-	coretypes "github.com/kava-labs/tendermint/rpc/core/types"
-	types0 "github.com/kava-labs/tendermint/types"
+	types0 "github.com/kava-labs/kava/x/bep3/types"
 	amino "github.com/tendermint/go-amino"
+	coretypes "github.com/tendermint/tendermint/rpc/core/types"
+	types1 "github.com/tendermint/tendermint/types"
 	reflect "reflect"
 )
 
@@ -40,7 +40,7 @@ func (m *MockKavaChainClient) EXPECT() *MockKavaChainClientMockRecorder {
 }
 
 // BroadcastTx mocks base method
-func (m *MockKavaChainClient) BroadcastTx(arg0 types0.Tx) error {
+func (m *MockKavaChainClient) BroadcastTx(arg0 types1.Tx) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BroadcastTx", arg0)
 	ret0, _ := ret[0].(error)
@@ -98,10 +98,10 @@ func (mr *MockKavaChainClientMockRecorder) GetCodec() *gomock.Call {
 }
 
 // GetOpenOutgoingSwaps mocks base method
-func (m *MockKavaChainClient) GetOpenOutgoingSwaps() (bep3.AtomicSwaps, error) {
+func (m *MockKavaChainClient) GetOpenOutgoingSwaps() (types0.AtomicSwaps, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOpenOutgoingSwaps")
-	ret0, _ := ret[0].(bep3.AtomicSwaps)
+	ret0, _ := ret[0].(types0.AtomicSwaps)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

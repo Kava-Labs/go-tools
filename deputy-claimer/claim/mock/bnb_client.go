@@ -5,9 +5,9 @@
 package mock
 
 import (
-	rpc "github.com/binance-chain/go-sdk/client/rpc"
-	types "github.com/binance-chain/go-sdk/common/types"
 	gomock "github.com/golang/mock/gomock"
+	rpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
+	types "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	reflect "reflect"
 )
 

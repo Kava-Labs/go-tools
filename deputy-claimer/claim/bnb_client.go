@@ -3,8 +3,8 @@ package claim
 import (
 	"fmt"
 
-	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
-	"github.com/binance-chain/go-sdk/common/types"
+	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
+	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 )
 
 // querySwapsMaxPageSize is the maximum supported 'limit' parameter for querying swaps by recipient address

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	_ "github.com/envkey/envkeygo" // XXX could do with comment
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	"github.com/kava-labs/go-sdk/kava"
+	"github.com/kava-labs/kava/app"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
 )
@@ -53,7 +53,7 @@ func main() {
 
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig) // XXX G34 descend only one level of abstraction
+	app.SetBech32AddressPrefixes(kavaConfig) // XXX G34 descend only one level of abstraction
 	kavaConfig.Seal()
 
 	// XXX G30 functions should do one thing

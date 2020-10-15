@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/binance-chain/go-sdk/common/types"
-	bnbKeys "github.com/binance-chain/go-sdk/keys"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	"github.com/kava-labs/go-sdk/kava"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	bnbKeys "github.com/kava-labs/binance-chain-go-sdk/keys"
 	kavaKeys "github.com/kava-labs/go-sdk/keys"
+	"github.com/kava-labs/kava/app"
 )
 
 const (
@@ -50,7 +50,7 @@ func init() {
 	// set the prefix
 	// note: this will set the prefix for any package that imports this package
 	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig)
+	app.SetBech32AddressPrefixes(kavaConfig)
 
 	BnbDeputyAddr = BnbAddressFromMnemonic(BnbDeputyMnemonic)
 	for _, m := range BnbUserMnemonics {
@@ -92,7 +92,7 @@ func BnbAddressFromMnemonic(mnemonic string) types.AccAddress {
 
 // KavaAddressFromMnemonic converts a mnemonic to a kava address, using the default bip44 path.
 func KavaAddressFromMnemonic(mnemonic string) sdk.AccAddress {
-	manager, err := kavaKeys.NewMnemonicKeyManager(mnemonic, kava.Bip44CoinType)
+	manager, err := kavaKeys.NewMnemonicKeyManager(mnemonic, app.Bip44CoinType)
 	if err != nil {
 		panic(err.Error())
 	}
