@@ -9,8 +9,11 @@ import (
 	bnbmsg "github.com/binance-chain/go-sdk/types/msg"
 	"github.com/golang/mock/gomock"
 	sdk "github.com/kava-labs/cosmos-sdk/types"
+	authexported "github.com/kava-labs/cosmos-sdk/x/auth/exported"
+	authtypes "github.com/kava-labs/cosmos-sdk/x/auth/types"
 	"github.com/kava-labs/go-sdk/kava"
 	"github.com/kava-labs/go-sdk/kava/bep3"
+	tmtypes "github.com/kava-labs/tendermint/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim/mock"
@@ -21,6 +24,8 @@ var (
 	addressesKavaUsers0 sdk.AccAddress
 	addressesBnbDeputy  bnbtypes.AccAddress
 	addressesBnbUsers0  bnbtypes.AccAddress
+
+	mnemonicsKavaUsers0 = "season bone lucky dog depth pond royal decide unknown device fruit inch clock trap relief horse morning taxi bird session throw skull avocado private"
 
 	timestamp   int64
 	rndNum0     []byte
@@ -173,6 +178,71 @@ func TestGetClaimableBnbSwaps(t *testing.T) {
 		},
 	}
 	require.Equal(t, expectedClaimableSwaps, swaps)
+}
+
+func TestConstructAndSendKavaClaim(t *testing.T) {
+	// setup mock client
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	kc := mock.NewMockKavaChainClient(ctrl)
+
+	// set endpoints to return testing data
+	cdc := kava.MakeCodec()
+	kc.EXPECT().
+		GetCodec().
+		Return(cdc).AnyTimes()
+	kc.EXPECT().
+		GetChainID().
+		Return("kava-localnet", nil).AnyTimes()
+	testAcc := authexported.Account(&authtypes.BaseAccount{
+		Address:       addressesKavaUsers0,
+		AccountNumber: 12,
+		Sequence:      34,
+	})
+	kc.EXPECT().
+		GetAccount(addressesKavaUsers0).
+		Return(testAcc, nil).AnyTimes()
+
+	expectedTxJSON := `{
+		"type": "cosmos-sdk/StdTx",
+		"value": {
+			"msg": [
+				{
+					"type": "bep3/MsgClaimAtomicSwap",
+					"value": {
+						"from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
+						"swap_id": "9E3FDDA337B885622E8C0C6A7970C95BC312A97BB7BA38C26F0E3D7A44FB93A8",
+						"random_number": "6712DDF02589858704CF70CF39FFF8724FE71F1F2D7560878A97BBC5C1367535"
+					}
+				}
+			],
+			"fee": {
+				"amount": [],
+				"gas": "250000"
+			},
+			"signatures": [
+				{
+					"pub_key": {
+						"type": "tendermint/PubKeySecp256k1",
+						"value": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
+					},
+					"signature": "0w+31XqrpS8ZpG0piYLL+ItQMIEbqJnkOUJnQZaAKQoAHzrJKWqBex9xd+I9yw82/SN0sCpffJwViTx8K5FPVA=="
+				}
+			],
+			"memo": ""
+		}
+	}`
+	var expectedTx authtypes.StdTx
+	cdc.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
+	expectedTxBytes := tmtypes.Tx(cdc.MustMarshalBinaryLengthPrefixed(expectedTx))
+	// set expected tx
+	kc.EXPECT().BroadcastTx(expectedTxBytes)
+
+	// run function under test (mock will verify tx was created correctly)
+	testID := mustDecodeHex("9e3fdda337b885622e8c0c6a7970c95bc312a97bb7ba38c26f0e3d7a44fb93a8")
+	testRndNum := mustDecodeHex("6712ddf02589858704cf70cf39fff8724fe71f1f2d7560878a97bbc5c1367535")
+	_, err := constructAndSendClaim(kc, mnemonicsKavaUsers0, testID, testRndNum)
+	require.NoError(t, err)
 }
 
 func calcBnbSwapID(swap bnbtypes.AtomicSwap, senderOtherChain string) bnbtypes.SwapBytes {

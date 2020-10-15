@@ -180,7 +180,7 @@ func constructAndSendClaim(kavaClient KavaChainClient, mnemonic string, swapID, 
 		ChainID:       chainID,
 		AccountNumber: account.GetAccountNumber(),
 		Sequence:      account.GetSequence(),
-		Fee:           authtypes.NewStdFee(250000, nil),
+		Fee:           authtypes.NewStdFee(250_000, nil),
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
