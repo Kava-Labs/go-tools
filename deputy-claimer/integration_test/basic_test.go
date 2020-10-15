@@ -4,32 +4,43 @@ package main
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	bnbKeys "github.com/kava-labs/binance-chain-go-sdk/keys"
 	"github.com/kava-labs/binance-chain-go-sdk/types/msg"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-sdk/client"
+	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	"github.com/kava-labs/kava/app"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
-	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
 	"github.com/kava-labs/go-tools/deputy-claimer/integration_test/common"
 )
 
+func TestMain(m *testing.M) {
+	config := sdk.GetConfig()
+	app.SetBech32AddressPrefixes(config)
+	config.Seal()
+
+	os.Exit(m.Run())
+}
+
 func TestClaimKava(t *testing.T) {
+	addrs := common.GetAddresses()
+
 	// setup clients
 	cdc := app.MakeCodec()
-	kavaClient := client.NewKavaClient(cdc, common.KavaUserMnemonics[0], app.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
-	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(common.KavaUserMnemonics[0], app.Bip44CoinType)
+	kavaClient := client.NewKavaClient(cdc, addrs.Kava.Users[0].Mnemonic, app.Bip44CoinType, common.KavaNodeURL)
+	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(addrs.Kava.Users[0].Mnemonic, app.Bip44CoinType)
 	require.NoError(t, err)
-	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(common.BnbDeputyMnemonic)
+	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic)
 	require.NoError(t, err)
 	bnbClient := bnbRpc.NewRPCClient(common.BnbNodeURL, types.ProdNetwork)
 	bnbClient.SetKeyManager(bnbKeyM)
@@ -40,10 +51,10 @@ func TestClaimKava(t *testing.T) {
 	timestamp := time.Now().Unix() - 10*60 - 1 // set the timestamp to be in the past
 	rndHash := bep3types.CalculateRandomHash(rndNum, timestamp)
 	createMsg := bep3types.NewMsgCreateAtomicSwap(
-		kavaKeyM.GetAddr(),              // sender
-		common.KavaDeputyAddr,           // recipient
-		common.BnbUserAddrs[0].String(), // recipient other chain
-		common.BnbDeputyAddr.String(),   // sender other chain
+		kavaKeyM.GetAddr(),                               // sender
+		addrs.Kava.Deputys.Bnb.HotWallet.Address,         // recipient
+		addrs.Bnb.Users[0].Address.String(),              // recipient other chain
+		addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(), // sender other chain
 		rndHash,
 		timestamp,
 		sdk.NewCoins(sdk.NewInt64Coin("bnb", 100_000_000)),
@@ -59,10 +70,10 @@ func TestClaimKava(t *testing.T) {
 	require.NoError(t, err)
 	rndHash2 := bep3types.CalculateRandomHash(rndNum2, timestamp)
 	createMsg2 := bep3types.NewMsgCreateAtomicSwap(
-		kavaKeyM.GetAddr(),              // sender
-		common.KavaDeputyAddr,           // recipient
-		common.BnbUserAddrs[0].String(), // recipient other chain
-		common.BnbDeputyAddr.String(),   // sender other chain
+		kavaKeyM.GetAddr(),                               // sender
+		addrs.Kava.Deputys.Bnb.HotWallet.Address,         // recipient
+		addrs.Bnb.Users[0].Address.String(),              // recipient other chain
+		addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(), // sender other chain
 		rndHash2,
 		timestamp,
 		sdk.NewCoins(sdk.NewInt64Coin("bnb", 100_000_000)),
@@ -75,9 +86,9 @@ func TestClaimKava(t *testing.T) {
 
 	// send corresponding htlts on bnb
 	_, err = bnbClient.HTLT(
-		common.BnbUserAddrs[0],           // recipient
-		common.KavaDeputyAddr.String(),   // recipient other chain
-		common.KavaUserAddrs[0].String(), // other chain sender
+		addrs.Bnb.Users[0].Address,                        // recipient
+		addrs.Kava.Deputys.Bnb.HotWallet.Address.String(), // recipient other chain
+		addrs.Kava.Users[0].Address.String(),              // other chain sender
 		rndHash,
 		timestamp,
 		types.Coins{{Denom: "BNB", Amount: 100_000_000}}, //{Denom: "BNB", Amount: 100_000_000}},
@@ -89,9 +100,9 @@ func TestClaimKava(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = bnbClient.HTLT(
-		common.BnbUserAddrs[0],           // recipient
-		common.KavaDeputyAddr.String(),   // recipient other chain
-		common.KavaUserAddrs[0].String(), // other chain sender
+		addrs.Bnb.Users[0].Address,                        // recipient
+		addrs.Kava.Deputys.Bnb.HotWallet.Address.String(), // recipient other chain
+		addrs.Kava.Users[0].Address.String(),              // other chain sender
 		rndHash2,
 		timestamp,
 		types.Coins{{Denom: "BNB", Amount: 100_000_000}}, //{Denom: "BNB", Amount: 100_000_000}},
@@ -104,29 +115,31 @@ func TestClaimKava(t *testing.T) {
 
 	// claim first bnb htlt
 	time.Sleep(3 * time.Second)
-	bnbID := msg.CalculateSwapID(rndHash, common.BnbDeputyAddr, common.KavaUserAddrs[0].String())
+	bnbID := msg.CalculateSwapID(rndHash, addrs.Bnb.Deputys.Bnb.HotWallet.Address, addrs.Kava.Users[0].Address.String())
 	_, err = bnbClient.ClaimHTLT(bnbID, rndNum, bnbRpc.Sync)
 	require.NoError(t, err)
 
 	// run
 	time.Sleep(5 * time.Second) // TODO replace with wait func
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
-	claim.NewKavaClaimer("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", common.KavaUserMnemonics[:2]).Run(ctx)
+	claim.NewKavaClaimer("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", "bnb1uky3me9ggqypmrsvxk7ur6hqkzq7zmv4ed4ng7", addrs.KavaUserMnemonics()[:2]).Run(ctx)
 	defer shutdownClaimer()
 	time.Sleep(8 * time.Second)
 
 	// check the first kava swap was claimed
-	kavaSwapID := bep3types.CalculateSwapID(rndHash, kavaKeyM.GetAddr(), common.BnbDeputyAddr.String())
+	kavaSwapID := bep3types.CalculateSwapID(rndHash, kavaKeyM.GetAddr(), addrs.Bnb.Deputys.Bnb.HotWallet.Address.String())
 	s, err := kavaClient.GetSwapByID(kavaSwapID)
 	require.NoError(t, err)
 	require.Equal(t, bep3types.Completed, s.Status)
 }
 
 func TestClaimBnb(t *testing.T) {
+	addrs := common.GetAddresses()
+
 	// setup clients
 	cdc := app.MakeCodec()
-	kavaClient := client.NewKavaClient(cdc, common.KavaDeputyMnemonic, app.Bip44CoinType, common.KavaNodeURL, client.LocalNetwork)
-	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(common.BnbUserMnemonics[0])
+	kavaClient := client.NewKavaClient(cdc, addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic, app.Bip44CoinType, common.KavaNodeURL)
+	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(addrs.Bnb.Users[0].Mnemonic)
 	require.NoError(t, err)
 	bnbClient := bnbRpc.NewRPCClient(common.BnbNodeURL, types.ProdNetwork)
 	bnbClient.SetKeyManager(bnbKeyM)
@@ -137,9 +150,9 @@ func TestClaimBnb(t *testing.T) {
 	timestamp := time.Now().Unix() - 10*60 - 1 // set the timestamp to be in the past
 	rndHash := bep3types.CalculateRandomHash(rndNum, timestamp)
 	_, err = bnbClient.HTLT(
-		common.BnbDeputyAddr,             // recipient
-		common.KavaUserAddrs[0].String(), // recipient other chain
-		common.KavaDeputyAddr.String(),   // other chain sender
+		addrs.Bnb.Deputys.Bnb.HotWallet.Address,           // recipient
+		addrs.Kava.Users[0].Address.String(),              // recipient other chain
+		addrs.Kava.Deputys.Bnb.HotWallet.Address.String(), // other chain sender
 		rndHash,
 		timestamp,
 		types.Coins{{Denom: "BNB", Amount: 100_000_000}}, //{Denom: "BNB", Amount: 100_000_000}},
@@ -150,10 +163,10 @@ func TestClaimBnb(t *testing.T) {
 	)
 	require.NoError(t, err)
 	createMsg := bep3types.NewMsgCreateAtomicSwap(
-		common.KavaDeputyAddr,           // sender
-		common.KavaUserAddrs[0],         // recipient
-		common.BnbDeputyAddr.String(),   // recipient other chain
-		common.BnbUserAddrs[0].String(), // sender other chain
+		addrs.Kava.Deputys.Bnb.HotWallet.Address,         // sender
+		addrs.Kava.Users[0].Address,                      // recipient
+		addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(), // recipient other chain
+		addrs.Bnb.Users[0].Address.String(),              // sender other chain
 		rndHash,
 		timestamp,
 		sdk.NewCoins(sdk.NewInt64Coin("bnb", 100_000_000)),
@@ -169,9 +182,9 @@ func TestClaimBnb(t *testing.T) {
 	require.NoError(t, err)
 	rndHash2 := bep3types.CalculateRandomHash(rndNum2, timestamp)
 	_, err = bnbClient.HTLT(
-		common.BnbDeputyAddr,             // recipient
-		common.KavaUserAddrs[0].String(), // recipient other chain
-		common.KavaDeputyAddr.String(),   // other chain sender
+		addrs.Bnb.Deputys.Bnb.HotWallet.Address,           // recipient
+		addrs.Kava.Users[0].Address.String(),              // recipient other chain
+		addrs.Kava.Deputys.Bnb.HotWallet.Address.String(), // other chain sender
 		rndHash2,
 		timestamp,
 		types.Coins{{Denom: "BNB", Amount: 100_000_000}}, //{Denom: "BNB", Amount: 100_000_000}},
@@ -182,10 +195,10 @@ func TestClaimBnb(t *testing.T) {
 	)
 	require.NoError(t, err)
 	createMsg2 := bep3types.NewMsgCreateAtomicSwap(
-		common.KavaDeputyAddr,           // sender
-		common.KavaUserAddrs[0],         // recipient
-		common.BnbDeputyAddr.String(),   // recipient other chain
-		common.BnbUserAddrs[0].String(), // sender other chain
+		addrs.Kava.Deputys.Bnb.HotWallet.Address,         // sender
+		addrs.Kava.Users[0].Address,                      // recipient
+		addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(), // recipient other chain
+		addrs.Bnb.Users[0].Address.String(),              // sender other chain
 		rndHash2,
 		timestamp,
 		sdk.NewCoins(sdk.NewInt64Coin("bnb", 100_000_000)),
@@ -198,9 +211,9 @@ func TestClaimBnb(t *testing.T) {
 
 	// claim first kava htlt
 	time.Sleep(3 * time.Second)
-	kavaID := bep3types.CalculateSwapID(rndHash, common.KavaDeputyAddr, common.BnbUserAddrs[0].String())
+	kavaID := bep3types.CalculateSwapID(rndHash, addrs.Kava.Deputys.Bnb.HotWallet.Address, addrs.Bnb.Users[0].Address.String())
 	claimMsg := bep3types.NewMsgClaimAtomicSwap(
-		common.KavaDeputyAddr,
+		addrs.Kava.Deputys.Bnb.HotWallet.Address,
 		kavaID,
 		rndNum,
 	)
@@ -211,12 +224,12 @@ func TestClaimBnb(t *testing.T) {
 	// run
 	time.Sleep(5 * time.Second) // TODO replace with wait func
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
-	claim.NewBnbClaimer("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", common.KavaDeputyAddr.String(), common.BnbDeputyAddr.String(), common.BnbUserMnemonics[:2]).Run(ctx)
+	claim.NewBnbClaimer("http://localhost:1317", "tcp://localhost:26657", "tcp://localhost:26658", addrs.Kava.Deputys.Bnb.HotWallet.Address.String(), addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(), addrs.BnbUserMnemonics()[:2]).Run(ctx)
 	defer shutdownClaimer()
 	time.Sleep(8 * time.Second)
 
 	// check the first bnb swap was claimed
-	bnbSwapID := msg.CalculateSwapID(rndHash, common.BnbUserAddrs[0], common.KavaDeputyAddr.String())
+	bnbSwapID := msg.CalculateSwapID(rndHash, addrs.Bnb.Users[0].Address, addrs.Kava.Deputys.Bnb.HotWallet.Address.String())
 	s, err := bnbClient.GetSwapByID(bnbSwapID)
 	require.NoError(t, err)
 	require.Equal(t, types.Completed, s.Status)

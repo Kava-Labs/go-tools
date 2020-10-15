@@ -15,4 +15,5 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/tendermint/go-amino v0.15.1
 	github.com/tendermint/tendermint v0.33.7
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
