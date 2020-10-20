@@ -32,8 +32,8 @@ func TestMain(m *testing.M) {
 func TestClaimBnb(t *testing.T) {
 	addrs := common.GetAddresses()
 
-	bnbSwapper := NewBnbSwapper(common.BnbNodeURL)
-	kavaSwapper := NewKavaSwapper(common.KavaNodeURL)
+	bnbSwapper := NewBnbSwapClient(common.BnbNodeURL)
+	kavaSwapper := NewKavaSwapClient(common.KavaNodeURL)
 	swapBuilder := NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -88,8 +88,8 @@ func TestClaimBnb(t *testing.T) {
 func TestClaimKava(t *testing.T) {
 	addrs := common.GetAddresses()
 
-	bnbSwapper := NewBnbSwapper(common.BnbNodeURL)
-	kavaSwapper := NewKavaSwapper(common.KavaNodeURL)
+	bnbSwapper := NewBnbSwapClient(common.BnbNodeURL)
+	kavaSwapper := NewKavaSwapClient(common.KavaNodeURL)
 	swapBuilder := NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,

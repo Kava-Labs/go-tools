@@ -73,16 +73,16 @@ func (swap BnbSwap) GetSwapID() []byte {
 	return msg.CalculateSwapID(swap.RandomNumberHash, swap.From, swap.SenderOtherChain)
 }
 
-// KavaSwapper handles sending txs to modify a kava swap on chain.
+// KavaSwapClient handles sending txs to modify a kava swap on chain.
 // It can create, claim, or refund a swap.
-type KavaSwapper struct {
+type KavaSwapClient struct {
 	kavaRpcUrl string
 }
 
-func NewKavaSwapper(KavaRpcUrl string) KavaSwapper {
-	return KavaSwapper{kavaRpcUrl: KavaRpcUrl}
+func NewKavaSwapClient(KavaRpcUrl string) KavaSwapClient {
+	return KavaSwapClient{kavaRpcUrl: KavaRpcUrl}
 }
-func (swapper KavaSwapper) Create(swap KavaSwap, mode client.SyncType) ([]byte, error) {
+func (swapper KavaSwapClient) Create(swap KavaSwap, mode client.SyncType) ([]byte, error) {
 	msg := bep3types.NewMsgCreateAtomicSwap(
 		swap.Sender,
 		swap.Recipient,
@@ -95,7 +95,7 @@ func (swapper KavaSwapper) Create(swap KavaSwap, mode client.SyncType) ([]byte, 
 	)
 	return swapper.broadcastMsg(msg, swap.SenderMnemonic, mode)
 }
-func (swapper KavaSwapper) Claim(swap KavaSwap, randomNumber []byte, mode client.SyncType) ([]byte, error) {
+func (swapper KavaSwapClient) Claim(swap KavaSwap, randomNumber []byte, mode client.SyncType) ([]byte, error) {
 	msg := bep3types.NewMsgClaimAtomicSwap(
 		swap.Sender, // doesn't need to be sender
 		swap.GetSwapID(),
@@ -103,14 +103,14 @@ func (swapper KavaSwapper) Claim(swap KavaSwap, randomNumber []byte, mode client
 	)
 	return swapper.broadcastMsg(msg, swap.SenderMnemonic, mode)
 }
-func (swapper KavaSwapper) Refund(swap KavaSwap, mode client.SyncType) ([]byte, error) {
+func (swapper KavaSwapClient) Refund(swap KavaSwap, mode client.SyncType) ([]byte, error) {
 	msg := bep3types.NewMsgRefundAtomicSwap(
 		swap.Sender, // doesn't need to be sender
 		swap.GetSwapID(),
 	)
 	return swapper.broadcastMsg(msg, swap.SenderMnemonic, mode)
 }
-func (swapper KavaSwapper) FetchStatus(swap KavaSwap) (bep3types.SwapStatus, error) {
+func (swapper KavaSwapClient) FetchStatus(swap KavaSwap) (bep3types.SwapStatus, error) {
 	standInMnemonic := "grass luxury welcome dismiss legal nothing glide crisp material broccoli jewel put inflict expose taxi wear second party air hockey crew ride wage nurse"
 	kavaClient := client.NewKavaClient(app.MakeCodec(), standInMnemonic, app.Bip44CoinType, swapper.kavaRpcUrl)
 	fetchedSwap, err := kavaClient.GetSwapByID(swap.GetSwapID())
@@ -120,7 +120,7 @@ func (swapper KavaSwapper) FetchStatus(swap KavaSwap) (bep3types.SwapStatus, err
 	return fetchedSwap.Status, nil
 }
 
-func (swapper KavaSwapper) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode client.SyncType) ([]byte, error) {
+func (swapper KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode client.SyncType) ([]byte, error) {
 	cdc := app.MakeCodec()
 	kavaClient := client.NewKavaClient(cdc, signerMnemonic, app.Bip44CoinType, swapper.kavaRpcUrl)
 
@@ -134,18 +134,18 @@ func (swapper KavaSwapper) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode
 	return res.Hash, nil
 }
 
-// BnbSwapper handles sending txs to modify a bnb swap on chain.
+// BnbSwapClient handles sending txs to modify a bnb swap on chain.
 // It can create, claim, or refund a swap.
-type BnbSwapper struct {
+type BnbSwapClient struct {
 	bnbSdkClient *bnbRpc.HTTP
 }
 
-func NewBnbSwapper(bnbRpcUrl string) BnbSwapper {
-	return BnbSwapper{
+func NewBnbSwapClient(bnbRpcUrl string) BnbSwapClient {
+	return BnbSwapClient{
 		bnbSdkClient: bnbRpc.NewRPCClient(bnbRpcUrl, types.ProdNetwork),
 	}
 }
-func (swapper BnbSwapper) Create(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, error) {
+func (swapper BnbSwapClient) Create(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, error) {
 	swapper.setSigningKey(swap.SenderMnemonic)
 	res, err := swapper.bnbSdkClient.HTLT(
 		swap.To,
@@ -168,7 +168,7 @@ func (swapper BnbSwapper) Create(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, er
 	return res.Hash, nil
 }
 
-func (swapper BnbSwapper) Claim(swap BnbSwap, randomNumber []byte, mode bnbRpc.SyncType) ([]byte, error) {
+func (swapper BnbSwapClient) Claim(swap BnbSwap, randomNumber []byte, mode bnbRpc.SyncType) ([]byte, error) {
 	swapper.setSigningKey(swap.SenderMnemonic)
 	res, err := swapper.bnbSdkClient.ClaimHTLT(swap.GetSwapID(), randomNumber, mode)
 	if err != nil {
@@ -179,7 +179,7 @@ func (swapper BnbSwapper) Claim(swap BnbSwap, randomNumber []byte, mode bnbRpc.S
 	}
 	return res.Hash, nil
 }
-func (swapper BnbSwapper) Refund(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, error) {
+func (swapper BnbSwapClient) Refund(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, error) {
 	swapper.setSigningKey(swap.SenderMnemonic)
 	res, err := swapper.bnbSdkClient.RefundHTLT(swap.GetSwapID(), mode)
 	if err != nil {
@@ -190,7 +190,7 @@ func (swapper BnbSwapper) Refund(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, er
 	}
 	return res.Hash, nil
 }
-func (swapper BnbSwapper) FetchStatus(swap BnbSwap) (types.SwapStatus, error) {
+func (swapper BnbSwapClient) FetchStatus(swap BnbSwap) (types.SwapStatus, error) {
 	fetchedSwap, err := swapper.bnbSdkClient.GetSwapByID(swap.GetSwapID())
 	if err != nil {
 		return 0, fmt.Errorf("could not fetch swap status: %w", err)
@@ -198,7 +198,7 @@ func (swapper BnbSwapper) FetchStatus(swap BnbSwap) (types.SwapStatus, error) {
 	return fetchedSwap.Status, nil
 }
 
-func (swapper BnbSwapper) setSigningKey(mnemonic string) {
+func (swapper BnbSwapClient) setSigningKey(mnemonic string) {
 	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(mnemonic)
 	if err != nil {
 		panic(err)
