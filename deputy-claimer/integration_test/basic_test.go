@@ -80,10 +80,9 @@ func TestClaimBnb(t *testing.T) {
 	time.Sleep(8 * time.Second)
 
 	// check the first bnb swap was claimed
-	bnbClient := NewBnbClient(addrs.Bnb.Users[0].Mnemonic, common.BnbNodeURL)
-	s, err := bnbClient.GetSwapByID(swap1.BnbSwap.GetSwapID())
+	status, err := bnbSwapper.FetchStatus(swap1.BnbSwap)
 	require.NoError(t, err)
-	require.Equalf(t, types.Completed, s.Status, "expected swap status '%s', actual '%s'", types.Completed, s.Status)
+	require.Equalf(t, types.Completed, status, "expected swap status '%s', actual '%s'", types.Completed, status)
 }
 
 func TestClaimKava(t *testing.T) {
@@ -136,8 +135,7 @@ func TestClaimKava(t *testing.T) {
 	time.Sleep(8 * time.Second)
 
 	// check the first kava swap was claimed
-	kavaClient := client.NewKavaClient(app.MakeCodec(), addrs.Kava.Users[0].Mnemonic, app.Bip44CoinType, common.KavaNodeURL)
-	s, err := kavaClient.GetSwapByID(swap1.KavaSwap.GetSwapID())
+	status, err := kavaSwapper.FetchStatus(swap1.KavaSwap)
 	require.NoError(t, err)
-	require.Equalf(t, bep3types.Completed, s.Status, "expected swap status '%s', actual '%s'", bep3types.Completed, s.Status)
+	require.Equalf(t, bep3types.Completed, status, "expected swap status '%s', actual '%s'", bep3types.Completed, status)
 }

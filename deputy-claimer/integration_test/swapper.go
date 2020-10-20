@@ -35,7 +35,7 @@ func NewKavaSwap(senderMnemonic string, recipient sdk.AccAddress, senderOtherCha
 			RandomNumberHash:    rndHash,
 			Timestamp:           timestamp,
 			Sender:              kavaAddressFromMnemonic(senderMnemonic),
-			Recipient:           recipient, // TODO name?
+			Recipient:           recipient,
 			SenderOtherChain:    senderOtherChain,
 			RecipientOtherChain: recipientOtherChain,
 		},
@@ -110,6 +110,15 @@ func (swapper KavaSwapper) Refund(swap KavaSwap, mode client.SyncType) ([]byte, 
 	)
 	return swapper.broadcastMsg(msg, swap.SenderMnemonic, mode)
 }
+func (swapper KavaSwapper) FetchStatus(swap KavaSwap) (bep3types.SwapStatus, error) {
+	standInMnemonic := "grass luxury welcome dismiss legal nothing glide crisp material broccoli jewel put inflict expose taxi wear second party air hockey crew ride wage nurse"
+	kavaClient := client.NewKavaClient(app.MakeCodec(), standInMnemonic, app.Bip44CoinType, swapper.kavaRpcUrl)
+	fetchedSwap, err := kavaClient.GetSwapByID(swap.GetSwapID())
+	if err != nil {
+		return 0, fmt.Errorf("could not fetch swap status: %w", err)
+	}
+	return fetchedSwap.Status, nil
+}
 
 func (swapper KavaSwapper) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode client.SyncType) ([]byte, error) {
 	cdc := app.MakeCodec()
@@ -128,15 +137,17 @@ func (swapper KavaSwapper) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode
 // BnbSwapper handles sending txs to modify a bnb swap on chain.
 // It can create, claim, or refund a swap.
 type BnbSwapper struct {
-	bnbRpcUrl string
+	bnbSdkClient *bnbRpc.HTTP
 }
 
 func NewBnbSwapper(bnbRpcUrl string) BnbSwapper {
-	return BnbSwapper{bnbRpcUrl: bnbRpcUrl}
+	return BnbSwapper{
+		bnbSdkClient: bnbRpc.NewRPCClient(bnbRpcUrl, types.ProdNetwork),
+	}
 }
 func (swapper BnbSwapper) Create(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, error) {
-	bnbClient := NewBnbClient(swap.SenderMnemonic, swapper.bnbRpcUrl)
-	res, err := bnbClient.HTLT(
+	swapper.setSigningKey(swap.SenderMnemonic)
+	res, err := swapper.bnbSdkClient.HTLT(
 		swap.To,
 		swap.RecipientOtherChain,
 		swap.SenderOtherChain,
@@ -158,8 +169,8 @@ func (swapper BnbSwapper) Create(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, er
 }
 
 func (swapper BnbSwapper) Claim(swap BnbSwap, randomNumber []byte, mode bnbRpc.SyncType) ([]byte, error) {
-	bnbClient := NewBnbClient(swap.SenderMnemonic, swapper.bnbRpcUrl)
-	res, err := bnbClient.ClaimHTLT(swap.GetSwapID(), randomNumber, mode)
+	swapper.setSigningKey(swap.SenderMnemonic)
+	res, err := swapper.bnbSdkClient.ClaimHTLT(swap.GetSwapID(), randomNumber, mode)
 	if err != nil {
 		return res.Hash, fmt.Errorf("swap rejected from node: %w", err)
 	}
@@ -169,8 +180,8 @@ func (swapper BnbSwapper) Claim(swap BnbSwap, randomNumber []byte, mode bnbRpc.S
 	return res.Hash, nil
 }
 func (swapper BnbSwapper) Refund(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, error) {
-	bnbClient := NewBnbClient(swap.SenderMnemonic, swapper.bnbRpcUrl)
-	res, err := bnbClient.RefundHTLT(swap.GetSwapID(), mode)
+	swapper.setSigningKey(swap.SenderMnemonic)
+	res, err := swapper.bnbSdkClient.RefundHTLT(swap.GetSwapID(), mode)
 	if err != nil {
 		return res.Hash, fmt.Errorf("swap rejected from node: %w", err)
 	}
@@ -179,17 +190,21 @@ func (swapper BnbSwapper) Refund(swap BnbSwap, mode bnbRpc.SyncType) ([]byte, er
 	}
 	return res.Hash, nil
 }
-func NewBnbClient(mnemonic string, nodeURL string) *bnbRpc.HTTP {
+func (swapper BnbSwapper) FetchStatus(swap BnbSwap) (types.SwapStatus, error) {
+	fetchedSwap, err := swapper.bnbSdkClient.GetSwapByID(swap.GetSwapID())
+	if err != nil {
+		return 0, fmt.Errorf("could not fetch swap status: %w", err)
+	}
+	return fetchedSwap.Status, nil
+}
+
+func (swapper BnbSwapper) setSigningKey(mnemonic string) {
 	bnbKeyM, err := bnbKeys.NewMnemonicKeyManager(mnemonic)
 	if err != nil {
 		panic(err)
 	}
-	bnbClient := bnbRpc.NewRPCClient(nodeURL, types.ProdNetwork)
-	bnbClient.SetKeyManager(bnbKeyM)
-	return bnbClient
+	swapper.bnbSdkClient.SetKeyManager(bnbKeyM)
 }
-
-// TODO add IsExpired, FetchStatus methods
 
 // CrossChainSwap holds details of both swaps involved in moving assets from one chain to the other.
 type CrossChainSwap struct {
