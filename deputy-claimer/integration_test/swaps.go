@@ -13,19 +13,18 @@ import (
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 )
 
-// KavaSwap is a struct to hold parameters for creating a HTLT on the kava chain.
+// KavaSwap holds all parameters required to create a HTLT on the kava chain.
 type KavaSwap struct {
 	bep3types.AtomicSwap // TODO inline fields
 	SenderMnemonic       string
 	HeightSpan           uint64
 }
 
-// TODO add New(Outgoing/Incoming)KavaSwap methods?
+// TODO
+// add New(Outgoing/Incoming)KavaSwap methods?
+// add validation checks on input params (like heightspan ≥ 0)?
 
 func NewKavaSwap(senderMnemonic string, recipient sdk.AccAddress, senderOtherChain, recipientOtherChain string, amount sdk.Coins, timestamp int64, rndHash []byte, heightspan int64) KavaSwap {
-	if heightspan < 0 {
-		panic("heightspan cannot be negative")
-	}
 	return KavaSwap{
 		AtomicSwap: bep3types.AtomicSwap{
 			Amount:              amount,
@@ -41,7 +40,7 @@ func NewKavaSwap(senderMnemonic string, recipient sdk.AccAddress, senderOtherCha
 	}
 }
 
-// BnbSwap is a struct to hold parameters for creating a HTLT on the bnb chain.
+// BnbSwap holds all parameters required to create a HTLT on the bnb chain.
 type BnbSwap struct {
 	types.AtomicSwap
 	SenderMnemonic   string
@@ -131,7 +130,6 @@ func NewKavaToBnbSwap(senderMnemonic string, recipient types.AccAddress, amount 
 	}
 }
 
-// TODO create useful constructors for this to convert a single swap amount into correct denoms and take off deputy fee
 type SwapAmount struct {
 	Kava sdk.Coins
 	Bnb  types.Coins
@@ -144,7 +142,7 @@ type SwapHeightSpan struct {
 func kavaAddressFromMnemonic(mnemonic string) sdk.AccAddress {
 	keyManager, err := keys.NewMnemonicKeyManager(mnemonic, app.Bip44CoinType)
 	if err != nil {
-		panic(fmt.Sprintf("new key manager from mnenomic err, err=%s", err.Error())) // TODO
+		panic(fmt.Sprintf("invalid mnemonic: %v", err.Error()))
 	}
 	return keyManager.GetAddr()
 }
@@ -152,7 +150,7 @@ func kavaAddressFromMnemonic(mnemonic string) sdk.AccAddress {
 func bnbAddressFromMnemonic(mnemonic string) types.AccAddress {
 	keyManager, err := bnbKeys.NewMnemonicKeyManager(mnemonic)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("invalid mnemonic: %v", err.Error()))
 	}
 	return keyManager.GetAddr()
 }

@@ -2,6 +2,7 @@ package integrationtest
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
@@ -10,12 +11,23 @@ import (
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 )
 
-var denomMap = map[string]string{
-	"XRP-BF2":  "xrpb",
-	"BUSD-BD1": "busd",
-	"BTCB-1DE": "btcb",
-	"BNB":      "bnb",
-}
+var (
+	denomMap = map[string]string{
+		"XRP-BF2":  "xrpb",
+		"BUSD-BD1": "busd",
+		"BTCB-1DE": "btcb",
+		"BNB":      "bnb",
+	}
+	deterministicRand          = rand.New(rand.NewSource(1234))
+	defaultKavaToBnbHeightSpan = SwapHeightSpan{
+		Kava: 200,
+		Bnb:  360,
+	}
+	defaultBnbToKavaHeightSpan = SwapHeightSpan{
+		Bnb:  10000,
+		Kava: 120,
+	}
+)
 
 // SwapBuilder assists in creating cross chain swaps by storing common swap parameters.
 type SwapBuilder struct {
@@ -25,8 +37,8 @@ type SwapBuilder struct {
 	calculateBnbAmount  func(sdk.Coins) types.Coins
 	heightSpanKavaToBnb SwapHeightSpan
 	heightSpanBnbToKava SwapHeightSpan
-	timestamper         func() int64
-	// TODO add rand seed, or rand num generator func
+	genTimestamp        func() int64
+	genRandomNumber     func() []byte
 }
 
 // NewDefaultSwapBuilder creates a SwapBuilder with defaults for common swap parameters.
@@ -36,30 +48,23 @@ func NewDefaultSwapBuilder(kavaDeputyMnemonic, bnbDeputyMnemonic string) SwapBui
 		bnbDeputyMnemonic:   bnbDeputyMnemonic,
 		calculateKavaAmount: convertBnbToKavaCoins,
 		calculateBnbAmount:  convertKavaToBnbCoins,
-		heightSpanKavaToBnb: SwapHeightSpan{
-			Bnb:  360,
-			Kava: 250,
-		},
-		heightSpanBnbToKava: SwapHeightSpan{ // TODO
-			Bnb:  360,
-			Kava: 250,
-		},
-		timestamper: getCurrentTimestamp,
+		heightSpanKavaToBnb: defaultKavaToBnbHeightSpan,
+		heightSpanBnbToKava: defaultBnbToKavaHeightSpan,
+		genTimestamp:        getCurrentTimestamp,
+		genRandomNumber:     getDeterministicRandomNumber,
 	}
 }
 
 // WithTimestamp returns a SwapBuilder with a fixed value for swap timestamps.
 func (builder SwapBuilder) WithTimestamp(timestamp int64) SwapBuilder {
-	builder.timestamper = func() int64 { return timestamp }
+	builder.genTimestamp = func() int64 { return timestamp }
 	return builder
 }
 
+// NewBnbToKavaSwap creates a cross chain swap using common parameters from the builder.
 func (builder SwapBuilder) NewBnbToKavaSwap(senderMnemonic string, recipient sdk.AccAddress, amount types.Coins) CrossChainSwap {
-	rndNum, err := bep3types.GenerateSecureRandomNumber()
-	if err != nil {
-		panic(err)
-	}
-	timestamp := builder.timestamper()
+	rndNum := builder.genRandomNumber()
+	timestamp := builder.genTimestamp()
 	rndHash := bep3types.CalculateRandomHash(rndNum, timestamp)
 	return NewBnbToKavaSwap(
 		senderMnemonic,
@@ -76,12 +81,11 @@ func (builder SwapBuilder) NewBnbToKavaSwap(senderMnemonic string, recipient sdk
 		rndNum,
 	)
 }
+
+// NewKavaToBnbSwap creates a cross chain swap using common parameters from the builder.
 func (builder SwapBuilder) NewKavaToBnbSwap(senderMnemonic string, recipient types.AccAddress, amount sdk.Coins) CrossChainSwap {
-	rndNum, err := bep3types.GenerateSecureRandomNumber()
-	if err != nil {
-		panic(err)
-	}
-	timestamp := builder.timestamper()
+	rndNum := builder.genRandomNumber()
+	timestamp := builder.genTimestamp()
 	rndHash := bep3types.CalculateRandomHash(rndNum, timestamp)
 	return NewKavaToBnbSwap(
 		senderMnemonic,
@@ -101,6 +105,14 @@ func (builder SwapBuilder) NewKavaToBnbSwap(senderMnemonic string, recipient typ
 
 func getCurrentTimestamp() int64 { return time.Now().Unix() }
 
+func getDeterministicRandomNumber() []byte {
+	bytes := make([]byte, 32)
+	if _, err := deterministicRand.Read(bytes); err != nil {
+		return []byte{}, err
+	}
+	return bytes, nil
+}
+
 func convertBnbToKavaCoins(coins types.Coins) sdk.Coins {
 	sdkCoins := sdk.NewCoins()
 	for _, c := range coins {
@@ -112,6 +124,7 @@ func convertBnbToKavaCoins(coins types.Coins) sdk.Coins {
 	}
 	return sdkCoins
 }
+
 func convertKavaToBnbCoins(coins sdk.Coins) types.Coins {
 	bnbCoins := types.Coins{}
 	for _, c := range coins {
