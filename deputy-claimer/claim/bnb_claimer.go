@@ -100,7 +100,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 	}
 
 	// wait for all go routines to finish
-	for i := 0; i > len(bc.mnemonics); i++ {
+	for i := 0; i < len(bc.mnemonics); i++ {
 		<-availableMnemonics
 	}
 	// report any errors

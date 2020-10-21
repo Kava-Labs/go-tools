@@ -7,13 +7,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/kava-labs/binance-chain-go-sdk/common/types"
-	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	"github.com/kava-labs/kava/app"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
-	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmtypes "github.com/tendermint/tendermint/types"
 )
@@ -106,7 +106,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	}
 
 	// wait for all go routines to finish
-	for i := 0; i > len(kc.mnemonics); i++ {
+	for i := 0; i < len(kc.mnemonics); i++ {
 		<-availableMnemonics
 	}
 	// report any errors // XXX C1 inappropriate information
