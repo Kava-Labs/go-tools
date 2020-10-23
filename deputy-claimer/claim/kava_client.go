@@ -26,14 +26,14 @@ import (
 //go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
 
 type KavaChainClient interface {
-	GetRandomNumberFromSwap(id []byte) ([]byte, error)
-	GetRPCClient() *kavaRpc.KavaClient
-	GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
 	GetOpenOutgoingSwaps() (bep3types.AtomicSwaps, error)
+	GetRandomNumberFromSwap(id []byte) ([]byte, error)
+	GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
 	GetAccount(address sdk.AccAddress) (authexported.Account, error)
 	GetChainID() (string, error)
 	BroadcastTx(tx tmtypes.Tx) error
 	GetCodec() *codec.Codec
+	GetRPCClient() *kavaRpc.KavaClient
 }
 
 var _ KavaChainClient = mixedKavaClient{}

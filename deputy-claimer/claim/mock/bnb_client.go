@@ -8,6 +8,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	rpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	types "github.com/kava-labs/binance-chain-go-sdk/common/types"
+	types0 "github.com/kava-labs/tendermint/types"
 	reflect "reflect"
 )
 
@@ -34,18 +35,47 @@ func (m *MockBnbChainClient) EXPECT() *MockBnbChainClientMockRecorder {
 	return m.recorder
 }
 
-// GetBNBSDKClient mocks base method
-func (m *MockBnbChainClient) GetBNBSDKClient() *rpc.HTTP {
+// BroadcastTx mocks base method
+func (m *MockBnbChainClient) BroadcastTx(arg0 types0.Tx) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBNBSDKClient")
-	ret0, _ := ret[0].(*rpc.HTTP)
+	ret := m.ctrl.Call(m, "BroadcastTx", arg0)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// GetBNBSDKClient indicates an expected call of GetBNBSDKClient
-func (mr *MockBnbChainClientMockRecorder) GetBNBSDKClient() *gomock.Call {
+// BroadcastTx indicates an expected call of BroadcastTx
+func (mr *MockBnbChainClientMockRecorder) BroadcastTx(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBNBSDKClient", reflect.TypeOf((*MockBnbChainClient)(nil).GetBNBSDKClient))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BroadcastTx", reflect.TypeOf((*MockBnbChainClient)(nil).BroadcastTx), arg0)
+}
+
+// GetAccount mocks base method
+func (m *MockBnbChainClient) GetAccount(arg0 types.AccAddress) (types.Account, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAccount", arg0)
+	ret0, _ := ret[0].(types.Account)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAccount indicates an expected call of GetAccount
+func (mr *MockBnbChainClientMockRecorder) GetAccount(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccount", reflect.TypeOf((*MockBnbChainClient)(nil).GetAccount), arg0)
+}
+
+// GetChainID mocks base method
+func (m *MockBnbChainClient) GetChainID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChainID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetChainID indicates an expected call of GetChainID
+func (mr *MockBnbChainClientMockRecorder) GetChainID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainID", reflect.TypeOf((*MockBnbChainClient)(nil).GetChainID))
 }
 
 // GetOpenOutgoingSwaps mocks base method

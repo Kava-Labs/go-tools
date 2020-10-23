@@ -5,6 +5,8 @@ import (
 
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/types"
+	tmtypes "github.com/kava-labs/tendermint/types"
 )
 
 // querySwapsMaxPageSize is the maximum supported 'limit' parameter for querying swaps by recipient address
@@ -13,10 +15,12 @@ const querySwapsMaxPageSize = 100
 //go:generate mockgen -destination mock/bnb_client.go -package mock . BnbChainClient
 
 type BnbChainClient interface { // XXX should be defined in the claimer, not the client. Doesn't need to be exported?
-	GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error)
 	GetOpenOutgoingSwaps() ([]types.AtomicSwap, error)
 	GetRandomNumberFromSwap(id []byte) ([]byte, error)
-	GetBNBSDKClient() *bnbRpc.HTTP
+	GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error)
+	GetAccount(address types.AccAddress) (types.Account, error)
+	GetChainID() string
+	BroadcastTx(tx tmtypes.Tx) error
 }
 
 var _ BnbChainClient = rpcBNBClient{}
@@ -63,14 +67,6 @@ func (bc rpcBNBClient) GetOpenOutgoingSwaps() ([]types.AtomicSwap, error) {
 	return swaps, nil
 }
 
-func (bc rpcBNBClient) GetAccount(address types.AccAddress) (types.Account, error) {
-	return bc.bnbSDKClient.GetAccount(address)
-}
-
-func (bc rpcBNBClient) GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error) {
-	return bc.bnbSDKClient.Tx(txHash, false)
-}
-
 func (bc rpcBNBClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	swap, err := bc.bnbSDKClient.GetSwapByID(id)
 	if err != nil {
@@ -82,6 +78,26 @@ func (bc rpcBNBClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	return swap.RandomNumber, nil
 }
 
-func (bc rpcBNBClient) GetBNBSDKClient() *bnbRpc.HTTP {
-	return bc.bnbSDKClient
+func (bc rpcBNBClient) GetTxConfirmation(txHash []byte) (*bnbRpc.ResultTx, error) {
+	return bc.bnbSDKClient.Tx(txHash, false)
+}
+
+func (bc rpcBNBClient) GetAccount(address types.AccAddress) (types.Account, error) {
+	return bc.bnbSDKClient.GetAccount(address)
+}
+
+func (bc rpcBNBClient) GetChainID() string {
+	// this could fetch the chain id from the node, but it's unlikely to ever change
+	return bnbtypes.ProdChainID
+}
+
+func (bc rpcBNBClient) BroadcastTx(tx tmtypes.Tx) error {
+	res, err := bc.bnbSDKClient.BroadcastTxSync(tx)
+	if err != nil {
+		return err
+	}
+	if res.Code != 0 { // tx failed to be submitted to the mempool
+		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log)
+	}
+	return nil
 }

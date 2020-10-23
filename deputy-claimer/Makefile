@@ -2,9 +2,11 @@ install:
 	go install
 
 generate-mocks:
+	@# -x prints commands as they're executed
 	go generate -x ./...
 
-test-unit: generate-mocks
+test-unit:
+	# note: mocks may need to be regenerated if interfaces have changed
 	go test ./...
 
 test-integration:

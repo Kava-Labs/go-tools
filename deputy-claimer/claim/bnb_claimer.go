@@ -7,12 +7,13 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 	"github.com/kava-labs/binance-chain-go-sdk/keys"
-	"github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	bnbtx "github.com/kava-labs/binance-chain-go-sdk/types/tx"
 	"github.com/kava-labs/kava/app"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
+	tmtypes "github.com/kava-labs/tendermint/types"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
@@ -143,7 +144,7 @@ func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, 
 		claimableSwaps = append(
 			claimableSwaps,
 			claimableSwap{
-				swapID:       msg.CalculateSwapID(s.RandomNumberHash, s.From, kavaDeputyAddr.String()),
+				swapID:       bnbmsg.CalculateSwapID(s.RandomNumberHash, s.From, kavaDeputyAddr.String()),
 				randomNumber: randNum,
 			})
 	}
@@ -155,11 +156,30 @@ func constructAndSendBnbClaim(bnbClient BnbChainClient, mnemonic string, swapID,
 	if err != nil {
 		return nil, fmt.Errorf("could not create key manager: %w", err)
 	}
-	bnbClient.GetBNBSDKClient().SetKeyManager(keyManager) // XXX G14 feature envy
-	defer bnbClient.GetBNBSDKClient().SetKeyManager(nil)
-	res, err := bnbClient.GetBNBSDKClient().ClaimHTLT(swapID, randNum, bnbRpc.Sync)
+	msg := bnbmsg.NewClaimHTLTMsg(
+		keyManager.GetAddr(),
+		swapID,
+		randNum,
+	)
+	account, err := bnbClient.GetAccount(keyManager.GetAddr())
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch account: %w", err)
+	}
+	signMsg := bnbtx.StdSignMsg{
+		ChainID:       bnbClient.GetChainID(),
+		AccountNumber: account.GetAccountNumber(),
+		Sequence:      account.GetSequence(),
+		Memo:          "",
+		Msgs:          []bnbmsg.Msg{msg},
+		Source:        bnbtx.Source,
+	}
+	txBz, err := keyManager.Sign(signMsg)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign: %w", err)
+	}
+	err = bnbClient.BroadcastTx(txBz)
 	if err != nil {
 		return nil, fmt.Errorf("could not submit claim: %w", err)
 	}
-	return res.Hash, nil
+	return tmtypes.Tx(txBz).Hash(), nil
 }
