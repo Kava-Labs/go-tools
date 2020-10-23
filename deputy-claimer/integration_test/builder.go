@@ -108,9 +108,9 @@ func getCurrentTimestamp() int64 { return time.Now().Unix() }
 func getDeterministicRandomNumber() []byte {
 	bytes := make([]byte, 32)
 	if _, err := deterministicRand.Read(bytes); err != nil {
-		return []byte{}, err
+		panic(err)
 	}
-	return bytes, nil
+	return bytes
 }
 
 func convertBnbToKavaCoins(coins types.Coins) sdk.Coins {
