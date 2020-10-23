@@ -8,7 +8,6 @@ import (
 	types "github.com/cosmos/cosmos-sdk/types"
 	exported "github.com/cosmos/cosmos-sdk/x/auth/exported"
 	gomock "github.com/golang/mock/gomock"
-	client "github.com/kava-labs/go-sdk/client"
 	types0 "github.com/kava-labs/kava/x/bep3/types"
 	amino "github.com/tendermint/go-amino"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -110,20 +109,6 @@ func (m *MockKavaChainClient) GetOpenOutgoingSwaps() (types0.AtomicSwaps, error)
 func (mr *MockKavaChainClientMockRecorder) GetOpenOutgoingSwaps() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenOutgoingSwaps", reflect.TypeOf((*MockKavaChainClient)(nil).GetOpenOutgoingSwaps))
-}
-
-// GetRPCClient mocks base method
-func (m *MockKavaChainClient) GetRPCClient() *client.KavaClient {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRPCClient")
-	ret0, _ := ret[0].(*client.KavaClient)
-	return ret0
-}
-
-// GetRPCClient indicates an expected call of GetRPCClient
-func (mr *MockKavaChainClientMockRecorder) GetRPCClient() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRPCClient", reflect.TypeOf((*MockKavaChainClient)(nil).GetRPCClient))
 }
 
 // GetRandomNumberFromSwap mocks base method

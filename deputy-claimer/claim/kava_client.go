@@ -33,7 +33,6 @@ type KavaChainClient interface {
 	GetChainID() (string, error)
 	BroadcastTx(tx tmtypes.Tx) error
 	GetCodec() *codec.Codec
-	GetRPCClient() *kavaRpc.KavaClient
 }
 
 var _ KavaChainClient = mixedKavaClient{}
@@ -60,7 +59,7 @@ type restResponse struct {
 }
 
 func (kc mixedKavaClient) GetOpenOutgoingSwaps() (bep3types.AtomicSwaps, error) {
-	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000")
+	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000") // TODO handle higher limits
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +152,4 @@ func (kc mixedKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 func (kc mixedKavaClient) GetCodec() *codec.Codec {
 	// TODO codec is passed in at creation, it shouldn't need to be pulled out again
 	return kc.codec
-}
-
-func (kc mixedKavaClient) GetRPCClient() *kavaRpc.KavaClient {
-	return kc.kavaSDKClient
 }
