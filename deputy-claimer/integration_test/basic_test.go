@@ -30,7 +30,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestClaimBnb(t *testing.T) {
-	t.Skip()
 	addrs := common.GetAddresses()
 
 	bnbSwapper := NewBnbSwapClient(common.BnbNodeURL)
@@ -87,7 +86,6 @@ func TestClaimBnb(t *testing.T) {
 }
 
 func TestClaimKava(t *testing.T) {
-	t.Skip()
 	addrs := common.GetAddresses()
 
 	bnbSwapper := NewBnbSwapClient(common.BnbNodeURL)

@@ -20,12 +20,12 @@ var (
 	}
 	deterministicRand          = rand.New(rand.NewSource(1234))
 	defaultKavaToBnbHeightSpan = SwapHeightSpan{
-		Kava: 200,
-		Bnb:  360,
+		Kava: 220, // must be > other_chain_min_accept_expire_height_span deputy param
+		Bnb:  360, // bnb_expire_height_span param in deputy
 	}
 	defaultBnbToKavaHeightSpan = SwapHeightSpan{
-		Bnb:  10000,
-		Kava: 120,
+		Bnb:  10000, // must be > bnb_min_accept_expire_height_span deputy param
+		Kava: 120,   // other_chain_expire_height_span deputy param
 	}
 )
 

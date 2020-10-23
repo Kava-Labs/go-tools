@@ -86,7 +86,6 @@ func TestMultipleClaimBnb(t *testing.T) {
 }
 
 func TestMultipleClaimKava(t *testing.T) {
-	t.Skip()
 	addrs := common.GetAddresses()
 
 	bnbSwapper := NewBnbSwapClient(common.BnbNodeURL)
