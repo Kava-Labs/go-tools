@@ -25,7 +25,9 @@ func loadConfig() (Config, error) {
 	v.SetConfigName("config") // name of config file (without extension)
 	v.SetConfigType("toml")
 	v.AddConfigPath(".")
-	v.ReadInConfig()
+	if err := v.ReadInConfig(); err != nil {
+		return Config{}, err
+	}
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
