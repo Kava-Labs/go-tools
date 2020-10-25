@@ -24,7 +24,7 @@ func loadConfig() (Config, error) {
 	v := viper.New()
 	v.SetConfigName("config") // name of config file (without extension)
 	v.SetConfigType("toml")
-	v.AddConfigPath(".")
+	v.AddConfigPath("$HOME")
 	if err := v.ReadInConfig(); err != nil {
 		return Config{}, err
 	}
