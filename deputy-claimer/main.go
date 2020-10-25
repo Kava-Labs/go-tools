@@ -67,15 +67,15 @@ func loadConfig() (Config, error) {
 
 func main() {
 
-	cfg, err := loadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
 	app.SetBech32AddressPrefixes(kavaConfig) // XXX G34 descend only one level of abstraction
 	kavaConfig.Seal()
+
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// XXX G30 functions should do one thing
 
