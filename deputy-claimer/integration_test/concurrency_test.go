@@ -17,14 +17,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
-	"github.com/kava-labs/go-tools/deputy-claimer/integration_test/common"
+	"github.com/kava-labs/go-tools/deputy-claimer/testcommon"
 )
 
 func TestMultipleClaimBnb(t *testing.T) {
-	addrs := common.GetAddresses()
+	addrs := testcommon.GetAddresses()
 
-	bnbSwapper := NewBnbSwapClient(common.BnbNodeURL)
-	kavaSwapper := NewKavaSwapClient(common.KavaNodeURL)
+	bnbSwapper := NewBnbSwapClient(testcommon.BnbNodeURL)
+	kavaSwapper := NewKavaSwapClient(testcommon.KavaNodeURL)
 	swapBuilder := NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -63,11 +63,10 @@ func TestMultipleClaimBnb(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewBnbClaimer(
-		common.KavaRestURL,
-		common.KavaNodeURL,
-		common.BnbNodeURL,
-		addrs.Kava.Deputys.Bnb.HotWallet.Address.String(),
-		addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
+		testcommon.KavaRestURL,
+		testcommon.KavaNodeURL,
+		testcommon.BnbNodeURL,
+		getDeputyAddresses(addrs),
 		addrs.BnbUserMnemonics()[:2],
 	).Run(ctx)
 	defer shutdownClaimer()
@@ -86,10 +85,10 @@ func TestMultipleClaimBnb(t *testing.T) {
 }
 
 func TestMultipleClaimKava(t *testing.T) {
-	addrs := common.GetAddresses()
+	addrs := testcommon.GetAddresses()
 
-	bnbSwapper := NewBnbSwapClient(common.BnbNodeURL)
-	kavaSwapper := NewKavaSwapClient(common.KavaNodeURL)
+	bnbSwapper := NewBnbSwapClient(testcommon.BnbNodeURL)
+	kavaSwapper := NewKavaSwapClient(testcommon.KavaNodeURL)
 	swapBuilder := NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -128,10 +127,10 @@ func TestMultipleClaimKava(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewKavaClaimer(
-		common.KavaRestURL,
-		common.KavaNodeURL,
-		common.BnbNodeURL,
-		addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
+		testcommon.KavaRestURL,
+		testcommon.KavaNodeURL,
+		testcommon.BnbNodeURL,
+		getDeputyAddresses(addrs),
 		addrs.KavaUserMnemonics()[:2],
 	).Run(ctx)
 	defer shutdownClaimer()

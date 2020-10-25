@@ -17,13 +17,12 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim/mock"
+	"github.com/kava-labs/go-tools/deputy-claimer/testcommon"
 )
 
 var (
-	addressesKavaDeputy sdk.AccAddress
-	addressesKavaUsers0 sdk.AccAddress
-	addressesBnbDeputy  bnbtypes.AccAddress
-	addressesBnbUsers0  bnbtypes.AccAddress
+	addrs    testcommon.Addresses
+	depAddrs DeputyAddresses
 
 	mnemonicsKavaUsers0 = "season bone lucky dog depth pond royal decide unknown device fruit inch clock trap relief horse morning taxi bird session throw skull avocado private"
 
@@ -43,11 +42,8 @@ func init() {
 	app.SetBech32AddressPrefixes(cfg)
 	cfg.Seal()
 
-	// These addresses are copied from kvtool common addresses.
-	addressesKavaDeputy = mustDecodeKavaAddress("kava1agcvt07tcw0tglu0hmwdecsnuxp2yd45f3avgm")
-	addressesKavaUsers0 = mustDecodeKavaAddress("kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc")
-	addressesBnbDeputy = mustDecodeBnbAddress("bnb1zfa5vmsme2v3ttvqecfleeh2xtz5zghh49hfqe")
-	addressesBnbUsers0 = mustDecodeBnbAddress("bnb10rr5f8m73rxgnz9afvnfn7fn9pwhfskem5kn0x")
+	addrs = testcommon.GetAddresses()
+	depAddrs = getDeputyAddresses(addrs)
 
 	timestamp = time.Date(2020, 10, 11, 17, 0, 0, 0, time.UTC).Add(-10 * time.Minute).Unix() // TODO replace with fixed time once time is abstracted from claimer
 	rndNum0 = mustDecodeHex("52af03e28b32dc838c98936a7654996bd21bcc0d3da5277d5065cf242b26dfe5")
@@ -63,10 +59,10 @@ func init() {
 			RandomNumberHash:    rndNumHash0,
 			ExpireHeight:        1_000_000,
 			Timestamp:           timestamp,
-			Sender:              addressesKavaUsers0,
-			Recipient:           addressesKavaDeputy,
-			SenderOtherChain:    addressesBnbDeputy.String(),
-			RecipientOtherChain: addressesBnbUsers0.String(),
+			Sender:              addrs.Kava.Users[0].Address,
+			Recipient:           addrs.Kava.Deputys.Bnb.HotWallet.Address,
+			SenderOtherChain:    addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
+			RecipientOtherChain: addrs.Bnb.Users[0].Address.String(),
 			ClosedBlock:         0, // default for open swaps
 			Status:              bep3types.Open,
 			CrossChain:          true,
@@ -77,10 +73,10 @@ func init() {
 			RandomNumberHash:    rndNumHash1,
 			ExpireHeight:        1_000_000,
 			Timestamp:           timestamp,
-			Sender:              addressesKavaDeputy,
-			Recipient:           addressesKavaUsers0,
-			SenderOtherChain:    addressesBnbUsers0.String(),
-			RecipientOtherChain: addressesBnbDeputy.String(),
+			Sender:              addrs.Kava.Deputys.Bnb.HotWallet.Address,
+			Recipient:           addrs.Kava.Users[0].Address,
+			SenderOtherChain:    addrs.Bnb.Users[0].Address.String(),
+			RecipientOtherChain: addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
 			ClosedBlock:         0, // default for open swaps
 			Status:              bep3types.Open,
 			CrossChain:          true,
@@ -90,12 +86,12 @@ func init() {
 	testBnbSwaps = []bnbtypes.AtomicSwap{
 		{
 			// kava to bnb swaps
-			From:                addressesBnbDeputy,
-			To:                  addressesBnbUsers0,
+			From:                addrs.Bnb.Deputys.Bnb.HotWallet.Address,
+			To:                  addrs.Bnb.Users[0].Address,
 			OutAmount:           bnbtypes.Coins{{Denom: "BNB", Amount: 1_00_000_000}},
 			InAmount:            nil, // seems to always be nil
 			ExpectedIncome:      "100000000:BNB",
-			RecipientOtherChain: addressesKavaDeputy.String(),
+			RecipientOtherChain: addrs.Kava.Deputys.Bnb.HotWallet.Address.String(),
 			RandomNumberHash:    rndNumHash0,
 			RandomNumber:        rndNum0,
 			Timestamp:           timestamp,
@@ -107,12 +103,12 @@ func init() {
 		},
 		{
 			// bnb to kava swap
-			From:                addressesBnbUsers0,
-			To:                  addressesBnbDeputy,
+			From:                addrs.Bnb.Users[0].Address,
+			To:                  addrs.Bnb.Deputys.Bnb.HotWallet.Address,
 			OutAmount:           bnbtypes.Coins{{Denom: "BNB", Amount: 1_00_000_000}},
 			InAmount:            nil, // seems to always be nil
 			ExpectedIncome:      "100000000:BNB",
-			RecipientOtherChain: addressesKavaUsers0.String(),
+			RecipientOtherChain: addrs.Kava.Users[0].Address.String(),
 			RandomNumberHash:    rndNumHash1,
 			RandomNumber:        nil, // default for unclaimed swap
 			Timestamp:           timestamp,
@@ -137,10 +133,10 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 		Return(testKavaSwaps[:1], nil) // only return outgoing swaps
 
 	bc.EXPECT().
-		GetRandomNumberFromSwap([]byte(calcBnbSwapID(testBnbSwaps[0], addressesKavaUsers0.String()))).
+		GetRandomNumberFromSwap([]byte(calcBnbSwapID(testBnbSwaps[0], addrs.Kava.Users[0].Address.String()))).
 		Return(testBnbSwaps[0].RandomNumber, nil)
 
-	swaps, err := getClaimableKavaSwaps(kc, bc, addressesBnbDeputy)
+	swaps, err := getClaimableKavaSwaps(kc, bc, depAddrs)
 	require.NoError(t, err)
 
 	expectedClaimableSwaps := []claimableSwap{
@@ -168,12 +164,12 @@ func TestGetClaimableBnbSwaps(t *testing.T) {
 		GetRandomNumberFromSwap([]byte(testKavaSwaps[1].GetSwapID())).
 		Return(rndNum1, nil)
 
-	swaps, err := getClaimableBnbSwaps(kc, bc, addressesKavaDeputy)
+	swaps, err := getClaimableBnbSwaps(kc, bc, depAddrs)
 	require.NoError(t, err)
 
 	expectedClaimableSwaps := []claimableSwap{
 		{
-			swapID:       []byte(calcBnbSwapID(testBnbSwaps[1], addressesKavaDeputy.String())),
+			swapID:       []byte(calcBnbSwapID(testBnbSwaps[1], addrs.Kava.Deputys.Bnb.HotWallet.Address.String())),
 			randomNumber: rndNum1,
 		},
 	}
@@ -195,12 +191,12 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 		GetChainID().
 		Return("kava-localnet", nil).AnyTimes()
 	testAcc := authexported.Account(&authtypes.BaseAccount{
-		Address:       addressesKavaUsers0,
+		Address:       addrs.Kava.Users[0].Address,
 		AccountNumber: 12,
 		Sequence:      34,
 	})
 	kc.EXPECT().
-		GetAccount(addressesKavaUsers0).
+		GetAccount(addrs.Kava.Users[0].Address).
 		Return(testAcc, nil).AnyTimes()
 
 	expectedTxJSON := `{
@@ -247,6 +243,27 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 
 func calcBnbSwapID(swap bnbtypes.AtomicSwap, senderOtherChain string) bnbtypes.SwapBytes {
 	return bnbmsg.CalculateSwapID(swap.RandomNumberHash, swap.From, senderOtherChain)
+}
+
+func getDeputyAddresses(addrs testcommon.Addresses) DeputyAddresses {
+	return DeputyAddresses{
+		"bnb": {
+			Kava: addrs.Kava.Deputys.Bnb.HotWallet.Address,
+			Bnb:  addrs.Bnb.Deputys.Bnb.HotWallet.Address,
+		},
+		"busd": {
+			Kava: addrs.Kava.Deputys.Busd.HotWallet.Address,
+			Bnb:  addrs.Bnb.Deputys.Busd.HotWallet.Address,
+		},
+		"btcb": {
+			Kava: addrs.Kava.Deputys.Btcb.HotWallet.Address,
+			Bnb:  addrs.Bnb.Deputys.Btcb.HotWallet.Address,
+		},
+		"xrpb": {
+			Kava: addrs.Kava.Deputys.Xrpb.HotWallet.Address,
+			Bnb:  addrs.Bnb.Deputys.Xrpb.HotWallet.Address,
+		},
+	}
 }
 
 func mustDecodeKavaAddress(address string) sdk.AccAddress {

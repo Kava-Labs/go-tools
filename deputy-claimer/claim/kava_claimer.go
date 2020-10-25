@@ -9,7 +9,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
 	kavaKeys "github.com/kava-labs/go-sdk/keys"
 	"github.com/kava-labs/kava/app"
@@ -19,23 +18,19 @@ import (
 )
 
 type KavaClaimer struct {
-	kavaClient    KavaChainClient
-	bnbClient     BnbChainClient
-	mnemonics     []string
-	bnbDeputyAddr types.AccAddress
+	kavaClient      KavaChainClient
+	bnbClient       BnbChainClient
+	mnemonics       []string
+	deputyAddresses DeputyAddresses
 }
 
-func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, bnbDeputyAddrString string, mnemonics []string) KavaClaimer {
+func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAddresses, mnemonics []string) KavaClaimer {
 	cdc := app.MakeCodec()
-	bnbDeputyAddr, err := types.AccAddressFromBech32(bnbDeputyAddrString)
-	if err != nil {
-		panic(err)
-	}
 	return KavaClaimer{
-		kavaClient:    NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc), // XXX hard dependency makes testing hard
-		bnbClient:     NewRpcBNBClient(bnbRPCURL, bnbDeputyAddrString),
-		mnemonics:     mnemonics,
-		bnbDeputyAddr: bnbDeputyAddr,
+		kavaClient:      NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc), // XXX hard dependency makes testing hard
+		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
+		mnemonics:       mnemonics,
+		deputyAddresses: depAddrs,
 	}
 }
 func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate this starts a goroutine
@@ -63,7 +58,7 @@ func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate 
 // these also make it hard to test
 func (kc KavaClaimer) fetchAndClaimSwaps() error {
 
-	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.bnbDeputyAddr)
+	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.deputyAddresses)
 	if err != nil {
 		return fmt.Errorf("could not fetch claimable swaps: %w", err)
 	}
@@ -127,7 +122,7 @@ type claimableSwap struct {
 	randomNumber tmbytes.HexBytes
 }
 
-func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, bnbDeputyAddr types.AccAddress) ([]claimableSwap, error) {
+func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, depAddrs DeputyAddresses) ([]claimableSwap, error) {
 	swaps, err := kavaClient.GetOpenOutgoingSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
@@ -145,7 +140,12 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 	// parse out swap ids, query those txs on bnb, extract random numbers
 	var claimableSwaps []claimableSwap
 	for _, s := range filteredSwaps {
-		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddr, s.Sender.String())
+		bnbDeputyAddress, found := depAddrs.GetMatchingBnb(s.Recipient)
+		if !found {
+			log.Printf("unexpectedly could not find bnb deputy address for kava deputy %s", s.Recipient)
+			continue
+		}
+		bID := bnbmsg.CalculateSwapID(s.RandomNumberHash, bnbDeputyAddress, s.Sender.String())
 		randNum, err := bnbClient.GetRandomNumberFromSwap(bID)
 		if err != nil {
 			log.Printf("could not fetch random num for bnb swap ID %x: %v\n", bID, err)

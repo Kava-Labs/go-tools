@@ -26,31 +26,25 @@ type BnbChainClient interface { // XXX should be defined in the claimer, not the
 var _ BnbChainClient = rpcBNBClient{}
 
 type rpcBNBClient struct {
-	deputyAddressString string
-	bnbSDKClient        *bnbRpc.HTTP
+	deputyAddresses []types.AccAddress
+	bnbSDKClient    *bnbRpc.HTTP
 }
 
-func NewRpcBNBClient(rpcURL string, deputyAddress string) rpcBNBClient {
+func NewRpcBNBClient(rpcURL string, deputyAddresses []types.AccAddress) rpcBNBClient {
 	return rpcBNBClient{
-		deputyAddressString: deputyAddress,
-		bnbSDKClient:        bnbRpc.NewRPCClient(rpcURL, types.ProdNetwork),
+		deputyAddresses: deputyAddresses,
+		bnbSDKClient:    bnbRpc.NewRPCClient(rpcURL, types.ProdNetwork),
 	}
 }
 
 func (bc rpcBNBClient) GetOpenOutgoingSwaps() ([]types.AtomicSwap, error) {
 	var swapIDs []types.SwapBytes
-	var queryOffset int64 = 0
-	for {
-		swapIDsPage, err := bc.bnbSDKClient.GetSwapByRecipient(bc.deputyAddressString, queryOffset, querySwapsMaxPageSize)
+	for _, addr := range bc.deputyAddresses {
+		ids, err := bc.GetSwapIDsByRecipient(addr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch swaps by recipient (offset %d): %w", queryOffset, err)
+			return nil, fmt.Errorf("failed to get swaps for deputy %s", addr)
 		}
-		swapIDs = append(swapIDs, swapIDsPage...)
-		if len(swapIDsPage) < querySwapsMaxPageSize {
-			// if less than a full page of swapIDs was returned, there is no more to query
-			break
-		}
-		queryOffset += querySwapsMaxPageSize
+		swapIDs = append(swapIDs, ids...)
 	}
 
 	var swaps []types.AtomicSwap
@@ -65,6 +59,24 @@ func (bc rpcBNBClient) GetOpenOutgoingSwaps() ([]types.AtomicSwap, error) {
 		swaps = append(swaps, s)
 	}
 	return swaps, nil
+}
+
+func (bc rpcBNBClient) GetSwapIDsByRecipient(recipient types.AccAddress) ([]types.SwapBytes, error) {
+	var swapIDs []types.SwapBytes
+	var queryOffset int64 = 0
+	for {
+		swapIDsPage, err := bc.bnbSDKClient.GetSwapByRecipient(recipient.String(), queryOffset, querySwapsMaxPageSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch swaps by recipient (offset %d): %w", queryOffset, err) // TODO should probably retry on failure
+		}
+		swapIDs = append(swapIDs, swapIDsPage...)
+		if len(swapIDsPage) < querySwapsMaxPageSize {
+			// if less than a full page of swapIDs was returned, there is no more to query
+			break
+		}
+		queryOffset += querySwapsMaxPageSize
+	}
+	return swapIDs, nil
 }
 
 func (bc rpcBNBClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {

@@ -2,54 +2,44 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"log"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	_ "github.com/envkey/envkeygo" // XXX could do with comment
 	"github.com/kava-labs/kava/app"
+	"github.com/spf13/viper"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
 )
 
 type Config struct {
-	BnbRPCURL         string
-	KavaRestURL       string
-	KavaRPCURL        string
-	BnbDeputyAddress  string
-	KavaDeputyAddress string
-	BnbMnemonics      []string
-	KavaMnemonics     []string
+	BnbRPCURL     string
+	KavaRestURL   string
+	KavaRPCURL    string
+	Deputies      claim.DeputyAddresses
+	BnbMnemonics  []string
+	KavaMnemonics []string
 }
 
-func loadConfig() Config {
-	return Config{
-		BnbRPCURL:         os.Getenv("BNB_RPC_URL"),
-		KavaRestURL:       os.Getenv("KAVA_REST_URL"),
-		KavaRPCURL:        os.Getenv("KAVA_RPC_URL"),
-		BnbDeputyAddress:  os.Getenv("BNB_DEPUTY_ADDRESS"),
-		KavaDeputyAddress: os.Getenv("KAVA_DEPUTY_ADDRESS"),
-		KavaMnemonics:     getSequentialEnvVars("KAVA_MNEMONIC_"),
-		BnbMnemonics:      getSequentialEnvVars("BNB_MNEMONIC_"),
-	}
-}
+func loadConfig() (Config, error) {
+	v := viper.New()
+	v.SetConfigName("config") // name of config file (without extension)
+	v.SetConfigType("toml")
+	v.AddConfigPath(".")
+	v.ReadInConfig()
 
-// XXX could use godoc
-func getSequentialEnvVars(prefix string) []string {
-	var envVars []string
-	for i := 0; ; i++ {
-		envVar, found := os.LookupEnv(fmt.Sprintf("%s%d", prefix, i))
-		if !found {
-			break
-		}
-		envVars = append(envVars, envVar)
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		return Config{}, err
 	}
-	return envVars
+	return cfg, nil
 }
 
 func main() {
 
-	cfg := loadConfig()
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
@@ -58,10 +48,10 @@ func main() {
 
 	// XXX G30 functions should do one thing
 
-	// XXX F1 too many arguements
+	// XXX F1 too many arguments
 	// XXX G5 duplication
-	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
-	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.KavaDeputyAddress, cfg.BnbDeputyAddress, cfg.BnbMnemonics)
+	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.KavaMnemonics)
+	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.BnbMnemonics)
 
 	ctx := context.Background() // XXX G34 too many levels of abstraction
 	kavaClaimer.Run(ctx)

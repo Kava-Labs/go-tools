@@ -6,7 +6,7 @@ generate-mocks:
 	go generate -x ./...
 
 test-unit:
-	# note: mocks may need to be regenerated if interfaces have changed
+	# note: mocks need to be regenerated if interfaces have changed
 	go test ./...
 
 test-integration:
