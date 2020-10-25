@@ -5,6 +5,7 @@ import (
 	"log"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	"github.com/kava-labs/kava/app"
 	"github.com/spf13/viper"
 
@@ -20,6 +21,18 @@ type Config struct {
 	KavaMnemonics []string
 }
 
+type ConfigSimple struct {
+	BnbRPCURL   string
+	KavaRestURL string
+	KavaRPCURL  string
+	Deputies    map[string]struct {
+		Kava string
+		Bnb  string
+	}
+	BnbMnemonics  []string
+	KavaMnemonics []string
+}
+
 func loadConfig() (Config, error) {
 	v := viper.New()
 	v.SetConfigName("config") // name of config file (without extension)
@@ -29,9 +42,25 @@ func loadConfig() (Config, error) {
 		return Config{}, err
 	}
 
-	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	var temp ConfigSimple
+	if err := v.Unmarshal(&temp); err != nil {
 		return Config{}, err
+	}
+
+	deputies := claim.DeputyAddresses{}
+	for k, v := range temp.Deputies {
+		deputies[k] = claim.DeputyAddress{
+			Kava: mustDecodeKavaAddress(v.Kava),
+			Bnb:  mustDecodeBnbAddress(v.Bnb),
+		}
+	}
+	cfg := Config{
+		BnbRPCURL:     temp.BnbRPCURL,
+		KavaRestURL:   temp.KavaRestURL,
+		KavaRPCURL:    temp.KavaRPCURL,
+		Deputies:      deputies,
+		BnbMnemonics:  temp.BnbMnemonics,
+		KavaMnemonics: temp.KavaMnemonics,
 	}
 	return cfg, nil
 }
@@ -60,4 +89,20 @@ func main() {
 	bnbClaimer.Run(ctx) // XXX G5 duplication
 
 	select {}
+}
+
+func mustDecodeKavaAddress(address string) sdk.AccAddress {
+	aa, err := sdk.AccAddressFromBech32(address)
+	if err != nil {
+		panic(err)
+	}
+	return aa
+}
+
+func mustDecodeBnbAddress(address string) bnbtypes.AccAddress {
+	aa, err := bnbtypes.AccAddressFromBech32(address)
+	if err != nil {
+		panic(err)
+	}
+	return aa
 }
