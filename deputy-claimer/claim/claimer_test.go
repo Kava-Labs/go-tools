@@ -213,7 +213,12 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 				}
 			],
 			"fee": {
-				"amount": [],
+				"amount": [
+					{
+						"denom": "ukava",
+						"amount": "62500"
+					}
+				],
 				"gas": "250000"
 			},
 			"signatures": [
@@ -222,7 +227,7 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 						"type": "tendermint/PubKeySecp256k1",
 						"value": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
 					},
-					"signature": "0w+31XqrpS8ZpG0piYLL+ItQMIEbqJnkOUJnQZaAKQoAHzrJKWqBex9xd+I9yw82/SN0sCpffJwViTx8K5FPVA=="
+					"signature": "bQGaRBq9FuYDWpMEfPF6scgnayakdZCp6lB1d/JE+iUfKzw5B16iOhox+vENzxgQOIYb1VFJYyKP9o2gIrE4Sg=="
 				}
 			],
 			"memo": ""

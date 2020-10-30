@@ -17,6 +17,11 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
+var (
+	defaultGas      uint64      = 250_000
+	defaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
+)
+
 type KavaClaimer struct {
 	kavaClient      KavaChainClient
 	bnbClient       BnbChainClient
@@ -33,6 +38,7 @@ func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAd
 		deputyAddresses: depAddrs,
 	}
 }
+
 func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate this starts a goroutine
 	go func(ctx context.Context) {
 		for {
@@ -176,11 +182,18 @@ func constructAndSendClaim(kavaClient KavaChainClient, mnemonic string, swapID, 
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch account: %w", err)
 	}
+	fee := authtypes.NewStdFee(
+		defaultGas,
+		sdk.NewCoins(sdk.NewCoin(
+			defaultGasPrice.Denom,
+			defaultGasPrice.Amount.MulInt64(int64(defaultGas)).Ceil().TruncateInt(),
+		)),
+	)
 	signMsg := authtypes.StdSignMsg{
 		ChainID:       chainID,
 		AccountNumber: account.GetAccountNumber(),
 		Sequence:      account.GetSequence(),
-		Fee:           authtypes.NewStdFee(250_000, nil),
+		Fee:           fee,
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
