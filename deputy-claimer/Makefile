@@ -12,4 +12,4 @@ test-unit:
 test-integration:
 	@# run go vet first to avoid waiting for containers to spin up before finding there's a typo
 	go vet ./...
-	cd integration_test && run-tests.sh
+	cd test/integration && run-tests.sh

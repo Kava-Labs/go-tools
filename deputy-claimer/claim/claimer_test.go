@@ -16,12 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 	tmtypes "github.com/tendermint/tendermint/types"
 
+	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
 	"github.com/kava-labs/go-tools/deputy-claimer/claim/mock"
-	"github.com/kava-labs/go-tools/deputy-claimer/testcommon"
 )
 
 var (
-	addrs    testcommon.Addresses
+	addrs    addresses.Addresses
 	depAddrs DeputyAddresses
 
 	mnemonicsKavaUsers0 = "season bone lucky dog depth pond royal decide unknown device fruit inch clock trap relief horse morning taxi bird session throw skull avocado private"
@@ -42,7 +42,7 @@ func init() {
 	app.SetBech32AddressPrefixes(cfg)
 	cfg.Seal()
 
-	addrs = testcommon.GetAddresses()
+	addrs = addresses.GetAddresses()
 	depAddrs = getDeputyAddresses(addrs)
 
 	timestamp = time.Date(2020, 10, 11, 17, 0, 0, 0, time.UTC).Add(-10 * time.Minute).Unix() // TODO replace with fixed time once time is abstracted from claimer
@@ -250,7 +250,7 @@ func calcBnbSwapID(swap bnbtypes.AtomicSwap, senderOtherChain string) bnbtypes.S
 	return bnbmsg.CalculateSwapID(swap.RandomNumberHash, swap.From, senderOtherChain)
 }
 
-func getDeputyAddresses(addrs testcommon.Addresses) DeputyAddresses {
+func getDeputyAddresses(addrs addresses.Addresses) DeputyAddresses {
 	return DeputyAddresses{
 		"bnb": {
 			Kava: addrs.Kava.Deputys.Bnb.HotWallet.Address,
