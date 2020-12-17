@@ -6,34 +6,30 @@ import (
 	"log"
 	"time"
 
-	bnbRpc "github.com/binance-chain/go-sdk/client/rpc"
-	"github.com/binance-chain/go-sdk/common/types"
-	"github.com/binance-chain/go-sdk/keys"
-	"github.com/binance-chain/go-sdk/types/msg"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	"github.com/kava-labs/go-sdk/kava"
-	"github.com/kava-labs/go-sdk/kava/bep3"
-	tmbytes "github.com/kava-labs/tendermint/libs/bytes"
+	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	"github.com/kava-labs/binance-chain-go-sdk/keys"
+	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	bnbtx "github.com/kava-labs/binance-chain-go-sdk/types/tx"
+	"github.com/kava-labs/kava/app"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
+	tmtypes "github.com/kava-labs/tendermint/types"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
 type BnbClaimer struct {
-	kavaClient     kavaChainClient
-	bnbClient      bnbChainClient
-	mnemonics      []string
-	kavaDeputyAddr sdk.AccAddress
+	kavaClient      KavaChainClient
+	bnbClient       BnbChainClient
+	mnemonics       []string
+	deputyAddresses DeputyAddresses
 }
 
-func NewBnbClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, kavaDeputyAddrString, bnbDeputyAddrString string, mnemonics []string) BnbClaimer {
-	cdc := kava.MakeCodec()
-	kavaDeputyAddr, err := sdk.AccAddressFromBech32(kavaDeputyAddrString)
-	if err != nil {
-		panic(err)
-	}
+func NewBnbClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAddresses, mnemonics []string) BnbClaimer {
+	cdc := app.MakeCodec()
 	return BnbClaimer{
-		kavaClient:     newKavaChainClient(kavaRestURL, kavaRPCURL, cdc),
-		bnbClient:      newBnbChainClient(bnbRPCURL, bnbDeputyAddrString),
-		mnemonics:      mnemonics,
-		kavaDeputyAddr: kavaDeputyAddr,
+		kavaClient:      NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc),
+		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
+		mnemonics:       mnemonics,
+		deputyAddresses: depAddrs,
 	}
 }
 func (bc BnbClaimer) Run(ctx context.Context) {
@@ -57,7 +53,7 @@ func (bc BnbClaimer) Run(ctx context.Context) {
 
 func (bc BnbClaimer) fetchAndClaimSwaps() error {
 
-	claimableSwaps, err := getClaimableBnbSwaps(bc.kavaClient, bc.bnbClient, bc.kavaDeputyAddr)
+	claimableSwaps, err := getClaimableBnbSwaps(bc.kavaClient, bc.bnbClient, bc.deputyAddresses)
 	if err != nil {
 		return fmt.Errorf("could not fetch claimable swaps: %w", err)
 	}
@@ -83,7 +79,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 				return
 			}
 			err = Wait(15*time.Second, func() (bool, error) {
-				res, err := bc.bnbClient.getTxConfirmation(txHash)
+				res, err := bc.bnbClient.GetTxConfirmation(txHash)
 				if err != nil {
 					return false, nil
 				}
@@ -100,7 +96,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 	}
 
 	// wait for all go routines to finish
-	for i := 0; i > len(bc.mnemonics); i++ {
+	for i := 0; i < len(bc.mnemonics); i++ {
 		<-availableMnemonics
 	}
 	// report any errors
@@ -116,8 +112,8 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 	return nil
 }
 
-func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, kavaDeputyAddr sdk.AccAddress) ([]claimableSwap, error) {
-	swaps, err := bnbClient.getOpenSwaps()
+func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, depAddrs DeputyAddresses) ([]claimableSwap, error) {
+	swaps, err := bnbClient.GetOpenOutgoingSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
 	}
@@ -133,33 +129,57 @@ func getClaimableBnbSwaps(kavaClient kavaChainClient, bnbClient bnbChainClient, 
 	// parse out swap ids, query those txs on bnb, extract random numbers
 	var claimableSwaps []claimableSwap
 	for _, s := range filteredSwaps {
-		kID := bep3.CalculateSwapID(s.RandomNumberHash, kavaDeputyAddr, s.From.String())
+		kavaDeputyAddress, found := depAddrs.GetMatchingKava(s.To)
+		if !found {
+			log.Printf("unexpectedly could not find bnb deputy address for kava deputy %s", s.To)
+			continue
+		}
+		kID := bep3types.CalculateSwapID(s.RandomNumberHash, kavaDeputyAddress, s.From.String())
 		// get the random number for a claim transaction for the kava swap
-		randNum, err := kavaClient.getRandomNumberFromSwap(kID)
+		randNum, err := kavaClient.GetRandomNumberFromSwap(kID)
 		if err != nil {
-			log.Printf("could not fetch random num from kava swap ID %x: %w\n", kID, err)
+			log.Printf("could not fetch random num for kava swap ID %x: %v\n", kID, err)
 			continue
 		}
 		claimableSwaps = append(
 			claimableSwaps,
 			claimableSwap{
-				swapID:       msg.CalculateSwapID(s.RandomNumberHash, s.From, kavaDeputyAddr.String()),
+				swapID:       bnbmsg.CalculateSwapID(s.RandomNumberHash, s.From, kavaDeputyAddress.String()),
 				randomNumber: randNum,
 			})
 	}
 	return claimableSwaps, nil
 }
 
-func constructAndSendBnbClaim(bnbClient bnbChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+func constructAndSendBnbClaim(bnbClient BnbChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	keyManager, err := keys.NewMnemonicKeyManager(mnemonic)
 	if err != nil {
 		return nil, fmt.Errorf("could not create key manager: %w", err)
 	}
-	bnbClient.bnbSDKClient.SetKeyManager(keyManager)
-	defer bnbClient.bnbSDKClient.SetKeyManager(nil)
-	res, err := bnbClient.bnbSDKClient.ClaimHTLT(swapID, randNum, bnbRpc.Sync)
+	msg := bnbmsg.NewClaimHTLTMsg(
+		keyManager.GetAddr(),
+		swapID,
+		randNum,
+	)
+	account, err := bnbClient.GetAccount(keyManager.GetAddr())
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch account: %w", err)
+	}
+	signMsg := bnbtx.StdSignMsg{
+		ChainID:       bnbClient.GetChainID(),
+		AccountNumber: account.GetAccountNumber(),
+		Sequence:      account.GetSequence(),
+		Memo:          "",
+		Msgs:          []bnbmsg.Msg{msg},
+		Source:        bnbtx.Source,
+	}
+	txBz, err := keyManager.Sign(signMsg)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign: %w", err)
+	}
+	err = bnbClient.BroadcastTx(txBz)
 	if err != nil {
 		return nil, fmt.Errorf("could not submit claim: %w", err)
 	}
-	return res.Hash, nil
+	return tmtypes.Tx(txBz).Hash(), nil
 }

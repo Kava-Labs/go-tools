@@ -2,65 +2,107 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"log"
 
-	_ "github.com/envkey/envkeygo"
-	sdk "github.com/kava-labs/cosmos-sdk/types"
-	"github.com/kava-labs/go-sdk/kava"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
+	"github.com/kava-labs/kava/app"
+	"github.com/spf13/viper"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
 )
 
 type Config struct {
-	BnbRPCURL         string
-	KavaRestURL       string
-	KavaRPCURL        string
-	BnbDeputyAddress  string
-	KavaDeputyAddress string
-	BnbMnemonics      []string
-	KavaMnemonics     []string
+	BnbRPCURL     string
+	KavaRestURL   string
+	KavaRPCURL    string
+	Deputies      claim.DeputyAddresses
+	BnbMnemonics  []string
+	KavaMnemonics []string
 }
 
-func loadConfig() Config {
-	return Config{
-		BnbRPCURL:         os.Getenv("BNB_RPC_URL"),
-		KavaRestURL:       os.Getenv("KAVA_REST_URL"),
-		KavaRPCURL:        os.Getenv("KAVA_RPC_URL"),
-		BnbDeputyAddress:  os.Getenv("BNB_DEPUTY_ADDRESS"),
-		KavaDeputyAddress: os.Getenv("KAVA_DEPUTY_ADDRESS"),
-		KavaMnemonics:     getSequentialEnvVars("KAVA_MNEMONIC_"),
-		BnbMnemonics:      getSequentialEnvVars("BNB_MNEMONIC_"),
+type ConfigSimple struct {
+	BnbRPCURL   string
+	KavaRestURL string
+	KavaRPCURL  string
+	Deputies    map[string]struct {
+		Kava string
+		Bnb  string
 	}
+	BnbMnemonics  []string
+	KavaMnemonics []string
 }
 
-func getSequentialEnvVars(prefix string) []string {
-	var envVars []string
-	for i := 0; ; i++ {
-		envVar, found := os.LookupEnv(fmt.Sprintf("%s%d", prefix, i))
-		if !found {
-			break
+func loadConfig() (Config, error) {
+	v := viper.New()
+	v.SetConfigName("config") // name of config file (without extension)
+	v.SetConfigType("toml")
+	v.AddConfigPath("$HOME")
+	if err := v.ReadInConfig(); err != nil {
+		return Config{}, err
+	}
+
+	var temp ConfigSimple
+	if err := v.Unmarshal(&temp); err != nil {
+		return Config{}, err
+	}
+
+	deputies := claim.DeputyAddresses{}
+	for k, v := range temp.Deputies {
+		deputies[k] = claim.DeputyAddress{
+			Kava: mustDecodeKavaAddress(v.Kava),
+			Bnb:  mustDecodeBnbAddress(v.Bnb),
 		}
-		envVars = append(envVars, envVar)
 	}
-	return envVars
+	cfg := Config{
+		BnbRPCURL:     temp.BnbRPCURL,
+		KavaRestURL:   temp.KavaRestURL,
+		KavaRPCURL:    temp.KavaRPCURL,
+		Deputies:      deputies,
+		BnbMnemonics:  temp.BnbMnemonics,
+		KavaMnemonics: temp.KavaMnemonics,
+	}
+	return cfg, nil
 }
 
 func main() {
 
-	cfg := loadConfig()
-
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig)
+	app.SetBech32AddressPrefixes(kavaConfig) // XXX G34 descend only one level of abstraction
 	kavaConfig.Seal()
 
-	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.BnbDeputyAddress, cfg.KavaMnemonics)
-	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.KavaDeputyAddress, cfg.BnbDeputyAddress, cfg.BnbMnemonics)
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	ctx := context.Background()
+	// XXX G30 functions should do one thing
+
+	// XXX F1 too many arguments
+	// XXX G5 duplication
+	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.KavaMnemonics)
+	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.BnbMnemonics)
+
+	ctx := context.Background() // XXX G34 too many levels of abstraction
 	kavaClaimer.Run(ctx)
-	bnbClaimer.Run(ctx)
+	bnbClaimer.Run(ctx) // XXX G5 duplication
 
 	select {}
+}
+
+func mustDecodeKavaAddress(address string) sdk.AccAddress {
+	aa, err := sdk.AccAddressFromBech32(address)
+	if err != nil {
+		panic(err)
+	}
+	return aa
+}
+
+func mustDecodeBnbAddress(address string) bnbtypes.AccAddress {
+	aa, err := bnbtypes.AccAddressFromBech32(address)
+	if err != nil {
+		panic(err)
+	}
+	return aa
 }
