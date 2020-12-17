@@ -21,7 +21,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-// XXX G11 inconsistency - why use rpc and rest?
+// TODO use either rest or rpc, not both
 
 //go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
 
@@ -82,7 +82,7 @@ func (kc mixedKavaClient) GetAccount(address sdk.AccAddress) (authexported.Accou
 		return nil, err
 	}
 	defer resp.Body.Close()
-	bz, err := ioutil.ReadAll(resp.Body) // XXX G5 Duplication between all these funcs
+	bz, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (kc mixedKavaClient) BroadcastTx(tx tmtypes.Tx) error {
 		return err
 	}
 	if res.Code != 0 { // tx failed to be submitted to the mempool
-		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log) // XXX should return a named error
+		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log) // TODO should return a named error
 	}
 	return nil
 }
