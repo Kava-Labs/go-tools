@@ -91,6 +91,10 @@ func Main(ctx context.Context, c config.Config) {
 	for {
 		select {
 		case <-ctx.Done():
+			err = s.Shutdown(ctx)
+			if err != nil {
+				log.Error(err)
+			}
 			return
 		case claim := <-claims:
 			switch strings.ToUpper(claim.TargetChain) {
