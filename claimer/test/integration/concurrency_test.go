@@ -56,7 +56,7 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 		Kava: config.KavaConfig{
 			ChainID:   "kava-localnet",
 			Endpoint:  addresses.KavaNodeURL,
-			Mnemonics: kavaUserMenmonics(addrs)[2:],
+			Mnemonics: kavaUserMenmonics(addrs)[1:],
 		},
 		BinanceChain: config.BinanceChainConfig{
 			ChainID:  "Binance-Chain-Tigris",
@@ -73,11 +73,14 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 		err := sendClaimRequest("kava", s.KavaSwap.GetSwapID(), s.RandomNumber)
 		require.NoError(t, err)
 	}
-	averageBlockTime := 6
-	waitTime := int(math.Ceil(
-		float64(numConcurrentSwaps)/float64(len(cfg.Kava.Mnemonics)),
-	)) * averageBlockTime
-	time.Sleep(time.Duration(waitTime) * time.Second)
+	averageBlockTime := 5
+	waitTime := time.Duration(
+		int(math.Ceil(
+			float64(numConcurrentSwaps)/float64(len(cfg.Kava.Mnemonics)),
+		))*averageBlockTime+averageBlockTime,
+	) * time.Second
+	t.Logf("waiting for %s to let claimer claim all swaps", waitTime)
+	time.Sleep(waitTime)
 
 	for _, s := range swaps {
 		status, err := kavaSwapper.FetchStatus(s.KavaSwap)
