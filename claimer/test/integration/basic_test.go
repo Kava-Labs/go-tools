@@ -23,6 +23,7 @@ import (
 
 	"github.com/kava-labs/go-tools/claimer/claimer"
 	"github.com/kava-labs/go-tools/claimer/config"
+	"github.com/kava-labs/go-tools/claimer/server"
 )
 
 func TestMain(m *testing.M) {
@@ -62,9 +63,8 @@ func TestClaimSwapKava(t *testing.T) {
 			Mnemonic: bnbUserMenmonics(addrs)[0],
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go claimer.Run(ctx, cfg)
+	shutdownFunc := startApp(cfg)
+	defer shutdownFunc()
 	time.Sleep(1 * time.Second) // give time for the server to start
 
 	err = sendClaimRequest("kava", swap1.KavaSwap.GetSwapID(), swap1.RandomNumber)
@@ -108,9 +108,8 @@ func TestClaimSwapBnb(t *testing.T) {
 			Mnemonic: bnbUserMenmonics(addrs)[0],
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go claimer.Run(ctx, cfg)
+	shutdownFunc := startApp(cfg)
+	defer shutdownFunc()
 	time.Sleep(1 * time.Second) // give time for the server to start
 
 	err = sendClaimRequest("binance", swap1.BnbSwap.GetSwapID(), swap1.RandomNumber)
@@ -122,6 +121,23 @@ func TestClaimSwapBnb(t *testing.T) {
 	status, err := bnbSwapper.FetchStatus(swap1.BnbSwap)
 	require.NoError(t, err)
 	require.Equalf(t, bnbtypes.Completed, status, "expected swap status '%s', actual '%s'", bnbtypes.Completed, status)
+}
+
+func startApp(cfg config.Config) func() {
+	claimQueue := make(chan server.ClaimJob, claimer.JobQueueSize)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	dispatcher := claimer.NewDispatcher(claimQueue)
+	go dispatcher.Start(ctx, cfg)
+
+	s := server.NewServer(claimQueue)
+	go s.Start()
+
+	shutdown := func() {
+		s.Shutdown(context.Background())
+		cancel()
+	}
+	return shutdown
 }
 
 func sendClaimRequest(chain string, swapID []byte, randomNumber []byte) error {
