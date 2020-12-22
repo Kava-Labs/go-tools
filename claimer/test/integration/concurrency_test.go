@@ -15,8 +15,8 @@ import (
 	kavatypes "github.com/kava-labs/kava/x/bep3/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kava-labs/go-tools/claimer/claimer"
 	"github.com/kava-labs/go-tools/claimer/config"
-	"github.com/kava-labs/go-tools/claimer/renamethis"
 )
 
 func TestClaimConcurrentSwapsKava(t *testing.T) {
@@ -66,7 +66,7 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go renamethis.Main(ctx, cfg)
+	go claimer.Run(ctx, cfg)
 	time.Sleep(1 * time.Second) // give time for the server to start
 
 	for _, s := range swaps {
