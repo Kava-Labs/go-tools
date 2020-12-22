@@ -30,7 +30,17 @@ type KavaClaimer struct {
 	Status  bool
 }
 
-func Run(ctx context.Context, c config.Config) {
+type Dispatcher struct {
+	jobQueue <-chan server.ClaimJob
+}
+
+func NewDispatcher(jobQueue <-chan server.ClaimJob) Dispatcher {
+	return Dispatcher{
+		jobQueue: jobQueue,
+	}
+}
+
+func (d Dispatcher) Start(ctx context.Context, c config.Config) {
 	// Load kava claimers
 	sdkConfig := sdk.GetConfig()
 	kava.SetBech32AddressPrefixes(sdkConfig)
@@ -74,23 +84,14 @@ func Run(ctx context.Context, c config.Config) {
 	}
 	bnbClient.SetKeyManager(bnbKeyManager)
 
-	log.Info("Starting server...")
-	claims := make(chan server.ClaimJob, JobQueueSize)
-	s := server.NewServer(claims)
-	go s.StartServer()
-
 	sem := semaphore.NewWeighted(int64(len(kavaClaimers)))
 
 	// RUN WORKERS --------------------------
 	for {
 		select {
 		case <-ctx.Done():
-			err = s.Shutdown(ctx)
-			if err != nil {
-				log.Error(err)
-			}
 			return
-		case claim := <-claims:
+		case claim := <-d.jobQueue:
 			switch strings.ToUpper(claim.TargetChain) {
 			case server.TargetKava:
 				if err := sem.Acquire(ctx, 1); err != nil {

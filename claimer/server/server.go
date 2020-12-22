@@ -48,8 +48,8 @@ func NewServer(claims chan<- ClaimJob) *Server {
 	}
 }
 
-// StartServer starts the server
-func (s *Server) StartServer() error {
+// Start starts the server
+func (s *Server) Start() error {
 	r := mux.NewRouter()
 	r.HandleFunc("/claim", s.claim).Methods(http.MethodPost)
 	r.HandleFunc("/status", s.status)

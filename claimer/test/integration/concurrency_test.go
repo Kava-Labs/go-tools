@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -15,7 +14,6 @@ import (
 	kavatypes "github.com/kava-labs/kava/x/bep3/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kava-labs/go-tools/claimer/claimer"
 	"github.com/kava-labs/go-tools/claimer/config"
 )
 
@@ -64,9 +62,8 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 			Mnemonic: bnbUserMenmonics(addrs)[0],
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go claimer.Run(ctx, cfg)
+	shutdownFunc := startApp(cfg)
+	defer shutdownFunc()
 	time.Sleep(1 * time.Second) // give time for the server to start
 
 	for _, s := range swaps {
