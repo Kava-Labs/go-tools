@@ -1,4 +1,4 @@
-package renamethis
+package claimer
 
 import (
 	"fmt"

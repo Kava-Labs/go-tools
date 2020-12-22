@@ -21,8 +21,8 @@ import (
 	kavatypes "github.com/kava-labs/kava/x/bep3/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kava-labs/go-tools/claimer/claimer"
 	"github.com/kava-labs/go-tools/claimer/config"
-	"github.com/kava-labs/go-tools/claimer/renamethis"
 )
 
 func TestMain(m *testing.M) {
@@ -64,7 +64,7 @@ func TestClaimSwapKava(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go renamethis.Main(ctx, cfg)
+	go claimer.Run(ctx, cfg)
 	time.Sleep(1 * time.Second) // give time for the server to start
 
 	err = sendClaimRequest("kava", swap1.KavaSwap.GetSwapID(), swap1.RandomNumber)
@@ -78,7 +78,7 @@ func TestClaimSwapKava(t *testing.T) {
 	require.Equalf(t, kavatypes.Completed, status, "expected swap status '%s', actual '%s'", kavatypes.Completed, status)
 }
 func TestClaimSwapBnb(t *testing.T) {
-	time.Sleep(1*time.Second)
+	time.Sleep(1 * time.Second)
 	addrs := addresses.GetAddresses()
 
 	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
@@ -110,7 +110,7 @@ func TestClaimSwapBnb(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go renamethis.Main(ctx, cfg)
+	go claimer.Run(ctx, cfg)
 	time.Sleep(1 * time.Second) // give time for the server to start
 
 	err = sendClaimRequest("binance", swap1.BnbSwap.GetSwapID(), swap1.RandomNumber)

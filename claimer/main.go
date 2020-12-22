@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
+	"github.com/kava-labs/go-tools/claimer/claimer"
 	"github.com/kava-labs/go-tools/claimer/config"
-	"github.com/kava-labs/go-tools/claimer/renamethis"
 )
 
 func main() {
@@ -15,5 +15,5 @@ func main() {
 	}
 	c := *config
 
-	renamethis.Main(context.Background(), c)
+	claimer.Run(context.Background(), c)
 }
