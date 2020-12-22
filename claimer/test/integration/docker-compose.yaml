@@ -9,17 +9,6 @@ services:
             - 26658:26657
         volumes:
             - ./binance/initstate/.bnbchaind/config:/root/.bnbchaind/config
-    bnbrest:
-        build: ./binance
-        command:
-            - bnbcli
-            - api-server
-            - --laddr=tcp://0.0.0.0:8080
-            - --node=tcp://bnbnode:26657
-        ports:
-            - 8080:8080
-        volumes:
-            - ./binance/initstate/.bnbcli:/root/.bnbcli
     kavanode:
         command:
             - sh
@@ -31,15 +20,4 @@ services:
         volumes:
             - ./kava/initstate/.kvd/config:/root/.kvd/config
             - ./kava/initstate/.kvcli/config:/root/.kvcli/config
-    kavarest:
-        command:
-            - kvcli
-            - rest-server
-            - --node=tcp://kavanode:26657
-            - --trust-node
-            - --laddr=tcp://0.0.0.0:1317
-            - --unsafe-cors
-        image: kava/kava:v0.12.0
-        ports:
-            - 1317:1317
 version: "3"
