@@ -30,6 +30,8 @@ import (
 	"github.com/kava-labs/go-tools/claimer/server"
 )
 
+var JobQueueSize = 1000
+
 // KavaClaimer is a worker that sends claim transactions on Kava
 type KavaClaimer struct {
 	Keybase keys.KeyManager
@@ -81,7 +83,7 @@ func Main(ctx context.Context, c config.Config) {
 	bnbClient.SetKeyManager(bnbKeyManager)
 
 	log.Info("Starting server...")
-	claims := make(chan server.ClaimJob, 0)
+	claims := make(chan server.ClaimJob, JobQueueSize)
 	s := server.NewServer(claims)
 	go s.StartServer()
 
@@ -153,7 +155,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError 
 		return NewErrorFailed(err)
 	}
 
-	res, err := bnbHTTP.ClaimHTLT(swapID[:], randomNumber[:], brpc.Sync)
+	res, err := bnbHTTP.ClaimHTLT(swapID[:], randomNumber[:], brpc.Commit)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
@@ -179,17 +181,22 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 	}
 
 	var claimer KavaClaimer
+	var randNum int
 	selectedClaimer := false
 	for !selectedClaimer {
 		source := rand.NewSource(time.Now().UnixNano())
 		r := rand.New(source)
-		randNumb := r.Intn(len(kavaClaimers))
-		randClaimer := kavaClaimers[randNumb%len(kavaClaimers)]
+		randNum = r.Intn(len(kavaClaimers))
+		randClaimer := kavaClaimers[randNum]
 		if randClaimer.Status {
 			selectedClaimer = true
+			kavaClaimers[randNum].Status = false
 			claimer = randClaimer
 		}
 	}
+	defer func() {
+		kavaClaimers[randNum].Status = true
+	}()
 
 	fromAddr := claimer.Keybase.GetAddr()
 
@@ -230,17 +237,18 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		return NewErrorFailed(fmt.Errorf("the tx data exceeds max length %d ", maxTxLength))
 	}
 
-	res, err := http.BroadcastTxSync(tx)
+	res, err := http.BroadcastTxCommit(tx)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-
-	if res.Code != 0 {
-		return NewErrorFailed(errors.New(res.Log))
+	if res.CheckTx.Code != 0 {
+		return NewErrorFailed(errors.New(res.CheckTx.Log))
+	}
+	if res.DeliverTx.Code != 0 {
+		return NewErrorFailed(errors.New(res.DeliverTx.Log))
 	}
 
 	log.Info("Claim tx sent to Kava: ", res.Hash.String())
-	time.Sleep(7 * time.Second) // After sending the transaction, wait a full block
 	return nil
 }
 
