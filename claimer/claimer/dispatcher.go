@@ -6,17 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bkeys "github.com/kava-labs/binance-chain-go-sdk/keys"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/sync/semaphore"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-sdk/keys"
 	kava "github.com/kava-labs/kava/app"
+	log "github.com/sirupsen/logrus"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	rpcclient "github.com/tendermint/tendermint/rpc/client/http"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
@@ -31,25 +30,25 @@ type KavaClaimer struct {
 }
 
 type Dispatcher struct {
-	jobQueue <-chan server.ClaimJob
+	config   config.Config
+	jobQueue chan server.ClaimJob
+	cdc      *codec.Codec
 }
 
-func NewDispatcher() Dispatcher {
+func NewDispatcher(cfg config.Config) Dispatcher {
 	jobQueue := make(chan server.ClaimJob, JobQueueSize)
+	cdc := kava.MakeCodec()
 	return Dispatcher{
+		config:   cfg,
 		jobQueue: jobQueue,
+		cdc:      cdc,
 	}
 }
 
-func (d Dispatcher) Start(ctx context.Context, c config.Config) {
-	// Load kava claimers
-	sdkConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(sdkConfig)
-	cdc := kava.MakeCodec()
-
+func (d Dispatcher) Start(ctx context.Context) {
 	// SETUP CLAIMERS --------------------------
 	var kavaClaimers []KavaClaimer
-	for _, kavaMnemonic := range c.Kava.Mnemonics {
+	for _, kavaMnemonic := range d.config.Kava.Mnemonics {
 		kavaClaimer := KavaClaimer{}
 		keyManager, err := keys.NewMnemonicKeyManager(kavaMnemonic, kava.Bip44CoinType)
 		if err != nil {
@@ -62,7 +61,7 @@ func (d Dispatcher) Start(ctx context.Context, c config.Config) {
 
 	// SETUP KAVA CLIENT --------------------------
 	// Start Kava HTTP client
-	http, err := rpcclient.New(c.Kava.Endpoint, "/websocket")
+	http, err := rpcclient.New(d.config.Kava.Endpoint, "/websocket")
 	if err != nil {
 		panic(err)
 	}
@@ -75,11 +74,11 @@ func (d Dispatcher) Start(ctx context.Context, c config.Config) {
 	// SETUP BNB CLIENT --------------------------
 	// Set up Binance Chain client
 	bncNetwork := btypes.TestNetwork
-	if c.BinanceChain.ChainID == "Binance-Chain-Tigris" {
+	if d.config.BinanceChain.ChainID == "Binance-Chain-Tigris" {
 		bncNetwork = btypes.ProdNetwork
 	}
-	bnbClient := brpc.NewRPCClient(c.BinanceChain.Endpoint, bncNetwork)
-	bnbKeyManager, err := bkeys.NewMnemonicKeyManager(c.BinanceChain.Mnemonic)
+	bnbClient := brpc.NewRPCClient(d.config.BinanceChain.Endpoint, bncNetwork)
+	bnbKeyManager, err := bkeys.NewMnemonicKeyManager(d.config.BinanceChain.Mnemonic)
 	if err != nil {
 		panic(err)
 	}
@@ -103,7 +102,7 @@ func (d Dispatcher) Start(ctx context.Context, c config.Config) {
 				go func() {
 					defer sem.Release(1)
 					Retry(10, 20*time.Second, func() (err ClaimError) {
-						err = claimOnKava(c.Kava, http, claim, cdc, kavaClaimers)
+						err = claimOnKava(d.config.Kava, http, claim, d.cdc, kavaClaimers)
 						return
 					})
 				}()

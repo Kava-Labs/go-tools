@@ -8,17 +8,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
-	"github.com/kava-labs/go-tools/claimer/config"
-	"github.com/kava-labs/go-tools/claimer/server"
 	bep3 "github.com/kava-labs/kava/x/bep3/types"
 	log "github.com/sirupsen/logrus"
-	amino "github.com/tendermint/go-amino"
 	rpcclient "github.com/tendermint/tendermint/rpc/client/http"
 	tmtypes "github.com/tendermint/tendermint/types"
+
+	"github.com/kava-labs/go-tools/claimer/config"
+	"github.com/kava-labs/go-tools/claimer/server"
 )
 
 func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError {
@@ -63,7 +64,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError 
 }
 
 func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.ClaimJob,
-	cdc *amino.Codec, kavaClaimers []KavaClaimer) ClaimError {
+	cdc *codec.Codec, kavaClaimers []KavaClaimer) ClaimError {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
@@ -147,7 +148,7 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 }
 
 // Check if swap is claimable
-func isClaimableKava(http *rpcclient.HTTP, cdc *amino.Codec, swapID []byte) ClaimError {
+func isClaimableKava(http *rpcclient.HTTP, cdc *codec.Codec, swapID []byte) ClaimError {
 	claimableParams := bep3.NewQueryAtomicSwapByID(swapID)
 	claimableBz, err := cdc.MarshalJSON(claimableParams)
 	if err != nil {
@@ -189,7 +190,7 @@ func isClaimableKava(http *rpcclient.HTTP, cdc *amino.Codec, swapID []byte) Clai
 	return nil
 }
 
-func getKavaAcc(http *rpcclient.HTTP, cdc *amino.Codec, fromAddr sdk.AccAddress) (uint64, uint64, ClaimError) {
+func getKavaAcc(http *rpcclient.HTTP, cdc *codec.Codec, fromAddr sdk.AccAddress) (uint64, uint64, ClaimError) {
 	params := authtypes.NewQueryAccountParams(fromAddr)
 	bz, err := cdc.MarshalJSON(params)
 	if err != nil {
