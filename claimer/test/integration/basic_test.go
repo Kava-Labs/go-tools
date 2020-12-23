@@ -124,13 +124,11 @@ func TestClaimSwapBnb(t *testing.T) {
 }
 
 func startApp(cfg config.Config) func() {
-	claimQueue := make(chan server.ClaimJob, claimer.JobQueueSize)
-
 	ctx, cancel := context.WithCancel(context.Background())
-	dispatcher := claimer.NewDispatcher(claimQueue)
+	dispatcher := claimer.NewDispatcher()
 	go dispatcher.Start(ctx, cfg)
 
-	s := server.NewServer(claimQueue)
+	s := server.NewServer(dispatcher.JobQueue())
 	go s.Start()
 
 	shutdown := func() {

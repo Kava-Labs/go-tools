@@ -34,7 +34,8 @@ type Dispatcher struct {
 	jobQueue <-chan server.ClaimJob
 }
 
-func NewDispatcher(jobQueue <-chan server.ClaimJob) Dispatcher {
+func NewDispatcher() Dispatcher {
+	jobQueue := make(chan server.ClaimJob, JobQueueSize)
 	return Dispatcher{
 		jobQueue: jobQueue,
 	}
@@ -119,3 +120,5 @@ func (d Dispatcher) Start(ctx context.Context, c config.Config) {
 		}
 	}
 }
+
+func (d Dispatcher) JobQueue() chan server.ClaimJob { return d.jobQueue }

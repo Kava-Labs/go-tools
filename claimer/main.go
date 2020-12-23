@@ -12,20 +12,21 @@ import (
 
 func main() {
 	// Load config
-	config, err := config.GetConfig()
+	cfg, err := config.GetConfig()
 	if err != nil {
 		panic(err)
 	}
-	c := *config
 
+	dispatcher := claimer.NewDispatcher()
 	ctx := context.Background()
-	claimQueue := make(chan server.ClaimJob, claimer.JobQueueSize)
+	go dispatcher.Start(ctx, cfg)
 
-	dispatcher := claimer.NewDispatcher(claimQueue)
-	go dispatcher.Start(ctx, c)
-
-	s := server.NewServer(claimQueue)
+	s := server.NewServer(dispatcher.JobQueue())
 	log.Info("Starting server...")
-	go log.Fatal(s.Start())
+	go func() {
+		if err := s.Start(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 }
