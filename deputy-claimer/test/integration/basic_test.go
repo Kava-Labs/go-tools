@@ -1,6 +1,6 @@
 // +build integration
 
-package integrationtest
+package integration
 
 import (
 	"context"
@@ -18,7 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
-	"github.com/kava-labs/go-tools/deputy-claimer/testcommon"
+	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
+	"github.com/kava-labs/go-tools/deputy-claimer/test/swap"
 )
 
 func TestMain(m *testing.M) {
@@ -30,11 +31,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestClaimBnb(t *testing.T) {
-	addrs := testcommon.GetAddresses()
+	addrs := addresses.GetAddresses()
 
-	bnbSwapper := NewBnbSwapClient(testcommon.BnbNodeURL)
-	kavaSwapper := NewKavaSwapClient(testcommon.KavaNodeURL)
-	swapBuilder := NewDefaultSwapBuilder(
+	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
 	)
@@ -69,9 +70,9 @@ func TestClaimBnb(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewBnbClaimer(
-		testcommon.KavaRestURL,
-		testcommon.KavaNodeURL,
-		testcommon.BnbNodeURL,
+		addresses.KavaRestURL,
+		addresses.KavaNodeURL,
+		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.BnbUserMnemonics()[:2],
 	).Run(ctx)
@@ -85,11 +86,11 @@ func TestClaimBnb(t *testing.T) {
 }
 
 func TestClaimKava(t *testing.T) {
-	addrs := testcommon.GetAddresses()
+	addrs := addresses.GetAddresses()
 
-	bnbSwapper := NewBnbSwapClient(testcommon.BnbNodeURL)
-	kavaSwapper := NewKavaSwapClient(testcommon.KavaNodeURL)
-	swapBuilder := NewDefaultSwapBuilder(
+	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
 	)
@@ -124,9 +125,9 @@ func TestClaimKava(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewKavaClaimer(
-		testcommon.KavaRestURL,
-		testcommon.KavaNodeURL,
-		testcommon.BnbNodeURL,
+		addresses.KavaRestURL,
+		addresses.KavaNodeURL,
+		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.KavaUserMnemonics()[:2],
 	).Run(ctx)
@@ -139,7 +140,7 @@ func TestClaimKava(t *testing.T) {
 	require.Equalf(t, bep3types.Completed, status, "expected swap status '%s', actual '%s'", bep3types.Completed, status)
 }
 
-func getDeputyAddresses(addrs testcommon.Addresses) claim.DeputyAddresses {
+func getDeputyAddresses(addrs addresses.Addresses) claim.DeputyAddresses {
 	return claim.DeputyAddresses{
 		"bnb": {
 			Kava: addrs.Kava.Deputys.Bnb.HotWallet.Address,

@@ -1,5 +1,5 @@
-// Package testcommon defines kava and bnb chain addresses used for integration testing.
-package testcommon
+// Package addresses defines kava and bnb chain addresses used for integration testing.
+package addresses
 
 import (
 	"encoding/json"

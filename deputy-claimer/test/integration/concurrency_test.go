@@ -1,6 +1,6 @@
 // +build integration
 
-package integrationtest
+package integration
 
 import (
 	"context"
@@ -17,21 +17,22 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
-	"github.com/kava-labs/go-tools/deputy-claimer/testcommon"
+	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
+	"github.com/kava-labs/go-tools/deputy-claimer/test/swap"
 )
 
 func TestMultipleClaimBnb(t *testing.T) {
-	addrs := testcommon.GetAddresses()
+	addrs := addresses.GetAddresses()
 
-	bnbSwapper := NewBnbSwapClient(testcommon.BnbNodeURL)
-	kavaSwapper := NewKavaSwapClient(testcommon.KavaNodeURL)
-	swapBuilder := NewDefaultSwapBuilder(
+	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
 	)
 	swapBuilder = swapBuilder.WithTimestamp(time.Now().Unix() - 10*60 - 1) // set the timestamp to be in the past
 
-	createTestBnbToKavaSwap := func() (CrossChainSwap, error) {
+	createTestBnbToKavaSwap := func() (swap.CrossChainSwap, error) {
 		swap := swapBuilder.NewBnbToKavaSwap(
 			addrs.Bnb.Users[0].Mnemonic,
 			addrs.Kava.Users[0].Address,
@@ -52,7 +53,7 @@ func TestMultipleClaimBnb(t *testing.T) {
 		return swap, nil
 	}
 
-	swaps := []CrossChainSwap{}
+	swaps := []swap.CrossChainSwap{}
 	for i := 0; i < 6; i++ {
 		t.Logf("creating test swap %d", i)
 		swap, err := createTestBnbToKavaSwap()
@@ -63,9 +64,9 @@ func TestMultipleClaimBnb(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewBnbClaimer(
-		testcommon.KavaRestURL,
-		testcommon.KavaNodeURL,
-		testcommon.BnbNodeURL,
+		addresses.KavaRestURL,
+		addresses.KavaNodeURL,
+		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.BnbUserMnemonics()[:2],
 	).Run(ctx)
@@ -85,17 +86,17 @@ func TestMultipleClaimBnb(t *testing.T) {
 }
 
 func TestMultipleClaimKava(t *testing.T) {
-	addrs := testcommon.GetAddresses()
+	addrs := addresses.GetAddresses()
 
-	bnbSwapper := NewBnbSwapClient(testcommon.BnbNodeURL)
-	kavaSwapper := NewKavaSwapClient(testcommon.KavaNodeURL)
-	swapBuilder := NewDefaultSwapBuilder(
+	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
 	)
 	swapBuilder = swapBuilder.WithTimestamp(time.Now().Unix() - 10*60 - 1) // set the timestamp to be in the past
 
-	createTestKavaToBnbSwap := func() (CrossChainSwap, error) {
+	createTestKavaToBnbSwap := func() (swap.CrossChainSwap, error) {
 		swap := swapBuilder.NewKavaToBnbSwap(
 			addrs.Kava.Users[0].Mnemonic,
 			addrs.Bnb.Users[0].Address,
@@ -116,7 +117,7 @@ func TestMultipleClaimKava(t *testing.T) {
 		return swap, nil
 	}
 
-	swaps := []CrossChainSwap{}
+	swaps := []swap.CrossChainSwap{}
 	for i := 0; i < 6; i++ {
 		t.Logf("creating test swap %d", i)
 		swap, err := createTestKavaToBnbSwap()
@@ -127,9 +128,9 @@ func TestMultipleClaimKava(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewKavaClaimer(
-		testcommon.KavaRestURL,
-		testcommon.KavaNodeURL,
-		testcommon.BnbNodeURL,
+		addresses.KavaRestURL,
+		addresses.KavaNodeURL,
+		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.KavaUserMnemonics()[:2],
 	).Run(ctx)
