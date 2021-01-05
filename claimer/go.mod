@@ -10,6 +10,7 @@ require (
 	github.com/kava-labs/go-tools/deputy-claimer v0.0.0-20201223131958-31f436616e96
 	github.com/kava-labs/kava v0.12.1
 	github.com/sirupsen/logrus v1.4.2
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	github.com/tendermint/tendermint v0.33.9
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
