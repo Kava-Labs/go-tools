@@ -39,7 +39,7 @@ func NewConfig() *Config {
 	}
 }
 
-// GetConfig loads and validates the a configuration file, returning the Config struct if valid
+// GetConfig loads and validates a configuration file, returning the Config struct if valid
 func GetConfig(filePath string) (*Config, error) {
 	var config Config
 
