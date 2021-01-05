@@ -137,6 +137,7 @@ github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef/go.mod h1:cIg4er
 github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
 github.com/golang/mock v1.3.1-0.20190508161146-9fa652df1129/go.mod h1:sBzyDLLjw3U8JLTeZvSv8jJB+tU5PVekmnlKIyFUx0Y=
+github.com/golang/mock v1.4.4/go.mod h1:l3mdAwkq5BuhzHwde/uurv3sEJeZMXNpwsxVWU71h+4=
 github.com/golang/protobuf v1.1.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.0/go.mod h1:Qd/q+1AKNOZr9uGQzbzCmRO6sUih6GTPZv6a1/R87v0=
@@ -237,6 +238,9 @@ github.com/kava-labs/go-amino v0.14.1-kava h1:mXiFIiRjc45RR+vs7cKO5Sk/kpZFapulBX
 github.com/kava-labs/go-amino v0.14.1-kava/go.mod h1:CVdr4CKxHrPCYuU60BWOsl21+ldnqXbUhh6wQc6AQIM=
 github.com/kava-labs/go-sdk v0.3.0-rc1 h1:avTi7xnXAPreaSz9RGFeUOgoLvvUSeShYTuKvBVFKjQ=
 github.com/kava-labs/go-sdk v0.3.0-rc1/go.mod h1:EGk8l+SCIC4wsQvGQ9iGcuYhlurKYgLkS6hbrxrvVnY=
+github.com/kava-labs/go-sdk v0.3.0 h1:f35uBhumh6pAwRf8ekCQDlpKqaDT33axXz78Ur8cDUw=
+github.com/kava-labs/go-tools v0.0.0-20201217180348-bd0c6e52ff51 h1:Zl8FPCGba9AJ4yaYWfI4eMWylUA0M7rxBMmqYOI6ayw=
+github.com/kava-labs/go-tools/deputy-claimer v0.0.0-20201217180348-bd0c6e52ff51 h1:ABJIkQnTjAjQAJSJ5sodv5RLPqBAx771fYwI3gmxp2g=
 github.com/kava-labs/kava v0.11.0-rc1 h1:2qV0SYgtzPxZ+oLJV5dzLweLNa0AXxM7X+n1zrnDOS0=
 github.com/kava-labs/kava v0.11.0-rc1/go.mod h1:1AYBNxuelDdwzZzWFsgPUMVwZ9qfKSjgT6UEEhTe/ys=
 github.com/kava-labs/tendermint v0.32.3-kava1 h1:6wP6pj7py2JKZLkpAiK+/SZzNiUW+3lwgXETdJga1yI=
