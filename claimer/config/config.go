@@ -39,11 +39,11 @@ func NewConfig() *Config {
 	}
 }
 
-// GetConfig loads and validates the default configuration file, returning the Config struct if valid
-func GetConfig() (*Config, error) {
+// GetConfig loads and validates a configuration file, returning the Config struct if valid
+func GetConfig(filePath string) (*Config, error) {
 	var config Config
 
-	err := loadConfig(DefaultConfigPath, &config)
+	err := loadConfig(filePath, &config)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func loadConfig(file string, config *Config) error {
 	}
 
 	fpClean := filepath.Clean(fp)
-	log.Info("Loading configuration", "path", fpClean)
+	log.Infof("Loading configuration path %s", fpClean)
 
 	f, err := os.Open(fpClean)
 	if err != nil {
