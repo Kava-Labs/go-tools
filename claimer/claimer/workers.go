@@ -22,6 +22,10 @@ import (
 	"github.com/kava-labs/go-tools/claimer/server"
 )
 
+// ClaimTxDefaultGas is the gas limit to use for claim txs.
+// On kava-4, claim txs have historically reached up to 163072 gas.
+const ClaimTxDefaultGas = 200_000
+
 func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
@@ -109,7 +113,7 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		ChainID:       config.ChainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           authtypes.NewStdFee(250000, sdk.Coins{}),
+		Fee:           authtypes.NewStdFee(ClaimTxDefaultGas, nil),
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
