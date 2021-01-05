@@ -203,7 +203,7 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		ChainID:       config.ChainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           authtypes.NewStdFee(250000, sdk.Coins{}),
+		Fee:           authtypes.NewStdFee(250000, nil),
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
