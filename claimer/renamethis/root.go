@@ -30,6 +30,10 @@ import (
 	"github.com/kava-labs/go-tools/claimer/server"
 )
 
+// ClaimTxDefaultGas is the gas limit to use for claim txs.
+// On kava-4, claim txs have historically reached up to 163072 gas.
+const ClaimTxDefaultGas = 200_000
+
 // KavaClaimer is a worker that sends claim transactions on Kava
 type KavaClaimer struct {
 	Keybase keys.KeyManager
@@ -203,7 +207,7 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		ChainID:       config.ChainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           authtypes.NewStdFee(250000, nil),
+		Fee:           authtypes.NewStdFee(ClaimTxDefaultGas, nil),
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
