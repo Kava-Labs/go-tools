@@ -33,10 +33,7 @@ func main() {
 
 	s := server.NewServer(dispatcher.JobQueue())
 	log.Info("Starting server...")
-	go func() {
-		if err := s.Start(); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
+	if err := s.Start(); err != nil {
+		log.Fatal(err)
+	}
 }
