@@ -3,32 +3,20 @@
 package integration
 
 import (
-	"context"
-	"fmt"
-	"net/http"
-	"os"
+	"math"
 	"testing"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	"github.com/kava-labs/go-sdk/client"
 	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
 	"github.com/kava-labs/go-tools/deputy-claimer/test/swap"
-	"github.com/kava-labs/kava/app"
 	kavatypes "github.com/kava-labs/kava/x/bep3/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/claimer/config"
-	"github.com/kava-labs/go-tools/claimer/renamethis"
 )
 
-func TestMain(m *testing.M) {
-	sdkConfig := sdk.GetConfig()
-	app.SetBech32AddressPrefixes(sdkConfig)
-
-	os.Exit(m.Run())
-}
 func TestClaimConcurrentSwapsKava(t *testing.T) {
 
 	addrs := addresses.GetAddresses()
@@ -66,7 +54,7 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 		Kava: config.KavaConfig{
 			ChainID:   "kava-localnet",
 			Endpoint:  addresses.KavaNodeURL,
-			Mnemonics: kavaUserMenmonics(addrs)[2:],
+			Mnemonics: kavaUserMenmonics(addrs)[1:],
 		},
 		BinanceChain: config.BinanceChainConfig{
 			ChainID:  "Binance-Chain-Tigris",
@@ -74,55 +62,26 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 			Mnemonic: bnbUserMenmonics(addrs)[0],
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go renamethis.Main(ctx, cfg)
+	shutdownFunc := startApp(cfg)
+	defer shutdownFunc()
 	time.Sleep(1 * time.Second) // give time for the server to start
 
 	for _, s := range swaps {
 		err := sendClaimRequest("kava", s.KavaSwap.GetSwapID(), s.RandomNumber)
 		require.NoError(t, err)
 	}
-	time.Sleep(20 * time.Second) // give time for last swap to be claimed
+	averageBlockTime := 5
+	waitTime := time.Duration(
+		int(math.Ceil(
+			float64(numConcurrentSwaps)/float64(len(cfg.Kava.Mnemonics)),
+		))*averageBlockTime+averageBlockTime,
+	) * time.Second
+	t.Logf("waiting for %s to let claimer claim all swaps", waitTime)
+	time.Sleep(waitTime)
 
 	for _, s := range swaps {
 		status, err := kavaSwapper.FetchStatus(s.KavaSwap)
 		require.NoError(t, err)
 		require.Equalf(t, kavatypes.Completed, status, "expected swap status '%s', actual '%s'", kavatypes.Completed, status)
 	}
-}
-
-func sendClaimRequest(chain string, swapID []byte, randomNumber []byte) error {
-	resp, err := http.Post(
-		fmt.Sprintf(
-			"http://localhost:8080/claim?target-chain=%s&swap-id=%x&random-number=%x",
-			chain,
-			swapID,
-			randomNumber,
-		),
-		"",
-		nil,
-	)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("claim request failed: %s", resp.Status)
-	}
-	return nil
-}
-
-func kavaUserMenmonics(addrs addresses.Addresses) []string {
-	mnemonics := []string{}
-	for _, u := range addrs.Kava.Users {
-		mnemonics = append(mnemonics, u.Mnemonic)
-	}
-	return mnemonics
-}
-func bnbUserMenmonics(addrs addresses.Addresses) []string {
-	mnemonics := []string{}
-	for _, u := range addrs.Bnb.Users {
-		mnemonics = append(mnemonics, u.Mnemonic)
-	}
-	return mnemonics
 }

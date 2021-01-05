@@ -1,28 +1,20 @@
-package renamethis
+package claimer
 
 import (
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 
-	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
-	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
-	bkeys "github.com/kava-labs/binance-chain-go-sdk/keys"
-	log "github.com/sirupsen/logrus"
-	amino "github.com/tendermint/go-amino"
-	"golang.org/x/sync/semaphore"
-
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/kava-labs/go-sdk/keys"
-	kava "github.com/kava-labs/kava/app"
+	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
+	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bep3 "github.com/kava-labs/kava/x/bep3/types"
-	tmlog "github.com/tendermint/tendermint/libs/log"
+	log "github.com/sirupsen/logrus"
 	rpcclient "github.com/tendermint/tendermint/rpc/client/http"
 	tmtypes "github.com/tendermint/tendermint/types"
 
@@ -33,97 +25,6 @@ import (
 // ClaimTxDefaultGas is the gas limit to use for claim txs.
 // On kava-4, claim txs have historically reached up to 163072 gas.
 const ClaimTxDefaultGas = 200_000
-
-// KavaClaimer is a worker that sends claim transactions on Kava
-type KavaClaimer struct {
-	Keybase keys.KeyManager
-	Status  bool
-}
-
-func Main(ctx context.Context, c config.Config) {
-	// Load kava claimers
-	sdkConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(sdkConfig)
-	cdc := kava.MakeCodec()
-
-	// SETUP CLAIMERS --------------------------
-	var kavaClaimers []KavaClaimer
-	for _, kavaMnemonic := range c.Kava.Mnemonics {
-		kavaClaimer := KavaClaimer{}
-		keyManager, err := keys.NewMnemonicKeyManager(kavaMnemonic, kava.Bip44CoinType)
-		if err != nil {
-			log.Error(err)
-		}
-		kavaClaimer.Keybase = keyManager
-		kavaClaimer.Status = true
-		kavaClaimers = append(kavaClaimers, kavaClaimer)
-	}
-
-	// SETUP KAVA CLIENT --------------------------
-	// Start Kava HTTP client
-	http, err := rpcclient.New(c.Kava.Endpoint, "/websocket")
-	if err != nil {
-		panic(err)
-	}
-	http.Logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
-	err = http.Start()
-	if err != nil {
-		panic(err)
-	}
-
-	// SETUP BNB CLIENT --------------------------
-	// Set up Binance Chain client
-	bncNetwork := btypes.TestNetwork
-	if c.BinanceChain.ChainID == "Binance-Chain-Tigris" {
-		bncNetwork = btypes.ProdNetwork
-	}
-	bnbClient := brpc.NewRPCClient(c.BinanceChain.Endpoint, bncNetwork)
-	bnbKeyManager, err := bkeys.NewMnemonicKeyManager(c.BinanceChain.Mnemonic)
-	if err != nil {
-		panic(err)
-	}
-	bnbClient.SetKeyManager(bnbKeyManager)
-
-	log.Info("Starting server...")
-	claims := make(chan server.ClaimJob, 0)
-	s := server.NewServer(claims)
-	go s.StartServer()
-
-	sem := semaphore.NewWeighted(int64(len(kavaClaimers)))
-
-	// RUN WORKERS --------------------------
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case claim := <-claims:
-			switch strings.ToUpper(claim.TargetChain) {
-			case server.TargetKava:
-				if err := sem.Acquire(ctx, 1); err != nil {
-					log.Error(err)
-					return
-				}
-
-				go func() {
-					defer sem.Release(1)
-					Retry(10, 20*time.Second, func() (err ClaimError) {
-						err = claimOnKava(c.Kava, http, claim, cdc, kavaClaimers)
-						return
-					})
-				}()
-				break
-			case server.TargetBinance, server.TargetBinanceChain:
-				go func() {
-					Retry(10, 15*time.Second, func() (err ClaimError) {
-						err = claimOnBinanceChain(bnbClient, claim)
-						return
-					})
-				}()
-				break
-			}
-		}
-	}
-}
 
 func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError {
 	swapID, err := hex.DecodeString(claim.SwapID)
@@ -153,7 +54,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError 
 		return NewErrorFailed(err)
 	}
 
-	res, err := bnbHTTP.ClaimHTLT(swapID[:], randomNumber[:], brpc.Sync)
+	res, err := bnbHTTP.ClaimHTLT(swapID[:], randomNumber[:], brpc.Commit)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
@@ -167,7 +68,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) ClaimError 
 }
 
 func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.ClaimJob,
-	cdc *amino.Codec, kavaClaimers []KavaClaimer) ClaimError {
+	cdc *codec.Codec, kavaClaimers []KavaClaimer) ClaimError {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
@@ -179,17 +80,22 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 	}
 
 	var claimer KavaClaimer
+	var randNum int
 	selectedClaimer := false
 	for !selectedClaimer {
 		source := rand.NewSource(time.Now().UnixNano())
 		r := rand.New(source)
-		randNumb := r.Intn(len(kavaClaimers))
-		randClaimer := kavaClaimers[randNumb%len(kavaClaimers)]
+		randNum = r.Intn(len(kavaClaimers))
+		randClaimer := kavaClaimers[randNum]
 		if randClaimer.Status {
 			selectedClaimer = true
+			kavaClaimers[randNum].Status = false
 			claimer = randClaimer
 		}
 	}
+	defer func() {
+		kavaClaimers[randNum].Status = true
+	}()
 
 	fromAddr := claimer.Keybase.GetAddr()
 
@@ -230,22 +136,23 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		return NewErrorFailed(fmt.Errorf("the tx data exceeds max length %d ", maxTxLength))
 	}
 
-	res, err := http.BroadcastTxSync(tx)
+	res, err := http.BroadcastTxCommit(tx)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-
-	if res.Code != 0 {
-		return NewErrorFailed(errors.New(res.Log))
+	if res.CheckTx.Code != 0 {
+		return NewErrorFailed(errors.New(res.CheckTx.Log))
+	}
+	if res.DeliverTx.Code != 0 {
+		return NewErrorFailed(errors.New(res.DeliverTx.Log))
 	}
 
 	log.Info("Claim tx sent to Kava: ", res.Hash.String())
-	time.Sleep(7 * time.Second) // After sending the transaction, wait a full block
 	return nil
 }
 
 // Check if swap is claimable
-func isClaimableKava(http *rpcclient.HTTP, cdc *amino.Codec, swapID []byte) ClaimError {
+func isClaimableKava(http *rpcclient.HTTP, cdc *codec.Codec, swapID []byte) ClaimError {
 	claimableParams := bep3.NewQueryAtomicSwapByID(swapID)
 	claimableBz, err := cdc.MarshalJSON(claimableParams)
 	if err != nil {
@@ -287,7 +194,7 @@ func isClaimableKava(http *rpcclient.HTTP, cdc *amino.Codec, swapID []byte) Clai
 	return nil
 }
 
-func getKavaAcc(http *rpcclient.HTTP, cdc *amino.Codec, fromAddr sdk.AccAddress) (uint64, uint64, ClaimError) {
+func getKavaAcc(http *rpcclient.HTTP, cdc *codec.Codec, fromAddr sdk.AccAddress) (uint64, uint64, ClaimError) {
 	params := authtypes.NewQueryAccountParams(fromAddr)
 	bz, err := cdc.MarshalJSON(params)
 	if err != nil {
