@@ -1,16 +1,12 @@
 package claimer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 )
-
-// ClaimError is an interface for claimer bot errors
-type ClaimError interface {
-	Error() string // Error function implementation makes ClaimError type compatible with err
-}
 
 // ErrorFailed is the type of error thrown when a claim request is non-retryable
 type ErrorFailed struct {
@@ -47,7 +43,7 @@ func (er ErrorRetryable) Error() string {
 }
 
 // Retry retries the given function for n attempts, sleeping x seconds between attempt
-func Retry(attempts int, sleep time.Duration, f func() ClaimError) {
+func Retry(attempts int, sleep time.Duration, f func() error) {
 	var err error
 	for i := 0; ; i++ {
 		err = f()
@@ -59,7 +55,7 @@ func Retry(attempts int, sleep time.Duration, f func() ClaimError) {
 			break
 		}
 
-		if fmt.Sprintf("%T", err) == "main.ErrorFailed" {
+		if errors.As(err, &ErrorFailed{}) {
 			log.Error("failed: ", err.Error())
 			return
 		}
@@ -68,5 +64,4 @@ func Retry(attempts int, sleep time.Duration, f func() ClaimError) {
 		log.Info("retrying: ", err.Error())
 	}
 	log.Error(fmt.Errorf("timed out after %d attempts, last error: %s", attempts, err.Error()))
-	return
 }

@@ -101,17 +101,15 @@ func (d Dispatcher) Start(ctx context.Context) {
 
 				go func() {
 					defer sem.Release(1)
-					Retry(10, 20*time.Second, func() (err ClaimError) {
-						err = claimOnKava(d.config.Kava, http, claim, d.cdc, kavaClaimers)
-						return
+					Retry(10, 20*time.Second, func() error {
+						return claimOnKava(d.config.Kava, http, claim, d.cdc, kavaClaimers)
 					})
 				}()
 				break
 			case server.TargetBinance, server.TargetBinanceChain:
 				go func() {
-					Retry(10, 15*time.Second, func() (err ClaimError) {
-						err = claimOnBinanceChain(bnbClient, claim)
-						return
+					Retry(10, 15*time.Second, func() error {
+						return claimOnBinanceChain(bnbClient, claim)
 					})
 				}()
 				break
