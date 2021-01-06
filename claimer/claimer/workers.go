@@ -22,9 +22,16 @@ import (
 	"github.com/kava-labs/go-tools/claimer/server"
 )
 
-// ClaimTxDefaultGas is the gas limit to use for claim txs.
-// On kava-4, claim txs have historically reached up to 163072 gas.
-const ClaimTxDefaultGas = 200_000
+const (
+	// ClaimTxDefaultGas is the gas limit to use for claim txs.
+	// On kava-4, claim txs have historically reached up to 163072 gas.
+	ClaimTxDefaultGas = 200_000
+
+	// tendermintRPCCommitTimeoutErrorMsg is part of the error msg returned from a BroadcastTxCommit request.
+	// It is triggered when the tx takes too long to make it into a block.
+	// The timeout is defined in tendermint config, under rpc.timeout_broadcast_tx_commit
+	tendermintRPCCommitTimeoutErrorMsg = "timed out waiting for tx to be included in a block"
+)
 
 func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
 	swapID, err := hex.DecodeString(claim.SwapID)
@@ -138,6 +145,9 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 
 	res, err := http.BroadcastTxCommit(tx)
 	if err != nil {
+		if strings.Contains(err.Error(), tendermintRPCCommitTimeoutErrorMsg) {
+			return NewErrorRetryable(err)
+		}
 		return NewErrorFailed(err)
 	}
 	if res.CheckTx.Code != 0 {
