@@ -14,7 +14,6 @@ import (
 	kava "github.com/kava-labs/kava/app"
 	log "github.com/sirupsen/logrus"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
@@ -45,8 +44,8 @@ func NewDispatcher(cfg config.Config) Dispatcher {
 }
 
 func (d Dispatcher) Start(ctx context.Context) {
-	// SETUP CLAIMERS --------------------------
-	var kavaClaimers []KavaClaimer
+	// Setup Mnemonics
+	kavaClaimers := make(chan KavaClaimer, len(d.config.Kava.Mnemonics))
 	for _, kavaMnemonic := range d.config.Kava.Mnemonics {
 		kavaClaimer := KavaClaimer{}
 		keyManager, err := keys.NewMnemonicKeyManager(kavaMnemonic, kava.Bip44CoinType)
@@ -55,7 +54,7 @@ func (d Dispatcher) Start(ctx context.Context) {
 		}
 		kavaClaimer.Keybase = keyManager
 		kavaClaimer.Status = true
-		kavaClaimers = append(kavaClaimers, kavaClaimer)
+		kavaClaimers <- kavaClaimer
 	}
 
 	// Start Kava HTTP client
@@ -65,7 +64,6 @@ func (d Dispatcher) Start(ctx context.Context) {
 		panic(err)
 	}
 
-	// SETUP BNB CLIENT --------------------------
 	// Set up Binance Chain client
 	bncNetwork := btypes.TestNetwork
 	if d.config.BinanceChain.ChainID == "Binance-Chain-Tigris" {
@@ -78,9 +76,7 @@ func (d Dispatcher) Start(ctx context.Context) {
 	}
 	bnbClient.SetKeyManager(bnbKeyManager)
 
-	sem := semaphore.NewWeighted(int64(len(kavaClaimers)))
-
-	// RUN WORKERS --------------------------
+	// Run Workers
 	for {
 		select {
 		case <-ctx.Done():
@@ -88,15 +84,14 @@ func (d Dispatcher) Start(ctx context.Context) {
 		case claim := <-d.jobQueue:
 			switch strings.ToUpper(claim.TargetChain) {
 			case server.TargetKava:
-				if err := sem.Acquire(ctx, 1); err != nil {
-					log.Error(err)
-					return
-				}
+				// fetch an available mnemonic, waiting if none available // TODO should respect ctx
+				claimer := <-kavaClaimers
 
 				go func() {
-					defer sem.Release(1)
+					// release the mnemonic when done
+					defer func() { kavaClaimers <- claimer }()
 					Retry(10, 20*time.Second, func() error {
-						return claimOnKava(d.config.Kava, kavaClient, claim, kavaClaimers)
+						return claimOnKava(d.config.Kava, kavaClient, claim, claimer)
 					})
 				}()
 			case server.TargetBinance, server.TargetBinanceChain:

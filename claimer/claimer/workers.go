@@ -4,10 +4,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net/url"
 	"strings"
-	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -85,7 +83,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
 // 	}
 // }
 
-func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.ClaimJob, kavaClaimers []KavaClaimer) error {
+func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.ClaimJob, claimer KavaClaimer) error {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
@@ -95,24 +93,6 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 	if err != nil {
 		return err
 	}
-
-	var claimer KavaClaimer
-	var randNum int
-	selectedClaimer := false
-	for !selectedClaimer {
-		source := rand.NewSource(time.Now().UnixNano())
-		r := rand.New(source)
-		randNum = r.Intn(len(kavaClaimers))
-		randClaimer := kavaClaimers[randNum]
-		if randClaimer.Status {
-			selectedClaimer = true
-			kavaClaimers[randNum].Status = false
-			claimer = randClaimer
-		}
-	}
-	defer func() {
-		kavaClaimers[randNum].Status = true
-	}()
 
 	fromAddr := claimer.Keybase.GetAddr()
 
