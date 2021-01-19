@@ -5,17 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/url"
 	"strings"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bep3 "github.com/kava-labs/kava/x/bep3/types"
 	log "github.com/sirupsen/logrus"
-	rpcclient "github.com/tendermint/tendermint/rpc/client/http"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-tools/claimer/config"
@@ -74,14 +73,25 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
 	return nil
 }
 
-func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.ClaimJob,
-	cdc *codec.Codec, kavaClaimers []KavaClaimer) error {
+// type KavaWorker struct {
+// 	client KavaClient
+// 	// signer KavaClaimer
+// }
+
+// func NewKavaWorker(cdc *codec.Codec, rpcAddr string, logger log.Logger) KavaWorker {
+// 	return KavaWorker{
+// 		client: NewKavaClient(cdc, rpcAddr, logger),
+// 		// signer: claimer,
+// 	}
+// }
+
+func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.ClaimJob, kavaClaimers []KavaClaimer) error {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
 
-	err = isClaimableKava(http, cdc, swapID)
+	err = isClaimableKava(client, swapID)
 	if err != nil {
 		return err
 	}
@@ -125,14 +135,14 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		Memo:          "",
 	}
 
-	sequence, accountNumber, err := getKavaAcc(http, cdc, fromAddr)
+	sequence, accountNumber, err := getAccountNumbers(client, fromAddr)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
 	signMsg.Sequence = sequence
 	signMsg.AccountNumber = accountNumber
 
-	signedMsg, err := claimer.Keybase.Sign(*signMsg, cdc)
+	signedMsg, err := claimer.Keybase.Sign(*signMsg, client.cdc)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
@@ -143,9 +153,9 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 		return NewErrorFailed(fmt.Errorf("the tx data exceeds max length %d ", maxTxLength))
 	}
 
-	res, err := http.BroadcastTxCommit(tx)
+	res, err := client.BroadcastTxCommit(tx)
 	if err != nil {
-		if strings.Contains(err.Error(), tendermintRPCCommitTimeoutErrorMsg) {
+		if broadcastErrorIsRetryable(err) {
 			return NewErrorRetryable(err)
 		}
 		return NewErrorFailed(err)
@@ -161,82 +171,36 @@ func claimOnKava(config config.KavaConfig, http *rpcclient.HTTP, claim server.Cl
 	return nil
 }
 
+func broadcastErrorIsRetryable(err error) bool {
+	var httpClientError *url.Error
+	isRetryable :=
+		// retry if the server times out waiting for a block
+		strings.Contains(err.Error(), tendermintRPCCommitTimeoutErrorMsg) ||
+			// retry if there's an error in posting the tx
+			errors.As(err, &httpClientError)
+	return isRetryable
+}
+
 // Check if swap is claimable
-func isClaimableKava(http *rpcclient.HTTP, cdc *codec.Codec, swapID []byte) error {
-	claimableParams := bep3.NewQueryAtomicSwapByID(swapID)
-	claimableBz, err := cdc.MarshalJSON(claimableParams)
+func isClaimableKava(client *KavaClient, swapID []byte) error {
+	swap, err := client.GetAtomicSwap(swapID)
 	if err != nil {
-		return NewErrorFailed(err)
+		return err // TODO
 	}
-
-	claimablePath := "custom/bep3/swap"
-
-	result, err := http.ABCIQuery(claimablePath, claimableBz)
-	if err != nil {
-		return NewErrorRetryable(err)
-	}
-
-	resp := result.Response
-	if !resp.IsOK() {
-		if strings.Contains(resp.Log, "atomic swap not found") {
-			return NewErrorRetryable(errors.New(resp.Log))
-		}
-		return NewErrorFailed(errors.New(resp.Log))
-	}
-
-	value := result.Response.GetValue()
-	if len(value) == 0 {
-		return NewErrorFailed(errors.New("no response value"))
-	}
-
-	var swap bep3.AtomicSwap
-	err = cdc.UnmarshalJSON(value, &swap)
-	if err != nil {
-		return NewErrorFailed(err)
-	}
-
 	if swap.Status == bep3.NULL {
 		return NewErrorRetryable(fmt.Errorf("swap %s not found in state", swapID))
 	} else if swap.Status == bep3.Expired || swap.Status == bep3.Completed {
 		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", hex.EncodeToString(swapID), swap.Status))
 	}
-
 	return nil
 }
 
-func getKavaAcc(http *rpcclient.HTTP, cdc *codec.Codec, fromAddr sdk.AccAddress) (uint64, uint64, error) {
-	params := authtypes.NewQueryAccountParams(fromAddr)
-	bz, err := cdc.MarshalJSON(params)
+func getAccountNumbers(client *KavaClient, fromAddr sdk.AccAddress) (uint64, uint64, error) {
+
+	acc, err := client.GetAccount(fromAddr)
 	if err != nil {
-		return 0, 0, NewErrorFailed(err)
+		return 0, 0, err // TODO error parsing
 	}
 
-	path := fmt.Sprintf("custom/acc/account/%s", fromAddr.String())
-
-	result, err := http.ABCIQuery(path, bz)
-	if err != nil {
-		return 0, 0, NewErrorFailed(err)
-	}
-
-	resp := result.Response
-	if !resp.IsOK() {
-		return 0, 0, NewErrorFailed(errors.New(resp.Log))
-	}
-
-	value := result.Response.GetValue()
-	if len(value) == 0 {
-		return 0, 0, NewErrorFailed(errors.New("no response value"))
-	}
-
-	var acc authtypes.BaseAccount
-	err = cdc.UnmarshalJSON(value, &acc)
-	if err != nil {
-		return 0, 0, NewErrorFailed(err)
-	}
-
-	if acc.Address.Empty() {
-		return 0, 0, NewErrorFailed(errors.New("the signer account does not exist on kava"))
-	}
-
-	return acc.Sequence, acc.AccountNumber, nil
+	return acc.GetSequence(), acc.GetAccountNumber(), nil
 }

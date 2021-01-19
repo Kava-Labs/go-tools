@@ -14,7 +14,6 @@ import (
 	kava "github.com/kava-labs/kava/app"
 	log "github.com/sirupsen/logrus"
 	tmlog "github.com/tendermint/tendermint/libs/log"
-	rpcclient "github.com/tendermint/tendermint/rpc/client/http"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/kava-labs/go-tools/claimer/config"
@@ -59,14 +58,9 @@ func (d Dispatcher) Start(ctx context.Context) {
 		kavaClaimers = append(kavaClaimers, kavaClaimer)
 	}
 
-	// SETUP KAVA CLIENT --------------------------
 	// Start Kava HTTP client
-	http, err := rpcclient.New(d.config.Kava.Endpoint, "/websocket")
-	if err != nil {
-		panic(err)
-	}
-	http.Logger = tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
-	err = http.Start()
+	logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
+	kavaClient, err := NewKavaClient(d.cdc, d.config.Kava.Endpoint, logger)
 	if err != nil {
 		panic(err)
 	}
@@ -102,17 +96,15 @@ func (d Dispatcher) Start(ctx context.Context) {
 				go func() {
 					defer sem.Release(1)
 					Retry(10, 20*time.Second, func() error {
-						return claimOnKava(d.config.Kava, http, claim, d.cdc, kavaClaimers)
+						return claimOnKava(d.config.Kava, kavaClient, claim, kavaClaimers)
 					})
 				}()
-				break
 			case server.TargetBinance, server.TargetBinanceChain:
 				go func() {
 					Retry(10, 15*time.Second, func() error {
 						return claimOnBinanceChain(bnbClient, claim)
 					})
 				}()
-				break
 			}
 		}
 	}
