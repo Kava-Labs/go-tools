@@ -21,12 +21,6 @@ import (
 
 var JobQueueSize = 1000
 
-// KavaClaimer is a worker that sends claim transactions on Kava
-type KavaClaimer struct {
-	Keybase keys.KeyManager
-	Status  bool
-}
-
 type Dispatcher struct {
 	config   config.Config
 	jobQueue chan server.ClaimJob
@@ -45,16 +39,13 @@ func NewDispatcher(cfg config.Config) Dispatcher {
 
 func (d Dispatcher) Start(ctx context.Context) {
 	// Setup Mnemonics
-	kavaClaimers := make(chan KavaClaimer, len(d.config.Kava.Mnemonics))
+	kavaKeys := make(chan keys.KeyManager, len(d.config.Kava.Mnemonics))
 	for _, kavaMnemonic := range d.config.Kava.Mnemonics {
-		kavaClaimer := KavaClaimer{}
 		keyManager, err := keys.NewMnemonicKeyManager(kavaMnemonic, kava.Bip44CoinType)
 		if err != nil {
 			log.Error(err)
 		}
-		kavaClaimer.Keybase = keyManager
-		kavaClaimer.Status = true
-		kavaClaimers <- kavaClaimer
+		kavaKeys <- keyManager
 	}
 
 	// Start Kava HTTP client
@@ -85,16 +76,17 @@ func (d Dispatcher) Start(ctx context.Context) {
 			switch strings.ToUpper(claim.TargetChain) {
 			case server.TargetKava:
 				// fetch an available mnemonic, waiting if none available // TODO should respect ctx
-				claimer := <-kavaClaimers
+				key := <-kavaKeys
 
 				go func() {
 					// release the mnemonic when done
-					defer func() { kavaClaimers <- claimer }()
+					defer func() { kavaKeys <- key }()
 					Retry(10, 20*time.Second, func() error {
-						return claimOnKava(d.config.Kava, kavaClient, claim, claimer)
+						return claimOnKava(d.config.Kava, kavaClient, claim, key)
 					})
 				}()
 			case server.TargetBinance, server.TargetBinanceChain:
+				// TODO make binance safe for concurrent requests
 				go func() {
 					Retry(10, 15*time.Second, func() error {
 						return claimOnBinanceChain(bnbClient, claim)

@@ -98,7 +98,7 @@ func (c *KavaClient) ABCIQuery(path string, data tmbytes.HexBytes) ([]byte, erro
 
 	value := result.Response.GetValue()
 	if len(value) == 0 {
-		return []byte{}, nil // TODO error?
+		return []byte{}, nil
 	}
 
 	return value, nil

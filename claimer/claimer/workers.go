@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
+	"github.com/kava-labs/go-sdk/keys"
 	bep3 "github.com/kava-labs/kava/x/bep3/types"
 	log "github.com/sirupsen/logrus"
 	tmtypes "github.com/tendermint/tendermint/types"
@@ -71,19 +74,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
 	return nil
 }
 
-// type KavaWorker struct {
-// 	client KavaClient
-// 	// signer KavaClaimer
-// }
-
-// func NewKavaWorker(cdc *codec.Codec, rpcAddr string, logger log.Logger) KavaWorker {
-// 	return KavaWorker{
-// 		client: NewKavaClient(cdc, rpcAddr, logger),
-// 		// signer: claimer,
-// 	}
-// }
-
-func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.ClaimJob, claimer KavaClaimer) error {
+func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.ClaimJob, keyManager keys.KeyManager) error {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
@@ -94,7 +85,7 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		return err
 	}
 
-	fromAddr := claimer.Keybase.GetAddr()
+	fromAddr := keyManager.GetAddr()
 
 	randomNumber, err := hex.DecodeString(claim.RandomNumber)
 	if err != nil {
@@ -122,7 +113,7 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 	signMsg.Sequence = sequence
 	signMsg.AccountNumber = accountNumber
 
-	signedMsg, err := claimer.Keybase.Sign(*signMsg, client.cdc)
+	signedMsg, err := keyManager.Sign(*signMsg, client.cdc)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
