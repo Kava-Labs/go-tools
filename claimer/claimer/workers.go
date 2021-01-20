@@ -26,11 +26,6 @@ const (
 	// ClaimTxDefaultGas is the gas limit to use for claim txs.
 	// On kava-4, claim txs have historically reached up to 163072 gas.
 	ClaimTxDefaultGas = 200_000
-
-	// tendermintRPCCommitTimeoutErrorMsg is part of the error msg returned from a BroadcastTxCommit request.
-	// It is triggered when the tx takes too long to make it into a block.
-	// The timeout is defined in tendermint config, under rpc.timeout_broadcast_tx_commit
-	tendermintRPCCommitTimeoutErrorMsg = "timed out waiting for tx to be included in a block"
 )
 
 func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
@@ -80,9 +75,14 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		return NewErrorFailed(err)
 	}
 
-	err = isClaimableKava(client, swapID)
+	swap, err := client.GetAtomicSwap(swapID)
 	if err != nil {
-		return err
+		return NewErrorRetryable(err)
+	}
+	if swap.Status == bep3.NULL {
+		return NewErrorRetryable(fmt.Errorf("swap %s not found in state", swapID))
+	} else if swap.Status == bep3.Expired || swap.Status == bep3.Completed {
+		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", hex.EncodeToString(swapID), swap.Status))
 	}
 
 	fromAddr := keyManager.GetAddr()
@@ -124,54 +124,78 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		return NewErrorFailed(fmt.Errorf("the tx data exceeds max length %d ", maxTxLength))
 	}
 
-	res, err := client.BroadcastTxCommit(tx)
+	res, err := client.BroadcastTxSync(tx)
 	if err != nil {
 		if broadcastErrorIsRetryable(err) {
 			return NewErrorRetryable(err)
 		}
 		return NewErrorFailed(err)
 	}
-	if res.CheckTx.Code != 0 {
-		return NewErrorFailed(errors.New(res.CheckTx.Log))
+	if res.Code != 0 {
+		if errorCodeIsRetryable(res.Codespace, res.Code) {
+			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.Log))
+		}
+		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.Log))
 	}
-	if res.DeliverTx.Code != 0 {
-		return NewErrorFailed(errors.New(res.DeliverTx.Log))
+	err = pollWithBackoff(time.Now().Add(60*time.Second), 2*time.Second, func() (bool, error) {
+		queryRes, err := client.GetTxConfirmation(res.Hash)
+		if err != nil {
+			return false, nil // poll again, it can't find the tx or node is down/slow
+		}
+		if queryRes.TxResult.Code != 0 {
+			return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+		}
+		return true, nil // return nothing, found successfully confirmed tx
+	})
+	if err != nil {
+		return NewErrorFailed(err)
 	}
-
 	log.Info("Claim tx sent to Kava: ", res.Hash.String())
 	return nil
 }
 
 func broadcastErrorIsRetryable(err error) bool {
 	var httpClientError *url.Error
-	isRetryable :=
-		// retry if the server times out waiting for a block
-		strings.Contains(err.Error(), tendermintRPCCommitTimeoutErrorMsg) ||
-			// retry if there's an error in posting the tx
-			errors.As(err, &httpClientError)
+	// retry if there's an error in posting the tx
+	isRetryable := errors.As(err, &httpClientError)
 	return isRetryable
 }
 
-// Check if swap is claimable
-func isClaimableKava(client *KavaClient, swapID []byte) error {
-	swap, err := client.GetAtomicSwap(swapID)
-	if err != nil {
-		return err // TODO
+// errorCodeIsRetryable returns true for temporary kava chain error codes.
+func errorCodeIsRetryable(codespace string, code uint32) bool {
+	// errors are organized by codespace, then error code. For example codespace:"sdk" code:5 is an insufficient funds error.
+	temporaryErrorCodes := map[string](map[uint32]bool){}
+	// Common sdk errors are listed in cosmos-sdk/types/errors
+	temporaryErrorCodes[sdkerrors.RootCodespace] = map[uint32]bool{
+		sdkerrors.ErrUnauthorized.ABCICode():    true, // returned when sig fails due to incorrect sequence
+		sdkerrors.ErrInvalidSequence.ABCICode(): true, // not currently used, but if that changes we want to retry
+		sdkerrors.ErrMempoolIsFull.ABCICode():   true,
 	}
-	if swap.Status == bep3.NULL {
-		return NewErrorRetryable(fmt.Errorf("swap %s not found in state", swapID))
-	} else if swap.Status == bep3.Expired || swap.Status == bep3.Completed {
-		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", hex.EncodeToString(swapID), swap.Status))
-	}
-	return nil
+	return temporaryErrorCodes[codespace][code]
 }
 
 func getAccountNumbers(client *KavaClient, fromAddr sdk.AccAddress) (uint64, uint64, error) {
-
 	acc, err := client.GetAccount(fromAddr)
 	if err != nil {
-		return 0, 0, err // TODO error parsing
+		return 0, 0, err
 	}
-
 	return acc.GetSequence(), acc.GetAccountNumber(), nil
+}
+
+// pollWithBackoff will call the provided function until either:
+// it returns true, it returns an error, the deadline is passed.
+// It will wait initialInterval after the first call, and double each subsequent call.
+func pollWithBackoff(deadline time.Time, initialInterval time.Duration, pollFunc func() (bool, error)) error {
+	const backoffMultiplier = 2
+
+	wait := initialInterval
+	for time.Now().Before(deadline) {
+		shouldStop, err := pollFunc()
+		if shouldStop || err != nil {
+			return err
+		}
+		time.Sleep(wait)
+		wait = wait * backoffMultiplier
+	}
+	return fmt.Errorf("polling timed out after %s", deadline)
 }
