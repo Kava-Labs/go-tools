@@ -5,6 +5,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	kava "github.com/kava-labs/kava/app"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
@@ -26,6 +27,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	log.SetLevel(logrus.DebugLevel)
 
 	dispatcher := claimer.NewDispatcher(*cfg)
 	ctx := context.Background()

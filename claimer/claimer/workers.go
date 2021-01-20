@@ -15,6 +15,7 @@ import (
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	"github.com/kava-labs/go-sdk/keys"
 	bep3 "github.com/kava-labs/kava/x/bep3/types"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	tmtypes "github.com/tendermint/tendermint/types"
 
@@ -26,6 +27,9 @@ const (
 	// ClaimTxDefaultGas is the gas limit to use for claim txs.
 	// On kava-4, claim txs have historically reached up to 163072 gas.
 	ClaimTxDefaultGas = 200_000
+
+	TxConfirmationTimeout      = 90 * time.Second
+	TxConfirmationPollInterval = 2 * time.Second
 )
 
 func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
@@ -137,7 +141,8 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		}
 		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.Log))
 	}
-	err = pollWithBackoff(time.Now().Add(60*time.Second), 2*time.Second, func() (bool, error) {
+	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
+		log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Debug("checking for tx confirmation") // TODO use non global logger, with swap ID field already included
 		queryRes, err := client.GetTxConfirmation(res.Hash)
 		if err != nil {
 			return false, nil // poll again, it can't find the tx or node is down/slow
@@ -150,7 +155,7 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-	log.Info("Claim tx sent to Kava: ", res.Hash.String())
+	log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.Hash.String())
 	return nil
 }
 
@@ -183,19 +188,25 @@ func getAccountNumbers(client *KavaClient, fromAddr sdk.AccAddress) (uint64, uin
 }
 
 // pollWithBackoff will call the provided function until either:
-// it returns true, it returns an error, the deadline is passed.
+// it returns true, it returns an error, the timeout passes.
 // It will wait initialInterval after the first call, and double each subsequent call.
-func pollWithBackoff(deadline time.Time, initialInterval time.Duration, pollFunc func() (bool, error)) error {
+func pollWithBackoff(timeout, initialInterval time.Duration, pollFunc func() (bool, error)) error {
 	const backoffMultiplier = 2
+	deadline := time.After(timeout)
 
 	wait := initialInterval
-	for time.Now().Before(deadline) {
-		shouldStop, err := pollFunc()
-		if shouldStop || err != nil {
-			return err
+	nextPoll := time.After(0)
+	for {
+		select {
+		case <-deadline:
+			return fmt.Errorf("polling timed out after %s", timeout)
+		case <-nextPoll:
+			shouldStop, err := pollFunc()
+			if shouldStop || err != nil {
+				return err
+			}
+			nextPoll = time.After(wait)
+			wait = wait * backoffMultiplier
 		}
-		time.Sleep(wait)
-		wait = wait * backoffMultiplier
 	}
-	return fmt.Errorf("polling timed out after %s", deadline)
 }
