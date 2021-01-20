@@ -28,8 +28,14 @@ const (
 	// On kava-4, claim txs have historically reached up to 163072 gas.
 	ClaimTxDefaultGas = 200_000
 
-	TxConfirmationTimeout      = 90 * time.Second
+	// TxConfirmationTimeout is the longest time to wait for a tx confirmation before giving up
+	TxConfirmationTimeout      = 3 * 60 * time.Second
 	TxConfirmationPollInterval = 2 * time.Second
+)
+
+var (
+	// DefaultGasPrice is default fee to pay for a tx, per gas
+	DefaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
 )
 
 func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
@@ -105,7 +111,7 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		ChainID:       config.ChainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           authtypes.NewStdFee(ClaimTxDefaultGas, nil),
+		Fee:           calculateFee(ClaimTxDefaultGas, DefaultGasPrice),
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
@@ -209,4 +215,16 @@ func pollWithBackoff(timeout, initialInterval time.Duration, pollFunc func() (bo
 			wait = wait * backoffMultiplier
 		}
 	}
+}
+
+// calculateFee calculates the total fee to be paid based on a total gas and gas price.
+func calculateFee(gas uint64, gasPrice sdk.DecCoin) authtypes.StdFee {
+	var coins sdk.Coins
+	if gas > 0 {
+		coins = sdk.NewCoins(sdk.NewCoin(
+			gasPrice.Denom,
+			gasPrice.Amount.MulInt64(int64(gas)).Ceil().TruncateInt(),
+		))
+	}
+	return authtypes.NewStdFee(gas, coins)
 }
