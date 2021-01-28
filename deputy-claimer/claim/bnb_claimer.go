@@ -22,7 +22,7 @@ type BnbClaimError struct {
 }
 
 func (r BnbClaimError) Error() string {
-	return fmt.Sprintf("level=error msg=%s chain=%s srcSwapId=%s destSwapId=%s rndNum=%s amount=%s",
+	return fmt.Sprintf("level=error msg=\"%s\" chain=%s srcSwapId=%s destSwapId=%s rndNum=%s amount=%s",
 		r.Err,
 		"binance",
 		r.Swap.swapID,

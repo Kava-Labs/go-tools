@@ -28,7 +28,7 @@ type KavaClaimError struct {
 }
 
 func (r KavaClaimError) Error() string {
-	return fmt.Sprintf("level=error msg=%s chain=%s srcSwapId=%s destSwapId=%s rndNum=%s amount=%s",
+	return fmt.Sprintf("level=error msg=\"%s\" chain=%s srcSwapId=%s destSwapId=%s rndNum=%s amount=%s",
 		r.Err,
 		"kava",
 		r.Swap.swapID,
