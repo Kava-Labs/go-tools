@@ -22,6 +22,22 @@ var (
 	defaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
 )
 
+type KavaClaimError struct {
+	Swap kavaClaimableSwap
+	Err  error
+}
+
+func (r KavaClaimError) Error() string {
+	return fmt.Sprintf("level=error msg=\"%s\" chain=%s srcSwapId=%s destSwapId=%s rndNum=%s amount=%s",
+		r.Err,
+		"kava",
+		r.Swap.swapID,
+		r.Swap.destSwapID,
+		r.Swap.randomNumber,
+		r.Swap.amount,
+	)
+}
+
 type KavaClaimer struct {
 	kavaClient      KavaChainClient
 	bnbClient       BnbChainClient
@@ -63,7 +79,6 @@ func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate 
 // XXX G34 descend only one level of abstraction, several times over
 // these also make it hard to test
 func (kc KavaClaimer) fetchAndClaimSwaps() error {
-
 	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.deputyAddresses)
 	if err != nil {
 		return fmt.Errorf("could not fetch claimable swaps: %w", err)
@@ -79,14 +94,14 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	for _, swap := range claimableSwaps {
 		mnemonic := <-availableMnemonics
 
-		go func(mnemonic string, mnemonics chan string, swap claimableSwap) {
+		go func(mnemonic string, mnemonics chan string, swap kavaClaimableSwap) {
 
 			log.Printf("sending claim for kava swap id %s", swap.swapID)
 			defer func() { mnemonics <- mnemonic }()
 
 			txHash, err := constructAndSendClaim(kc.kavaClient, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
-				errs <- fmt.Errorf("could not submit claim: %w", err)
+				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
 			}
 			err = Wait(15*time.Second, func() (bool, error) {
@@ -95,12 +110,12 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 					return false, nil
 				}
 				if res.TxResult.Code != 0 {
-					return true, fmt.Errorf("kava tx rejected from chain: %s", res.TxResult.Log)
+					return true, KavaClaimError{Swap: swap, Err: fmt.Errorf("kava tx rejected from chain: %s", res.TxResult.Log)}
 				}
 				return true, nil
 			})
 			if err != nil {
-				errs <- fmt.Errorf("could not get claim tx confirmation: %w", err)
+				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not get claim tx confirmation: %w", err)}
 				return
 			}
 		}(mnemonic, availableMnemonics, swap)
@@ -123,12 +138,14 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	return nil
 }
 
-type claimableSwap struct {
+type kavaClaimableSwap struct {
 	swapID       tmbytes.HexBytes // XXX should define my own byte type to abstract the different ones each chain uses
+	destSwapID   tmbytes.HexBytes
 	randomNumber tmbytes.HexBytes
+	amount       sdk.Coins
 }
 
-func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, depAddrs DeputyAddresses) ([]claimableSwap, error) {
+func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, depAddrs DeputyAddresses) ([]kavaClaimableSwap, error) {
 	swaps, err := kavaClient.GetOpenOutgoingSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
@@ -144,7 +161,7 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 	}
 
 	// parse out swap ids, query those txs on bnb, extract random numbers
-	var claimableSwaps []claimableSwap
+	var claimableSwaps []kavaClaimableSwap
 	for _, s := range filteredSwaps {
 		bnbDeputyAddress, found := depAddrs.GetMatchingBnb(s.Recipient)
 		if !found {
@@ -159,9 +176,11 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 		}
 		claimableSwaps = append(
 			claimableSwaps,
-			claimableSwap{
+			kavaClaimableSwap{
 				swapID:       s.GetSwapID(),
+				destSwapID:   bID,
 				randomNumber: randNum,
+				amount:       s.Amount,
 			})
 	}
 	return claimableSwaps, nil

@@ -16,6 +16,22 @@ import (
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
+type BnbClaimError struct {
+	Swap bnbClaimableSwap
+	Err  error
+}
+
+func (r BnbClaimError) Error() string {
+	return fmt.Sprintf("level=error msg=\"%s\" chain=%s srcSwapId=%s destSwapId=%s rndNum=%s amount=%s",
+		r.Err,
+		"binance",
+		r.Swap.swapID,
+		r.Swap.destSwapID,
+		r.Swap.randomNumber,
+		r.Swap.amount,
+	)
+}
+
 type BnbClaimer struct {
 	kavaClient      KavaChainClient
 	bnbClient       BnbChainClient
@@ -68,14 +84,14 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 	for _, swap := range claimableSwaps {
 		mnemonic := <-availableMnemonics
 
-		go func(mnemonic string, mnemonics chan string, swap claimableSwap) {
+		go func(mnemonic string, mnemonics chan string, swap bnbClaimableSwap) {
 
 			log.Printf("sending claim for bnb swap id %s", swap.swapID)
 			defer func() { mnemonics <- mnemonic }()
 
 			txHash, err := constructAndSendBnbClaim(bc.bnbClient, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
-				errs <- fmt.Errorf("could not submit claim: %w", err)
+				errs <- BnbClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
 			}
 			err = Wait(15*time.Second, func() (bool, error) {
@@ -84,12 +100,12 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 					return false, nil
 				}
 				if res.TxResult.Code != 0 {
-					return true, fmt.Errorf("bnb tx rejected from chain: %s", res.TxResult.Log)
+					return true, BnbClaimError{Swap: swap, Err: fmt.Errorf("bnb tx rejected from chain: %s", res.TxResult.Log)}
 				}
 				return true, nil
 			})
 			if err != nil {
-				errs <- fmt.Errorf("could not get claim tx confirmation: %w", err)
+				errs <- BnbClaimError{Swap: swap, Err: fmt.Errorf("could not get claim tx confirmation: %w", err)}
 				return
 			}
 		}(mnemonic, availableMnemonics, swap)
@@ -112,7 +128,14 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 	return nil
 }
 
-func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, depAddrs DeputyAddresses) ([]claimableSwap, error) {
+type bnbClaimableSwap struct {
+	swapID       tmbytes.HexBytes // XXX should define my own byte type to abstract the different ones each chain uses
+	destSwapID   tmbytes.HexBytes
+	randomNumber tmbytes.HexBytes
+	amount       types.Coins
+}
+
+func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, depAddrs DeputyAddresses) ([]bnbClaimableSwap, error) {
 	swaps, err := bnbClient.GetOpenOutgoingSwaps()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch open swaps: %w", err)
@@ -127,7 +150,7 @@ func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, 
 		}
 	}
 	// parse out swap ids, query those txs on bnb, extract random numbers
-	var claimableSwaps []claimableSwap
+	var claimableSwaps []bnbClaimableSwap
 	for _, s := range filteredSwaps {
 		kavaDeputyAddress, found := depAddrs.GetMatchingKava(s.To)
 		if !found {
@@ -143,9 +166,11 @@ func getClaimableBnbSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient, 
 		}
 		claimableSwaps = append(
 			claimableSwaps,
-			claimableSwap{
+			bnbClaimableSwap{
 				swapID:       bnbmsg.CalculateSwapID(s.RandomNumberHash, s.From, kavaDeputyAddress.String()),
+				destSwapID:   kID,
 				randomNumber: randNum,
+				amount:       s.OutAmount,
 			})
 	}
 	return claimableSwaps, nil

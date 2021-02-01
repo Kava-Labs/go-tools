@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	tmtypes "github.com/tendermint/tendermint/types"
 
-	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
 	"github.com/kava-labs/go-tools/deputy-claimer/claim/mock"
+	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
 )
 
 var (
@@ -139,12 +139,15 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 	swaps, err := getClaimableKavaSwaps(kc, bc, depAddrs)
 	require.NoError(t, err)
 
-	expectedClaimableSwaps := []claimableSwap{
+	expectedClaimableSwaps := []kavaClaimableSwap{
 		{
 			swapID:       testKavaSwaps[0].GetSwapID(),
+			destSwapID:   []byte(calcBnbSwapID(testBnbSwaps[0], addrs.Kava.Users[0].Address.String())),
 			randomNumber: []byte(testBnbSwaps[0].RandomNumber),
+			amount:       testKavaSwaps[0].Amount,
 		},
 	}
+
 	require.Equal(t, expectedClaimableSwaps, swaps)
 }
 
@@ -167,12 +170,15 @@ func TestGetClaimableBnbSwaps(t *testing.T) {
 	swaps, err := getClaimableBnbSwaps(kc, bc, depAddrs)
 	require.NoError(t, err)
 
-	expectedClaimableSwaps := []claimableSwap{
+	expectedClaimableSwaps := []bnbClaimableSwap{
 		{
 			swapID:       []byte(calcBnbSwapID(testBnbSwaps[1], addrs.Kava.Deputys.Bnb.HotWallet.Address.String())),
+			destSwapID:   []byte(testKavaSwaps[1].GetSwapID()),
 			randomNumber: rndNum1,
+			amount:       testBnbSwaps[1].OutAmount,
 		},
 	}
+
 	require.Equal(t, expectedClaimableSwaps, swaps)
 }
 
