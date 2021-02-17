@@ -64,7 +64,7 @@ func TestGetBorrowersToLiquidateSingleAssets(t *testing.T) {
 				DepositedAmount: sdk.Coins{{Amount: sdk.NewInt(10000000000), Denom: "busd"}},
 			},
 			{
-				// OK: busd only - over limit, liquidate
+				// NOT OK: busd only - over limit, liquidate
 				Address:         sdk.AccAddress(crypto.AddressHash([]byte("borrower4"))),
 				BorrowedAmount:  sdk.Coins{{Amount: sdk.NewInt(5000000001), Denom: "busd"}},
 				DepositedAmount: sdk.Coins{{Amount: sdk.NewInt(10000000000), Denom: "busd"}},
@@ -76,7 +76,7 @@ func TestGetBorrowersToLiquidateSingleAssets(t *testing.T) {
 				DepositedAmount: sdk.Coins{{Amount: sdk.NewInt(10000000000), Denom: "btcb"}},
 			},
 			{
-				// OK: btcb only - over limit, liquidate
+				// NOT OK: btcb only - over limit, liquidate
 				Address:         sdk.AccAddress(crypto.AddressHash([]byte("borrower6"))),
 				BorrowedAmount:  sdk.Coins{{Amount: sdk.NewInt(4000000001), Denom: "btcb"}},
 				DepositedAmount: sdk.Coins{{Amount: sdk.NewInt(10000000000), Denom: "btcb"}},
@@ -88,7 +88,7 @@ func TestGetBorrowersToLiquidateSingleAssets(t *testing.T) {
 				DepositedAmount: sdk.Coins{{Amount: sdk.NewInt(10000000000), Denom: "usdx"}},
 			},
 			{
-				// OK: usdx only - over limit, liquidate
+				// NOT OK: usdx only - over limit, liquidate
 				Address:         sdk.AccAddress(crypto.AddressHash([]byte("borrower8"))),
 				BorrowedAmount:  sdk.Coins{{Amount: sdk.NewInt(8000000001), Denom: "usdx"}},
 				DepositedAmount: sdk.Coins{{Amount: sdk.NewInt(10000000000), Denom: "usdx"}},
