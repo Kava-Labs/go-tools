@@ -1,4 +1,4 @@
-module github.com/kava-labs/hard-liquidation-engine
+module github.com/kava-labs/go-tools/hard-keeper-bot
 
 go 1.15
 
