@@ -66,10 +66,10 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 
 	res, err := kavaClient.Broadcast(msg, mode)
 	if err != nil {
-		return res.Hash, fmt.Errorf("swap rejected from node: %w", err)
+		return nil, err
 	}
 	if res.Code != 0 {
-		return res.Hash, fmt.Errorf("tx rejected from chain: %s", res.Log)
+		return res.Hash, fmt.Errorf("tx rejected: %s", res.Log)
 	}
 	return res.Hash, nil
 }
