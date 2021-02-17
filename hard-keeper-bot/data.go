@@ -12,18 +12,18 @@ type Position struct {
 	DepositedAmount sdk.Coins
 }
 
-type AssetData struct {
+type AssetInfo struct {
 	Price            sdk.Dec
 	LoanToValueRatio sdk.Dec
 	ConversionFactor sdk.Int
 }
 
-type LiquidationData struct {
-	Assets    map[string]AssetData
+type PositionData struct {
+	Assets    map[string]AssetInfo
 	Positions []Position
 }
 
-func GetLiquidationData(client LiquidationClient) (*LiquidationData, error) {
+func GetPositionData(client LiquidationClient) (*PositionData, error) {
 	// fetch chain info to get height
 	info, err := client.GetInfo()
 	if err != nil {
@@ -59,15 +59,15 @@ func GetLiquidationData(client LiquidationClient) (*LiquidationData, error) {
 		priceData[price.MarketID] = price.Price
 	}
 
-	// loop markets and create AssetData
-	assetData := make(map[string]AssetData)
+	// loop markets and create AssetInfo
+	assetInfo := make(map[string]AssetInfo)
 	for _, market := range markets {
 		price, ok := priceData[market.SpotMarketID]
 		if !ok {
 			return nil, fmt.Errorf("no price for market id %s", market.SpotMarketID)
 		}
 
-		assetData[market.Denom] = AssetData{
+		assetInfo[market.Denom] = AssetInfo{
 			Price:            price,
 			LoanToValueRatio: market.BorrowLimit.LoanToValue,
 			ConversionFactor: market.ConversionFactor,
@@ -99,8 +99,8 @@ func GetLiquidationData(client LiquidationClient) (*LiquidationData, error) {
 		}
 	}
 
-	return &LiquidationData{
-		Assets:    assetData,
+	return &PositionData{
+		Assets:    assetInfo,
 		Positions: positions,
 	}, nil
 }

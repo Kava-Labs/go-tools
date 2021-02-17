@@ -9,15 +9,15 @@ import (
 )
 
 func TestGetBorrowersToLiquidateNoData(t *testing.T) {
-	data := &LiquidationData{}
+	data := &PositionData{}
 	borrowers := GetBorrowersToLiquidate(data)
 	assert.Equal(t, borrowers, Borrowers{})
 }
 
 func TestGetBorrowersToLiquidateMissingMarket(t *testing.T) {
-	data := &LiquidationData{
+	data := &PositionData{
 		// no markets
-		Assets: map[string]AssetData{},
+		Assets: map[string]AssetInfo{},
 		Positions: []Position{
 			{
 				Address:         sdk.AccAddress(crypto.AddressHash([]byte("borrower1"))),
@@ -32,8 +32,8 @@ func TestGetBorrowersToLiquidateMissingMarket(t *testing.T) {
 }
 
 func TestGetBorrowersToLiquidateSingleAssets(t *testing.T) {
-	data := &LiquidationData{
-		Assets: map[string]AssetData{
+	data := &PositionData{
+		Assets: map[string]AssetInfo{
 			"busd": {
 				Price:            sdk.MustNewDecFromStr("1.0"),
 				LoanToValueRatio: sdk.MustNewDecFromStr("0.5"),
@@ -105,8 +105,8 @@ func TestGetBorrowersToLiquidateSingleAssets(t *testing.T) {
 }
 
 func TestGetBorrowersToLiquidateDifferentAsset(t *testing.T) {
-	data := &LiquidationData{
-		Assets: map[string]AssetData{
+	data := &PositionData{
+		Assets: map[string]AssetInfo{
 			"busd": {
 				Price:            sdk.MustNewDecFromStr("1.0"),
 				LoanToValueRatio: sdk.MustNewDecFromStr("0.5"),
@@ -209,8 +209,8 @@ func TestGetBorrowersToLiquidateDifferentAsset(t *testing.T) {
 }
 
 func TestGetBorrowersToLiquidateMultiAsset(t *testing.T) {
-	data := &LiquidationData{
-		Assets: map[string]AssetData{
+	data := &PositionData{
+		Assets: map[string]AssetInfo{
 			"busd": {
 				Price:            sdk.MustNewDecFromStr("1.0"),
 				LoanToValueRatio: sdk.MustNewDecFromStr("0.5"),

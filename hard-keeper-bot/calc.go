@@ -6,7 +6,7 @@ import (
 
 type Borrowers []sdk.AccAddress
 
-func GetBorrowersToLiquidate(data *LiquidationData) Borrowers {
+func GetBorrowersToLiquidate(data *PositionData) Borrowers {
 	assets := data.Assets
 	borrowersToLiquidate := Borrowers{}
 

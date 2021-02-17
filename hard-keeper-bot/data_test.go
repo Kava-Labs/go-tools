@@ -58,10 +58,10 @@ func (m MockClient) checkHeight(height int64) {
 	}
 }
 
-func TestGetLiquidationDataClientErrors(t *testing.T) {
+func TestGetPositionDataClientErrors(t *testing.T) {
 	type getDataTest struct {
 		client       MockClient
-		expectedData LiquidationData
+		expectedData PositionData
 	}
 
 	tests := []getDataTest{
@@ -71,7 +71,7 @@ func TestGetLiquidationDataClientErrors(t *testing.T) {
 				ExpectedHeight: int64(1001),
 				InfoErr:        errors.New("error in info"),
 			},
-			expectedData: LiquidationData{},
+			expectedData: PositionData{},
 		},
 		{
 			client: MockClient{
@@ -79,7 +79,7 @@ func TestGetLiquidationDataClientErrors(t *testing.T) {
 				ExpectedHeight: int64(1002),
 				PricesErr:      errors.New("error in get prices"),
 			},
-			expectedData: LiquidationData{},
+			expectedData: PositionData{},
 		},
 		{
 			client: MockClient{
@@ -87,7 +87,7 @@ func TestGetLiquidationDataClientErrors(t *testing.T) {
 				ExpectedHeight: int64(1003),
 				MarketsErr:     errors.New("error in get markets"),
 			},
-			expectedData: LiquidationData{},
+			expectedData: PositionData{},
 		},
 		{
 			client: MockClient{
@@ -95,7 +95,7 @@ func TestGetLiquidationDataClientErrors(t *testing.T) {
 				ExpectedHeight: int64(1004),
 				BorrowsErr:     errors.New("error in get borrows"),
 			},
-			expectedData: LiquidationData{},
+			expectedData: PositionData{},
 		},
 		{
 			client: MockClient{
@@ -103,12 +103,12 @@ func TestGetLiquidationDataClientErrors(t *testing.T) {
 				ExpectedHeight: int64(1005),
 				DepositsErr:    errors.New("error in get deposits"),
 			},
-			expectedData: LiquidationData{},
+			expectedData: PositionData{},
 		},
 	}
 
 	for _, tc := range tests {
-		_, err := GetLiquidationData(tc.client)
+		_, err := GetPositionData(tc.client)
 		assert.NotNil(t, err)
 
 		c := tc.client
@@ -134,7 +134,7 @@ func TestGetLiquidationDataClientErrors(t *testing.T) {
 func TestGetLiquidationMissingData(t *testing.T) {
 	type getDataTest struct {
 		client       MockClient
-		expectedData LiquidationData
+		expectedData PositionData
 		expectedErr  error
 	}
 
@@ -144,8 +144,8 @@ func TestGetLiquidationMissingData(t *testing.T) {
 				t:              t,
 				ExpectedHeight: int64(1001),
 			}, // no data case
-			expectedData: LiquidationData{
-				Assets:    make(map[string]AssetData),
+			expectedData: PositionData{
+				Assets:    make(map[string]AssetInfo),
 				Positions: []Position{},
 			},
 			expectedErr: nil,
@@ -165,8 +165,8 @@ func TestGetLiquidationMissingData(t *testing.T) {
 					},
 				},
 			}, // prices and nothing else
-			expectedData: LiquidationData{
-				Assets:    make(map[string]AssetData),
+			expectedData: PositionData{
+				Assets:    make(map[string]AssetInfo),
 				Positions: []Position{}, // no markets mean no data
 			},
 			expectedErr: nil,
@@ -215,8 +215,8 @@ func TestGetLiquidationMissingData(t *testing.T) {
 					},
 				},
 			}, // borrows but nothing else
-			expectedData: LiquidationData{
-				Assets: make(map[string]AssetData),
+			expectedData: PositionData{
+				Assets: make(map[string]AssetInfo),
 				// we have positions if we have borrowers
 				Positions: []Position{
 					{
@@ -249,8 +249,8 @@ func TestGetLiquidationMissingData(t *testing.T) {
 					},
 				},
 			}, // borrows but nothing else
-			expectedData: LiquidationData{
-				Assets: make(map[string]AssetData),
+			expectedData: PositionData{
+				Assets: make(map[string]AssetInfo),
 				// only borrowers count towards positions, depositors only are ignored
 				Positions: []Position{},
 			},
@@ -258,13 +258,13 @@ func TestGetLiquidationMissingData(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		data, err := GetLiquidationData(tc.client)
+		data, err := GetPositionData(tc.client)
 		assert.Equal(t, tc.expectedErr, err)
 		if err == nil {
 			assert.Equal(t, &tc.expectedData, data)
 		} else {
 			// error means nil return, no data
-			assert.Equal(t, &tc.expectedData, &LiquidationData{})
+			assert.Equal(t, &tc.expectedData, &PositionData{})
 		}
 	}
 }
@@ -272,7 +272,7 @@ func TestGetLiquidationMissingData(t *testing.T) {
 func TestGetLiquidationAllData(t *testing.T) {
 	type getDataTest struct {
 		client       MockClient
-		expectedData LiquidationData
+		expectedData PositionData
 	}
 
 	tests := []getDataTest{
@@ -325,8 +325,8 @@ func TestGetLiquidationAllData(t *testing.T) {
 					},
 				},
 			}, // single market and single borrower
-			expectedData: LiquidationData{
-				Assets: map[string]AssetData{
+			expectedData: PositionData{
+				Assets: map[string]AssetInfo{
 					"busd": {
 						Price:            sdk.MustNewDecFromStr("1.0"),
 						LoanToValueRatio: sdk.MustNewDecFromStr("0.5"),
@@ -437,8 +437,8 @@ func TestGetLiquidationAllData(t *testing.T) {
 					},
 				},
 			}, // multiple markets, multiple borrowers
-			expectedData: LiquidationData{
-				Assets: map[string]AssetData{
+			expectedData: PositionData{
+				Assets: map[string]AssetInfo{
 					"busd": {
 						Price:            sdk.MustNewDecFromStr("1.0"),
 						LoanToValueRatio: sdk.MustNewDecFromStr("0.5"),
@@ -472,7 +472,7 @@ func TestGetLiquidationAllData(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		data, err := GetLiquidationData(tc.client)
+		data, err := GetPositionData(tc.client)
 		assert.Nil(t, err)
 		assert.Equal(t, &tc.expectedData, data)
 	}

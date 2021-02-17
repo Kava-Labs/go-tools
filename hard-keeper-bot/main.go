@@ -64,7 +64,7 @@ func main() {
 	client := NewRpcLiquidationClient(http, cdc)
 
 	// fetch asset and position data using client
-	data, err := GetLiquidationData(client)
+	data, err := GetPositionData(client)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
