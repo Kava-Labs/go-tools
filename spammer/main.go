@@ -17,7 +17,7 @@ import (
 	"github.com/kava-labs/kava/x/cdp"
 	"github.com/kava-labs/kava/x/hard"
 
-	"github.com/kava-labs/go-sdk/spammer/client"
+	"github.com/kava-labs/go-tools/spammer/client"
 )
 
 const (
@@ -172,7 +172,7 @@ func (s Spammer) distributeCoins(perAddrAmount int64) error {
 	signMsg.Sequence = sequence
 	signMsg.AccountNumber = accountNumber
 
-	signedMsg, err := s.distributor.Sign(*signMsg, s.client.cdc)
+	signedMsg, err := s.distributor.Sign(*signMsg, s.client.Cdc)
 	if err != nil {
 		return err
 	}
@@ -229,7 +229,7 @@ func (s Spammer) openCDPs() error {
 		signMsg.Sequence = sequence
 		signMsg.AccountNumber = accountNumber
 
-		signedMsg, err := account.Sign(*signMsg, s.client.cdc)
+		signedMsg, err := account.Sign(*signMsg, s.client.Cdc)
 		if err != nil {
 			return err
 		}
@@ -301,7 +301,7 @@ func (s Spammer) hardDeposits() error {
 		signMsg.Sequence = sequence
 		signMsg.AccountNumber = accountNumber
 
-		signedMsg, err := account.Sign(*signMsg, s.client.cdc)
+		signedMsg, err := account.Sign(*signMsg, s.client.Cdc)
 		if err != nil {
 			return err
 		}
@@ -374,7 +374,7 @@ func (s Spammer) hardBorrows() error {
 		signMsg.Sequence = sequence
 		signMsg.AccountNumber = accountNumber
 
-		signedMsg, err := account.Sign(*signMsg, s.client.cdc)
+		signedMsg, err := account.Sign(*signMsg, s.client.Cdc)
 		if err != nil {
 			return err
 		}

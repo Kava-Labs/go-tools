@@ -16,8 +16,8 @@ import (
 )
 
 type KavaClient struct {
-	http *rpcclient.HTTP
-	cdc  *codec.Codec
+	Http *rpcclient.HTTP
+	Cdc  *codec.Codec
 }
 
 func NewKavaClient(cdc *codec.Codec, rpcAddr string, logger tmlog.Logger) (*KavaClient, error) {
@@ -28,13 +28,13 @@ func NewKavaClient(cdc *codec.Codec, rpcAddr string, logger tmlog.Logger) (*Kava
 	http.Logger = logger
 
 	return &KavaClient{
-		cdc:  cdc,
-		http: http,
+		Cdc:  cdc,
+		Http: http,
 	}, nil
 }
 
 func (c *KavaClient) GetChainID() (string, error) {
-	result, err := c.http.Status()
+	result, err := c.Http.Status()
 	if err != nil {
 		return "", err
 	}
@@ -43,7 +43,7 @@ func (c *KavaClient) GetChainID() (string, error) {
 
 func (c *KavaClient) GetAccount(address sdk.AccAddress) (acc authexported.Account, err error) {
 	params := authtypes.NewQueryAccountParams(address)
-	bz, err := c.cdc.MarshalJSON(params)
+	bz, err := c.Cdc.MarshalJSON(params)
 
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (c *KavaClient) GetAccount(address sdk.AccAddress) (acc authexported.Accoun
 		return nil, err
 	}
 
-	err = c.cdc.UnmarshalJSON(result, &acc)
+	err = c.Cdc.UnmarshalJSON(result, &acc)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (c *KavaClient) GetAccount(address sdk.AccAddress) (acc authexported.Accoun
 }
 
 func (c *KavaClient) ABCIQuery(path string, data tmbytes.HexBytes) ([]byte, error) {
-	result, err := c.http.ABCIQuery(path, data)
+	result, err := c.Http.ABCIQuery(path, data)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -84,13 +84,13 @@ func (c *KavaClient) ABCIQuery(path string, data tmbytes.HexBytes) ([]byte, erro
 }
 
 func (c *KavaClient) BroadcastTxSync(tx tmtypes.Tx) (*ctypes.ResultBroadcastTx, error) {
-	return c.http.BroadcastTxSync(tx)
+	return c.Http.BroadcastTxSync(tx)
 }
 
 func (c *KavaClient) BroadcastTxCommit(tx tmtypes.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
-	return c.http.BroadcastTxCommit(tx)
+	return c.Http.BroadcastTxCommit(tx)
 }
 
 func (c *KavaClient) GetTxConfirmation(txHash []byte) (*ctypes.ResultTx, error) {
-	return c.http.Tx(txHash, false)
+	return c.Http.Tx(txHash, false)
 }
