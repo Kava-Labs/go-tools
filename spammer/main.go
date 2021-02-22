@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	bip39 "github.com/cosmos/go-bip39"
@@ -16,8 +17,10 @@ import (
 )
 
 const (
-	mnemonic = "fragile flip puzzle adjust mushroom gas minimum maid love coach brush cattle match analyst oak spell blur thunder unfair inch mother park toilet toddler"
-	rpcAddr  = "tcp://localhost:26657"
+	mnemonic        = "secret words that unlock your address"
+	rpcAddr         = "tcp://localhost:26657"
+	ukavaPerAddress = 100000000
+	numAccounts     = 40
 )
 
 func main() {
@@ -39,7 +42,7 @@ func main() {
 	}
 
 	// Set up accounts
-	accounts, err := genNewAccounts(2)
+	accounts, err := genNewAccounts(numAccounts)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -47,10 +50,13 @@ func main() {
 	spamBot := spammer.NewSpammer(kavaClient, distributorKeyManager, accounts)
 
 	// Distribute coins to spammer's accounts
-	err = spamBot.DistributeCoins(100000000) // 100 KAVA per address
+	err = spamBot.DistributeCoins(ukavaPerAddress) // 100 KAVA per address
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	// Even though the distribution tx is confirmed, wait for the next block
+	time.Sleep(7 * time.Second)
 
 	// Each account sends a CDP creation tx
 	err = spamBot.OpenCDPs()

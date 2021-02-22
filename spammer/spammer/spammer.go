@@ -108,8 +108,20 @@ func (s Spammer) DistributeCoins(perAddrAmount int64) error {
 	if res.CheckTx.Code != 0 {
 		return fmt.Errorf("\nres.Code: %d\nLog:%s", res.CheckTx.Code, res.CheckTx.Log)
 	}
+	fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
 
-	fmt.Println(fmt.Sprintf("Sent %s each to %d accounts: %s", perUserCoins, len(s.accounts), res.Hash))
+	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
+		queryRes, err := s.client.GetTxConfirmation(res.Hash)
+		if err != nil {
+			return false, nil // poll again, it can't find the tx or node is down/slow
+		}
+		if queryRes.TxResult.Code != 0 {
+			return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+		}
+		return true, nil // return nothing, found successfully confirmed tx
+	})
+
+	fmt.Println(fmt.Sprintf("Sent %s each to %d accounts!", perUserCoins, len(s.accounts)))
 	return nil
 }
 
