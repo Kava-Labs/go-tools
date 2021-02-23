@@ -17,10 +17,9 @@ import (
 )
 
 const (
-	mnemonic                = "fragile flip puzzle adjust mushroom gas minimum maid love coach brush cattle match analyst oak spell blur thunder unfair inch mother park toilet toddler"
-	rpcAddr                 = "http://3.236.68.204:26657"
 	CreateCDPTxDefaultGas   = 500_000
 	DepositHardTxDefaultGas = 200_000
+	BorrowHardTxDefaultGas  = 200_000
 	// TxConfirmationTimeout is the longest time to wait for a tx confirmation before giving up
 	TxConfirmationTimeout      = 3 * 60 * time.Second
 	TxConfirmationPollInterval = 2 * time.Second
@@ -30,12 +29,14 @@ var (
 	DefaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.05"))
 )
 
+// Spammer contains a Kava client, as well as Key Managers for a distribution account and a set of sub-accounts
 type Spammer struct {
 	client      *client.KavaClient
 	distributor keys.KeyManager
 	accounts    []keys.KeyManager
 }
 
+// NewSpammer returns a new instance of Spammer
 func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager, accounts []keys.KeyManager) Spammer {
 	return Spammer{
 		client:      kavaClient,
@@ -46,6 +47,8 @@ func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager, acco
 
 // DistributeCoins distributes coins from the spammer's distributor account to the general accounts
 func (s Spammer) DistributeCoins(perAddrAmount sdk.Coins) error {
+	fmt.Println(fmt.Sprintf("Distributing %s to each account...", perAddrAmount))
+
 	var inputs []bank.Input
 	var outputs []bank.Output
 
@@ -109,23 +112,12 @@ func (s Spammer) DistributeCoins(perAddrAmount sdk.Coins) error {
 	if err != nil {
 		return err
 	}
+
+	// TODO:
 	// if res.CheckTx.Code != 0 {
 	// 	return fmt.Errorf("\nres.Code: %d\nLog:%s", res.CheckTx.Code, res.CheckTx.Log)
 	// }
-	fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
-
-	// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-	// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
-	// 	if err != nil {
-	// 		return false, nil // poll again, it can't find the tx or node is down/slow
-	// 	}
-	// 	if queryRes.TxResult.Code != 0 {
-	// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-	// 	}
-	// 	return true, nil // return nothing, found successfully confirmed tx
-	// })
-
-	// fmt.Println(fmt.Sprintf("Sent %s each to %d accounts!", perUserCoins, len(s.accounts)))
+	fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
 	return nil
 }
 
@@ -183,19 +175,7 @@ func (s Spammer) OpenCDPs(collateralCoin, principalCoin sdk.Coin, collateralType
 		if res.Code != 0 {
 			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
 		}
-		fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
-
-		// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-		// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
-		// 	if err != nil {
-		// 		return false, nil // poll again, it can't find the tx or node is down/slow
-		// 	}
-		// 	fmt.Printf("%v\n", queryRes.TxResult.Code)
-		// 	if queryRes.TxResult.Code != 0 {
-		// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-		// 	}
-		// 	return true, nil // return nothing, found successfully confirmed tx
-		// })
+		fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
 	}
 	fmt.Println(fmt.Sprintf("Successfully opened %d CDPs!", len(s.accounts)))
 	return nil
@@ -255,18 +235,7 @@ func (s Spammer) HardDeposits(depositCoins sdk.Coins) error {
 		if res.Code != 0 {
 			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
 		}
-		fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
-
-		// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-		// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
-		// 	if err != nil {
-		// 		return false, nil // poll again, it can't find the tx or node is down/slow
-		// 	}
-		// 	if queryRes.TxResult.Code != 0 {
-		// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-		// 	}
-		// 	return true, nil // return nothing, found successfully confirmed tx
-		// })
+		fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
 	}
 	fmt.Println(fmt.Sprintf("Successfully supplied on %d accounts!", len(s.accounts)))
 	return nil
@@ -326,18 +295,7 @@ func (s Spammer) HardBorrows(depositCoins sdk.Coins) error {
 		if res.Code != 0 {
 			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
 		}
-		fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
-
-		// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-		// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
-		// 	if err != nil {
-		// 		return false, nil // poll again, it can't find the tx or node is down/slow
-		// 	}
-		// 	if queryRes.TxResult.Code != 0 {
-		// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-		// 	}
-		// 	return true, nil // return nothing, found successfully confirmed tx
-		// })
+		fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
 	}
 	fmt.Println(fmt.Sprintf("Successfully borrowed on %d accounts!", len(s.accounts)))
 	return nil
@@ -361,28 +319,4 @@ func getAccountNumbers(client *client.KavaClient, fromAddr sdk.AccAddress) (uint
 		return 0, 0, err
 	}
 	return acc.GetSequence(), acc.GetAccountNumber(), nil
-}
-
-// pollWithBackoff will call the provided function until either:
-// it returns true, it returns an error, the timeout passes.
-// It will wait initialInterval after the first call, and double each subsequent call.
-func pollWithBackoff(timeout, initialInterval time.Duration, pollFunc func() (bool, error)) error {
-	const backoffMultiplier = 2
-	deadline := time.After(timeout)
-
-	wait := initialInterval
-	nextPoll := time.After(0)
-	for {
-		select {
-		case <-deadline:
-			return fmt.Errorf("polling timed out after %s", timeout)
-		case <-nextPoll:
-			shouldStop, err := pollFunc()
-			if shouldStop || err != nil {
-				return err
-			}
-			nextPoll = time.After(wait)
-			wait = wait * backoffMultiplier
-		}
-	}
 }
