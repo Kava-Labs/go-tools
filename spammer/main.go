@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	mnemonic = ""
-	rpcAddr  = "http://3.236.68.204:26657"
-
+	mnemonic    = ""
+	rpcAddr     = "http://3.236.68.204:26657"
 	numAccounts = 1000
 )
 
@@ -59,12 +58,12 @@ func main() {
 	spamBot := spammer.NewSpammer(kavaClient, distributorKeyManager, accounts)
 
 	// Distribute coins to spammer's accounts
-	err = spamBot.DistributeCoins(amountPerAddress) // 100 KAVA per address
+	err = spamBot.DistributeCoins(amountPerAddress)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	// Even though the distribution tx is confirmed, wait for the next block
+	// Wait for the distribution tx to be confirmed
 	time.Sleep(20 * time.Second)
 
 	// Each account sends a CDP creation tx
@@ -73,7 +72,7 @@ func main() {
 		fmt.Println(err)
 	}
 
-	// wait for cdp txs to confirm
+	// Wait for the create CDP txs to be confirmed
 	time.Sleep(120 * time.Second)
 
 	// Each account sends a Hard deposit tx
@@ -82,7 +81,7 @@ func main() {
 		fmt.Println(err)
 	}
 
-	// wait for deposit txs to confirm
+	// Wait for the Deposit txs to be confirmed
 	time.Sleep(45 * time.Second)
 
 	// Each account sends a Hard borrow tx
