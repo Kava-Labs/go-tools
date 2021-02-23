@@ -17,10 +17,19 @@ import (
 )
 
 const (
-	mnemonic        = "secret words that unlock your address"
-	rpcAddr         = "tcp://localhost:26657"
-	ukavaPerAddress = 100000000
-	numAccounts     = 40
+	mnemonic = ""
+	rpcAddr  = "http://3.236.68.204:26657"
+
+	numAccounts = 1000
+)
+
+var (
+	amountPerAddress = sdk.NewCoins(sdk.NewInt64Coin("xrpb", 200000000000), sdk.NewInt64Coin("ukava", 10000000), sdk.NewInt64Coin("hard", 50000000), sdk.NewInt64Coin("bnb", 200000000))
+	cdpCollateral    = sdk.NewInt64Coin("xrpb", 100000000000)
+	collateralType   = "xrpb-a"
+	cdpPrincipal     = sdk.NewInt64Coin("usdx", 260000000)
+	hardDeposit      = sdk.NewCoins(sdk.NewInt64Coin("usdx", 260000000), sdk.NewInt64Coin("xrpb", 100000000000), sdk.NewInt64Coin("bnb", 200000000))
+	hardBorrow       = sdk.NewCoins(sdk.NewInt64Coin("bnb", 100000000))
 )
 
 func main() {
@@ -50,28 +59,34 @@ func main() {
 	spamBot := spammer.NewSpammer(kavaClient, distributorKeyManager, accounts)
 
 	// Distribute coins to spammer's accounts
-	err = spamBot.DistributeCoins(ukavaPerAddress) // 100 KAVA per address
+	err = spamBot.DistributeCoins(amountPerAddress) // 100 KAVA per address
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	// Even though the distribution tx is confirmed, wait for the next block
-	time.Sleep(7 * time.Second)
+	time.Sleep(20 * time.Second)
 
 	// Each account sends a CDP creation tx
-	err = spamBot.OpenCDPs()
+	err = spamBot.OpenCDPs(cdpCollateral, cdpPrincipal, collateralType)
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	// wait for cdp txs to confirm
+	time.Sleep(120 * time.Second)
 
 	// Each account sends a Hard deposit tx
-	err = spamBot.HardDeposits()
+	err = spamBot.HardDeposits(hardDeposit)
 	if err != nil {
 		fmt.Println(err)
 	}
 
+	// wait for deposit txs to confirm
+	time.Sleep(45 * time.Second)
+
 	// Each account sends a Hard borrow tx
-	err = spamBot.HardBorrows()
+	err = spamBot.HardBorrows(hardBorrow)
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -18,7 +18,7 @@ import (
 
 const (
 	mnemonic                = "fragile flip puzzle adjust mushroom gas minimum maid love coach brush cattle match analyst oak spell blur thunder unfair inch mother park toilet toddler"
-	rpcAddr                 = "tcp://localhost:26657"
+	rpcAddr                 = "http://3.236.68.204:26657"
 	CreateCDPTxDefaultGas   = 500_000
 	DepositHardTxDefaultGas = 200_000
 	// TxConfirmationTimeout is the longest time to wait for a tx confirmation before giving up
@@ -27,7 +27,7 @@ const (
 )
 
 var (
-	DefaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
+	DefaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.05"))
 )
 
 type Spammer struct {
@@ -45,12 +45,17 @@ func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager, acco
 }
 
 // DistributeCoins distributes coins from the spammer's distributor account to the general accounts
-func (s Spammer) DistributeCoins(perAddrAmount int64) error {
+func (s Spammer) DistributeCoins(perAddrAmount sdk.Coins) error {
 	var inputs []bank.Input
 	var outputs []bank.Output
 
 	// Construct inputs
-	totalDistCoins := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(int64(len(s.accounts))*perAddrAmount)))
+	totalDistCoins := sdk.NewCoins()
+	for _, coin := range perAddrAmount {
+		newAmount := coin.Amount.Mul(sdk.NewInt(int64(len(s.accounts))))
+		totalCoin := sdk.NewCoin(coin.Denom, newAmount)
+		totalDistCoins = totalDistCoins.Add(totalCoin)
+	}
 
 	// TODO: check that address has enough coins
 	// if totalDistCoins.IsAllLT(senderAcc.Coins) {
@@ -61,9 +66,8 @@ func (s Spammer) DistributeCoins(perAddrAmount int64) error {
 	inputs = append(inputs, input)
 
 	// Construct outputs
-	perUserCoins := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(perAddrAmount)))
 	for _, account := range s.accounts {
-		output := bank.NewOutput(account.GetAddr(), perUserCoins)
+		output := bank.NewOutput(account.GetAddr(), perAddrAmount)
 		outputs = append(outputs, output)
 	}
 
@@ -82,7 +86,7 @@ func (s Spammer) DistributeCoins(perAddrAmount int64) error {
 		ChainID:       chainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           calculateFee(CreateCDPTxDefaultGas, DefaultGasPrice),
+		Fee:           calculateFee(20000000, DefaultGasPrice),
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
@@ -101,43 +105,40 @@ func (s Spammer) DistributeCoins(perAddrAmount int64) error {
 	tx := tmtypes.Tx(signedMsg)
 
 	// Broadcast msg
-	res, err := s.client.BroadcastTxCommit(tx)
+	res, err := s.client.Http.BroadcastTxAsync(tx)
 	if err != nil {
 		return err
 	}
-	if res.CheckTx.Code != 0 {
-		return fmt.Errorf("\nres.Code: %d\nLog:%s", res.CheckTx.Code, res.CheckTx.Log)
-	}
+	// if res.CheckTx.Code != 0 {
+	// 	return fmt.Errorf("\nres.Code: %d\nLog:%s", res.CheckTx.Code, res.CheckTx.Log)
+	// }
 	fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
 
-	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-		queryRes, err := s.client.GetTxConfirmation(res.Hash)
-		if err != nil {
-			return false, nil // poll again, it can't find the tx or node is down/slow
-		}
-		if queryRes.TxResult.Code != 0 {
-			return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-		}
-		return true, nil // return nothing, found successfully confirmed tx
-	})
+	// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
+	// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
+	// 	if err != nil {
+	// 		return false, nil // poll again, it can't find the tx or node is down/slow
+	// 	}
+	// 	if queryRes.TxResult.Code != 0 {
+	// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+	// 	}
+	// 	return true, nil // return nothing, found successfully confirmed tx
+	// })
 
-	fmt.Println(fmt.Sprintf("Sent %s each to %d accounts!", perUserCoins, len(s.accounts)))
+	// fmt.Println(fmt.Sprintf("Sent %s each to %d accounts!", perUserCoins, len(s.accounts)))
 	return nil
 }
 
 // OpenCDPs executes a series of CDP creations
-func (s Spammer) OpenCDPs() error {
-	collateralCoin := sdk.NewCoin("ukava", sdk.NewInt(10000000)) // 10 KAVA
-	principleCoin := sdk.NewCoin("usdx", sdk.NewInt(10000000))   // 10 USDX
-	collateralType := "ukava"
+func (s Spammer) OpenCDPs(collateralCoin, principalCoin sdk.Coin, collateralType string) error {
 
-	fmt.Println(fmt.Sprintf("\nOpening CDPs with %s collateral, %s principal on each account...", collateralCoin, principleCoin))
+	fmt.Println(fmt.Sprintf("\nOpening CDPs with %s collateral, %s principal on each account...", collateralCoin, principalCoin))
 
 	// Open CDPs
 	for _, account := range s.accounts {
 		fromAddr := account.GetAddr()
 
-		msg := cdp.NewMsgCreateCDP(fromAddr, collateralCoin, principleCoin, collateralType)
+		msg := cdp.NewMsgCreateCDP(fromAddr, collateralCoin, principalCoin, collateralType)
 		if err := msg.ValidateBasic(); err != nil {
 			return fmt.Errorf("msg basic validation failed: \n%v", err)
 		}
@@ -151,7 +152,7 @@ func (s Spammer) OpenCDPs() error {
 			ChainID:       chainID,
 			AccountNumber: 0,
 			Sequence:      0,
-			Fee:           calculateFee(CreateCDPTxDefaultGas, DefaultGasPrice),
+			Fee:           calculateFee(500000, DefaultGasPrice),
 			Msgs:          []sdk.Msg{msg},
 			Memo:          "",
 		}
@@ -175,7 +176,7 @@ func (s Spammer) OpenCDPs() error {
 		}
 
 		// Broadcast msg
-		res, err := s.client.BroadcastTxSync(tx)
+		res, err := s.client.Http.BroadcastTxAsync(tx)
 		if err != nil {
 			return err
 		}
@@ -184,24 +185,24 @@ func (s Spammer) OpenCDPs() error {
 		}
 		fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
 
-		err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-			queryRes, err := s.client.GetTxConfirmation(res.Hash)
-			if err != nil {
-				return false, nil // poll again, it can't find the tx or node is down/slow
-			}
-			if queryRes.TxResult.Code != 0 {
-				return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-			}
-			return true, nil // return nothing, found successfully confirmed tx
-		})
+		// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
+		// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
+		// 	if err != nil {
+		// 		return false, nil // poll again, it can't find the tx or node is down/slow
+		// 	}
+		// 	fmt.Printf("%v\n", queryRes.TxResult.Code)
+		// 	if queryRes.TxResult.Code != 0 {
+		// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+		// 	}
+		// 	return true, nil // return nothing, found successfully confirmed tx
+		// })
 	}
 	fmt.Println(fmt.Sprintf("Successfully opened %d CDPs!", len(s.accounts)))
 	return nil
 }
 
 // HardDeposits executes a series of Hard module deposits
-func (s Spammer) HardDeposits() error {
-	depositCoins := sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(10000000))) // 10 KAVA
+func (s Spammer) HardDeposits(depositCoins sdk.Coins) error {
 
 	fmt.Println(fmt.Sprintf("\nSupplying %s to Hard on each account...", depositCoins))
 
@@ -247,7 +248,7 @@ func (s Spammer) HardDeposits() error {
 		}
 
 		// Broadcast msg
-		res, err := s.client.BroadcastTxSync(tx)
+		res, err := s.client.Http.BroadcastTxAsync(tx)
 		if err != nil {
 			return err
 		}
@@ -256,24 +257,23 @@ func (s Spammer) HardDeposits() error {
 		}
 		fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
 
-		err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-			queryRes, err := s.client.GetTxConfirmation(res.Hash)
-			if err != nil {
-				return false, nil // poll again, it can't find the tx or node is down/slow
-			}
-			if queryRes.TxResult.Code != 0 {
-				return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-			}
-			return true, nil // return nothing, found successfully confirmed tx
-		})
+		// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
+		// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
+		// 	if err != nil {
+		// 		return false, nil // poll again, it can't find the tx or node is down/slow
+		// 	}
+		// 	if queryRes.TxResult.Code != 0 {
+		// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+		// 	}
+		// 	return true, nil // return nothing, found successfully confirmed tx
+		// })
 	}
 	fmt.Println(fmt.Sprintf("Successfully supplied on %d accounts!", len(s.accounts)))
 	return nil
 }
 
 // HardBorrows executes a series of Hard module borrows
-func (s Spammer) HardBorrows() error {
-	depositCoins := sdk.NewCoins(sdk.NewCoin("usdx", sdk.NewInt(10000000))) // 10 USDX
+func (s Spammer) HardBorrows(depositCoins sdk.Coins) error {
 
 	fmt.Println(fmt.Sprintf("\nBorrowing %s to Hard on each account...", depositCoins))
 
@@ -319,7 +319,7 @@ func (s Spammer) HardBorrows() error {
 		}
 
 		// Broadcast msg
-		res, err := s.client.BroadcastTxSync(tx)
+		res, err := s.client.Http.BroadcastTxAsync(tx)
 		if err != nil {
 			return err
 		}
@@ -328,16 +328,16 @@ func (s Spammer) HardBorrows() error {
 		}
 		fmt.Println(fmt.Sprintf("Sent tx %s, confirming...", res.Hash))
 
-		err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-			queryRes, err := s.client.GetTxConfirmation(res.Hash)
-			if err != nil {
-				return false, nil // poll again, it can't find the tx or node is down/slow
-			}
-			if queryRes.TxResult.Code != 0 {
-				return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
-			}
-			return true, nil // return nothing, found successfully confirmed tx
-		})
+		// err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
+		// 	queryRes, err := s.client.GetTxConfirmation(res.Hash)
+		// 	if err != nil {
+		// 		return false, nil // poll again, it can't find the tx or node is down/slow
+		// 	}
+		// 	if queryRes.TxResult.Code != 0 {
+		// 		return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+		// 	}
+		// 	return true, nil // return nothing, found successfully confirmed tx
+		// })
 	}
 	fmt.Println(fmt.Sprintf("Successfully borrowed on %d accounts!", len(s.accounts)))
 	return nil
