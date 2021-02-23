@@ -28,8 +28,7 @@ func ParseABCIResult(result *ctypes.ResultABCIQuery, err error) ([]byte, error) 
 	}
 
 	value := result.Response.GetValue()
-	// TODO: why do we check length here?
-	if len(value) == 0 {
+	if value == nil {
 		return []byte{}, nil
 	}
 
