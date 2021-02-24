@@ -7,6 +7,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
+	"github.com/prometheus/common/log"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-sdk/keys"
@@ -47,7 +48,7 @@ func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager, acco
 
 // DistributeCoins distributes coins from the spammer's distributor account to the general accounts
 func (s Spammer) DistributeCoins(perAddrAmount sdk.Coins) error {
-	fmt.Println(fmt.Sprintf("Distributing %s to each account...", perAddrAmount))
+	log.Infof("Distributing %s to each account...", perAddrAmount)
 
 	var inputs []bank.Input
 	var outputs []bank.Output
@@ -117,14 +118,14 @@ func (s Spammer) DistributeCoins(perAddrAmount sdk.Coins) error {
 	// if res.CheckTx.Code != 0 {
 	// 	return fmt.Errorf("\nres.Code: %d\nLog:%s", res.CheckTx.Code, res.CheckTx.Log)
 	// }
-	fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
+	log.Infof("Sent tx %s", res.Hash)
 	return nil
 }
 
 // OpenCDPs executes a series of CDP creations
 func (s Spammer) OpenCDPs(collateralCoin, principalCoin sdk.Coin, collateralType string) error {
 
-	fmt.Println(fmt.Sprintf("\nOpening CDPs with %s collateral, %s principal on each account...", collateralCoin, principalCoin))
+	log.Infof("\nOpening CDPs with %s collateral, %s principal on each account...", collateralCoin, principalCoin)
 
 	// Open CDPs
 	for _, account := range s.accounts {
@@ -175,16 +176,16 @@ func (s Spammer) OpenCDPs(collateralCoin, principalCoin sdk.Coin, collateralType
 		if res.Code != 0 {
 			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
 		}
-		fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
+		log.Infof("Sent tx %s", res.Hash)
 	}
-	fmt.Println(fmt.Sprintf("Successfully opened %d CDPs!", len(s.accounts)))
+	log.Infof("Successfully opened %d CDPs!", len(s.accounts))
 	return nil
 }
 
 // HardDeposits executes a series of Hard module deposits
 func (s Spammer) HardDeposits(depositCoins sdk.Coins) error {
 
-	fmt.Println(fmt.Sprintf("\nSupplying %s to Hard on each account...", depositCoins))
+	log.Infof("\nSupplying %s to Hard on each account...", depositCoins)
 
 	// Open CDPs
 	for _, account := range s.accounts {
@@ -235,16 +236,16 @@ func (s Spammer) HardDeposits(depositCoins sdk.Coins) error {
 		if res.Code != 0 {
 			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
 		}
-		fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
+		log.Infof("Sent tx %s", res.Hash)
 	}
-	fmt.Println(fmt.Sprintf("Successfully supplied on %d accounts!", len(s.accounts)))
+	log.Infof("Successfully supplied on %d accounts!", len(s.accounts))
 	return nil
 }
 
 // HardBorrows executes a series of Hard module borrows
 func (s Spammer) HardBorrows(depositCoins sdk.Coins) error {
 
-	fmt.Println(fmt.Sprintf("\nBorrowing %s to Hard on each account...", depositCoins))
+	log.Infof("\nBorrowing %s to Hard on each account...", depositCoins)
 
 	// Open CDPs
 	for _, account := range s.accounts {
@@ -295,9 +296,9 @@ func (s Spammer) HardBorrows(depositCoins sdk.Coins) error {
 		if res.Code != 0 {
 			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
 		}
-		fmt.Println(fmt.Sprintf("Sent tx %s", res.Hash))
+		log.Infof("Sent tx %s", res.Hash)
 	}
-	fmt.Println(fmt.Sprintf("Successfully borrowed on %d accounts!", len(s.accounts)))
+	log.Infof("Successfully borrowed on %d accounts!", len(s.accounts))
 	return nil
 }
 
