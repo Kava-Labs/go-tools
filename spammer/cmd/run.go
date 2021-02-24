@@ -1,18 +1,19 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"time"
 
-	"github.com/spf13/cobra"
-	// "github.com/spf13/viper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	bip39 "github.com/cosmos/go-bip39"
+	"github.com/prometheus/common/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 
 	"github.com/kava-labs/go-sdk/keys"
 	"github.com/kava-labs/go-tools/spammer/client"
+	"github.com/kava-labs/go-tools/spammer/config"
 	"github.com/kava-labs/go-tools/spammer/spammer"
 	"github.com/kava-labs/kava/app"
 )
@@ -34,8 +35,7 @@ var (
 	hardBorrow       = sdk.NewCoins(sdk.NewInt64Coin("bnb", 100000000))
 )
 
-// startCmd : represents the start command
-var startCmd = &cobra.Command{
+var runCmd = &cobra.Command{
 	Use:     "run",
 	Short:   "runs the spammer",
 	Example: "run",
@@ -46,27 +46,36 @@ var startCmd = &cobra.Command{
 		// 	log.Fatal("invalid --file flag")
 		// }
 
-		// Start Kava HTTP client
-		config := sdk.GetConfig()
-		app.SetBech32AddressPrefixes(config)
+		configPath := pflag.String("config", config.DefaultConfigPath, "path to config file")
+		pflag.Parse()
+
+		// Load kava claimers
+		sdkConfig := sdk.GetConfig()
+		app.SetBech32AddressPrefixes(sdkConfig)
 		cdc := app.MakeCodec()
 
+		// Load config
+		cfg, err := config.GetConfig(*configPath)
+		if err != nil {
+			panic(err)
+		}
+
 		logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
-		kavaClient, err := client.NewKavaClient(cdc, rpcAddr, logger)
+		kavaClient, err := client.NewKavaClient(cdc, cfg.RPCEndpoint, logger)
 		if err != nil {
 			panic(err)
 		}
 
 		// Set up accounts
-		distributorKeyManager, err := keys.NewMnemonicKeyManager(mnemonic, app.Bip44CoinType)
+		distributorKeyManager, err := keys.NewMnemonicKeyManager(cfg.Mnemonic, app.Bip44CoinType)
 		if err != nil {
 			panic(err)
 		}
 
 		// Set up accounts
-		accounts, err := genNewAccounts(numAccounts)
+		accounts, err := genNewAccounts(cfg.NumAccounts)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf(err.Error())
 		}
 
 		spamBot := spammer.NewSpammer(kavaClient, distributorKeyManager, accounts)
@@ -74,7 +83,7 @@ var startCmd = &cobra.Command{
 		// Distribute coins to spammer's accounts
 		err = spamBot.DistributeCoins(amountPerAddress)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf(err.Error())
 		}
 
 		// Wait for the distribution tx to be confirmed
@@ -83,7 +92,7 @@ var startCmd = &cobra.Command{
 		// Each account sends a CDP creation tx
 		err = spamBot.OpenCDPs(cdpCollateral, cdpPrincipal, collateralType)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf(err.Error())
 		}
 
 		// Wait for the create CDP txs to be confirmed
@@ -92,7 +101,7 @@ var startCmd = &cobra.Command{
 		// Each account sends a Hard deposit tx
 		err = spamBot.HardDeposits(hardDeposit)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf(err.Error())
 		}
 
 		// Wait for the Deposit txs to be confirmed
@@ -101,14 +110,14 @@ var startCmd = &cobra.Command{
 		// Each account sends a Hard borrow tx
 		err = spamBot.HardBorrows(hardBorrow)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf(err.Error())
 		}
 	},
 }
 
 // init : prepares required flags and adds them to the start cmd
 func init() {
-	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(runCmd)
 
 	// // Add flags and mark as required
 	// startCmd.PersistentFlags().String(flagInFile, "", "Path to start file")
