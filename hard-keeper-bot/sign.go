@@ -123,8 +123,6 @@ func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) e
 							Err:     err,
 						}
 
-						inflight[checkTxSeq%s.inflightTxLimit] = response
-
 						// tx malformed, could not sign
 						if response.Err != nil {
 							break
@@ -160,9 +158,12 @@ func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) e
 					// 0: success, in mempool
 					// 19: success, tx already in mempool
 					if result.Code == sdkerrors.SuccessABCICode || result.Code == sdkerrors.ErrTxInMempoolCache.ABCICode() {
+						inflight[checkTxSeq%s.inflightTxLimit] = response
 						checkTxSeq = checkTxSeq + 1
 					} else {
 						response.Err = fmt.Errorf("message failed to broadcast, unrecoverable error code %d", result.Code)
+						// write response immediatly
+						responses <- *response
 					}
 
 					// exit loop, msg has been processed
