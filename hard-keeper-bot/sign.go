@@ -180,11 +180,16 @@ func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) e
 			//   - send mempool heartbeat (currentRequest is nil)
 		BROADCAST_LOOP:
 			for broadcastTxSeq <= lastRequestTxSeq {
+
+				// we have a new request that has not been successfully broadcasted
+				// and are at the last broadcastTxSeq (broadcastTxSeq == checkTxSeq in this case)
 				sendingCurrentRequest := broadcastTxSeq == lastRequestTxSeq && currentRequest != nil
 
+				// check if we have a previous response to check/retry/send for the broadcastTxSeq
 				response := inflight[broadcastTxSeq%s.inflightTxLimit]
-				// checkTxSeq was skipped due to another signer or previous deployments
-				// or currentRequest needs to be sent
+
+				// no response -- either checkTxSeq was skipped (untracked mempool tx), or
+				// we are signing a new transactions (currentRequest is not nil)
 				if response == nil {
 					// nothing to do if no response to retry and not sending a current request
 					if !sendingCurrentRequest {
@@ -210,10 +215,12 @@ func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) e
 						Err:     err,
 					}
 
-					// could not sign the current request
+					// could not sign the currentRequest
 					if response.Err != nil {
-						// clear invalid request, return response
+						// clear invalid request, since this is non-recoverable
 						currentRequest = nil
+
+						// response immediately with error
 						responses <- *response
 
 						// exit loop
