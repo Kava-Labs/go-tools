@@ -175,9 +175,9 @@ func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) e
 			}
 
 			// loop serves three purposes
-			//	- recover from dropped txs (broadcastTxSeq < lastRequestTxSeq)
-			//  - send new requests (currentRequest is set)
-			//	- send mempool heartbeat (currentRequest is nil)
+			//   - recover from dropped txs (broadcastTxSeq < lastRequestTxSeq)
+			//   - send new requests (currentRequest is set)
+			//   - send mempool heartbeat (currentRequest is nil)
 		BROADCAST_LOOP:
 			for broadcastTxSeq <= lastRequestTxSeq {
 				sendingCurrentRequest := broadcastTxSeq == lastRequestTxSeq && currentRequest != nil
