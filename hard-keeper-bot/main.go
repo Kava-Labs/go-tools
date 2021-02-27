@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -104,7 +105,7 @@ func main() {
 
 			// error will be set if response is not Code 0 (success) or Code 19 (already in mempool)
 			if response.Err != nil {
-				fmt.Printf("response error %s\n", response.Err)
+				fmt.Printf("response code: %d error %s\n", response.Result.Code, response.Err)
 				continue
 			}
 
@@ -115,15 +116,16 @@ func main() {
 	}()
 
 	// send messages to signer
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < 1000; i++ {
 		fmt.Printf("sending request %d\n", i)
 		requests <- MsgRequest{
 			Msgs: []sdk.Msg{
 				bank.NewMsgSend(GetAccAddress(privKey), config.KavaKeeperAddress, sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(1000)}}),
 			},
 			Fee: authtypes.StdFee{
-				Gas: 70000,
+				Gas: 75000,
 			},
+			Memo: strconv.Itoa(i),
 		}
 	}
 
