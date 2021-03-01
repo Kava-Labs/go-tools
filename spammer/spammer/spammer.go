@@ -6,10 +6,12 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
+	"github.com/cosmos/go-bip39"
 	"github.com/prometheus/common/log"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-sdk/keys"
+	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/x/cdp"
 	"github.com/kava-labs/kava/x/hard"
 
@@ -19,7 +21,7 @@ import (
 
 const (
 	CreateCDPTxDefaultGas = 500_000
-	MultisendTxGas        = 400_000
+	MultisendTxGas        = 250_000
 	TxDefaultGas          = 200_000
 )
 
@@ -35,13 +37,18 @@ type Spammer struct {
 }
 
 // NewSpammer returns a new instance of Spammer
-func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager,
-	accounts []keys.KeyManager) Spammer {
-	return Spammer{
+func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager, numAccs int) (Spammer, error) {
+	accounts, err := genNewAccounts(numAccs)
+	if err != nil {
+		return Spammer{}, err
+	}
+
+	spammer := Spammer{
 		client:      kavaClient,
 		distributor: distributor,
 		accounts:    accounts,
 	}
+	return spammer, nil
 }
 
 // ProcessMsg processes a spammer message consisting of an sdk.Msg and processing details
@@ -74,6 +81,10 @@ func (s Spammer) processMsgViaPrimaryAccount(message types.Message) error {
 			return fmt.Errorf("multisend msg must only have one input")
 		}
 		msgMultisend.Inputs[0].Address = s.distributor.GetAddr()
+
+		if len(s.accounts) == 0 {
+			return fmt.Errorf("spammer requires at least one account to distribute to")
+		}
 
 		// Calculate coins per address
 		perAddrCoins := sdk.NewCoins()
@@ -156,7 +167,8 @@ func (s Spammer) broadcastMsg(msg sdk.Msg, account keys.KeyManager) error {
 	var fee authtypes.StdFee
 	switch msg.Type() {
 	case "multisend":
-		fee = calculateFee(MultisendTxGas, DefaultGasPrice)
+		multisendTxGas := uint64(MultisendTxGas + (len(s.accounts) * 20000)) // Scale gas with num accounts
+		fee = calculateFee(multisendTxGas, DefaultGasPrice)
 	case "create_cdp":
 		fee = calculateFee(CreateCDPTxDefaultGas, DefaultGasPrice)
 	default:
@@ -221,4 +233,27 @@ func getAccountNumbers(client *client.KavaClient, fromAddr sdk.AccAddress) (uint
 		return 0, 0, err
 	}
 	return acc.GetSequence(), acc.GetAccountNumber(), nil
+}
+
+func genNewAccounts(count int) ([]keys.KeyManager, error) {
+	var kavaKeys []keys.KeyManager
+	for i := 0; i < count; i++ {
+		entropySeed, err := bip39.NewEntropy(256)
+		if err != nil {
+			return kavaKeys, err
+		}
+
+		mnemonic, err := bip39.NewMnemonic(entropySeed)
+		if err != nil {
+			return kavaKeys, err
+		}
+
+		keyManager, err := keys.NewMnemonicKeyManager(mnemonic, app.Bip44CoinType)
+		if err != nil {
+			return kavaKeys, err
+		}
+		kavaKeys = append(kavaKeys, keyManager)
+	}
+
+	return kavaKeys, nil
 }

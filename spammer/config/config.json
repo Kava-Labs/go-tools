@@ -1,7 +1,7 @@
 {
     "mnemonic": "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
     "rpc_endpoint": "http://localhost:26657",
-    "num_accounts": "10",
+    "num_accounts": "100",
     "messages": [
         {
             "msg": {
@@ -13,15 +13,15 @@
                             "coins": [
                                 {
                                     "denom": "bnb",
-                                    "amount": "2000000000"
+                                    "amount": "20000000000"
                                 },
                                 {
                                     "denom": "ukava",
-                                    "amount": "100000000"
+                                    "amount": "1000000000"
                                 },
                                 {
                                     "denom": "xrpb",
-                                    "amount": "11000000000000"
+                                    "amount": "110000000000000"
                                 }
                             ]
                         }
@@ -33,7 +33,7 @@
                 "order": "1",
                 "count": "1",
                 "from_primary_account": true,
-                "after_wait_seconds": "20"
+                "after_wait_seconds": "30"
             }
         },
         {
@@ -54,9 +54,9 @@
             },
             "processor": {
                 "order": "2",
-                "count": "5",
+                "count": "100",
                 "from_primary_account": false,
-                "after_wait_seconds": "20"
+                "after_wait_seconds": "30"
             }
         },
         {
@@ -78,9 +78,9 @@
             },
             "processor": {
                 "order": "3",
-                "count": "5",
+                "count": "100",
                 "from_primary_account": false,
-                "after_wait_seconds": "20"
+                "after_wait_seconds": "30"
             }
         },
         {
@@ -98,7 +98,7 @@
             },
             "processor": {
                 "order": "4",
-                "count": "5",
+                "count": "100",
                 "from_primary_account": false,
                 "after_wait_seconds": "0"
             }

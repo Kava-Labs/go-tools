@@ -9,7 +9,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "spammer",
-	Short: "spammer for sending a series of transactions to the Kava blockchain",
+	Short: "spammer for sending a series of messages to the Kava blockchain",
 }
 
 // Execute runs the root command

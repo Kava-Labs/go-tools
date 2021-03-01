@@ -7,7 +7,6 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	bip39 "github.com/cosmos/go-bip39"
 	"github.com/prometheus/common/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -45,19 +44,15 @@ var runCmd = &cobra.Command{
 			panic(err)
 		}
 
-		// Set up accounts
 		distributorKeyManager, err := keys.NewMnemonicKeyManager(cfg.Mnemonic, app.Bip44CoinType)
 		if err != nil {
 			panic(err)
 		}
 
-		// Set up accounts
-		accounts, err := genNewAccounts(cfg.NumAccounts)
+		spammerBot, err := spammer.NewSpammer(kavaClient, distributorKeyManager, cfg.NumAccounts)
 		if err != nil {
-			log.Errorf(err.Error())
+			panic(err)
 		}
-
-		spamBot := spammer.NewSpammer(kavaClient, distributorKeyManager, accounts)
 
 		// Order messages
 		messages := cfg.Messages
@@ -65,9 +60,10 @@ var runCmd = &cobra.Command{
 			return messages[i].Processor.Order < messages[j].Processor.Order
 		})
 
+		// Process messages
 		for i, message := range messages {
 			log.Infof(fmt.Sprintf("Processing message %d: %s...", i+1, message.Msg.Type()))
-			err = spamBot.ProcessMsg(message)
+			err = spammerBot.ProcessMsg(message)
 			if err != nil {
 				log.Errorf(err.Error())
 			}
@@ -80,27 +76,4 @@ var runCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(runCmd)
-}
-
-func genNewAccounts(count int) ([]keys.KeyManager, error) {
-	var kavaKeys []keys.KeyManager
-	for i := 0; i < count; i++ {
-		entropySeed, err := bip39.NewEntropy(256)
-		if err != nil {
-			return kavaKeys, err
-		}
-
-		mnemonic, err := bip39.NewMnemonic(entropySeed)
-		if err != nil {
-			return kavaKeys, err
-		}
-
-		keyManager, err := keys.NewMnemonicKeyManager(mnemonic, app.Bip44CoinType)
-		if err != nil {
-			return kavaKeys, err
-		}
-		kavaKeys = append(kavaKeys, keyManager)
-	}
-
-	return kavaKeys, nil
 }
