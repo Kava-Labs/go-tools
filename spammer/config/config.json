@@ -1,5 +1,5 @@
 {
-    "mnemonic": "fragile flip puzzle adjust mushroom gas minimum maid love coach brush cattle match analyst oak spell blur thunder unfair inch mother park toilet toddler",
+    "mnemonic": "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
     "rpc_endpoint": "http://localhost:26657",
     "num_accounts": "10",
     "messages": [
@@ -13,11 +13,15 @@
                             "coins": [
                                 {
                                     "denom": "bnb",
-                                    "amount": "10000000000"
+                                    "amount": "2000000000"
                                 },
                                 {
                                     "denom": "ukava",
-                                    "amount": "10000000000"
+                                    "amount": "100000000"
+                                },
+                                {
+                                    "denom": "xrpb",
+                                    "amount": "11000000000000"
                                 }
                             ]
                         }
@@ -38,19 +42,19 @@
                 "value": {
                     "sender": "",
                     "collateral": {
-                        "denom" : "ukava",
-                        "amount" : "100000000"
+                        "denom" : "xrpb",
+                        "amount" : "1000000000000"
                     },
                     "principal": {
                         "denom" : "usdx",
-                        "amount" : "50000000"
+                        "amount" : "260000000"
                     },
-                    "collateral_type": "ukava"
+                    "collateral_type": "xrpb-a"
                 }
             },
             "processor": {
                 "order": "2",
-                "count": "3",
+                "count": "5",
                 "from_primary_account": false,
                 "after_wait_seconds": "20"
             }
@@ -60,10 +64,16 @@
                 "type": "hard/MsgDeposit",
                 "value": {
                     "depositor": "",
-                    "amount": [{
-                        "denom" : "bnb",
-                        "amount" : "1000000000"
-                    }]
+                    "amount": [
+                        {
+                            "denom" : "bnb",
+                            "amount" : "200000000"
+                        },
+                        {
+                            "denom" : "xrpb",
+                            "amount" : "100000000000"
+                        }
+                    ]
                 }
             },
             "processor": {
@@ -78,10 +88,12 @@
                 "type": "hard/MsgWithdraw",
                 "value": {
                     "depositor": "",
-                    "amount": [{
-                        "denom" : "bnb",
-                        "amount" : "1000000000"
-                    }]
+                    "amount": [
+                        {
+                            "denom": "bnb",
+                            "amount": "100000000"
+                        }
+                    ]
                 }
             },
             "processor": {

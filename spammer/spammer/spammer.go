@@ -19,6 +19,7 @@ import (
 
 const (
 	CreateCDPTxDefaultGas = 500_000
+	MultisendTxGas        = 400_000
 	TxDefaultGas          = 200_000
 )
 
@@ -154,6 +155,8 @@ func (s Spammer) broadcastMsg(msg sdk.Msg, account keys.KeyManager) error {
 
 	var fee authtypes.StdFee
 	switch msg.Type() {
+	case "multisend":
+		fee = calculateFee(MultisendTxGas, DefaultGasPrice)
 	case "create_cdp":
 		fee = calculateFee(CreateCDPTxDefaultGas, DefaultGasPrice)
 	default:

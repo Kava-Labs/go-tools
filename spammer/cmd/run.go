@@ -20,16 +20,6 @@ import (
 	"github.com/kava-labs/kava/app"
 )
 
-// TODO: use these values in the config file
-var (
-	amountPerAddress = sdk.NewCoins(sdk.NewInt64Coin("xrpb", 200000000000), sdk.NewInt64Coin("ukava", 10000000), sdk.NewInt64Coin("hard", 50000000), sdk.NewInt64Coin("bnb", 200000000))
-	cdpCollateral    = sdk.NewInt64Coin("xrpb", 100000000000)
-	collateralType   = "xrpb-a"
-	cdpPrincipal     = sdk.NewInt64Coin("usdx", 260000000)
-	hardDeposit      = sdk.NewCoins(sdk.NewInt64Coin("usdx", 260000000), sdk.NewInt64Coin("xrpb", 100000000000), sdk.NewInt64Coin("bnb", 200000000))
-	hardBorrow       = sdk.NewCoins(sdk.NewInt64Coin("bnb", 100000000))
-)
-
 var runCmd = &cobra.Command{
 	Use:     "run",
 	Short:   "runs the spammer",
