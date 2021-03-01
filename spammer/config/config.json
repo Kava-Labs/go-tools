@@ -1,5 +1,95 @@
 {
-    "mnemonic": "",
-    "rpc_endpoint": "http://3.236.68.204:26657",
-    "num_accounts": 1000
+    "mnemonic": "fragile flip puzzle adjust mushroom gas minimum maid love coach brush cattle match analyst oak spell blur thunder unfair inch mother park toilet toddler",
+    "rpc_endpoint": "http://localhost:26657",
+    "num_accounts": "10",
+    "messages": [
+        {
+            "msg": {
+                "type": "cosmos-sdk/MsgMultiSend",
+                "value": {
+                    "inputs": [
+                        {
+                            "address": "",
+                            "coins": [
+                                {
+                                    "denom": "bnb",
+                                    "amount": "10000000000"
+                                },
+                                {
+                                    "denom": "ukava",
+                                    "amount": "10000000000"
+                                }
+                            ]
+                        }
+                    ],
+                    "outputs": []
+                }
+            },
+            "processor": {
+                "order": "1",
+                "count": "1",
+                "from_primary_account": true,
+                "after_wait_seconds": "20"
+            }
+        },
+        {
+            "msg": {
+                "type": "cdp/MsgCreateCDP",
+                "value": {
+                    "sender": "",
+                    "collateral": {
+                        "denom" : "ukava",
+                        "amount" : "100000000"
+                    },
+                    "principal": {
+                        "denom" : "usdx",
+                        "amount" : "50000000"
+                    },
+                    "collateral_type": "ukava"
+                }
+            },
+            "processor": {
+                "order": "2",
+                "count": "3",
+                "from_primary_account": false,
+                "after_wait_seconds": "20"
+            }
+        },
+        {
+            "msg": {
+                "type": "hard/MsgDeposit",
+                "value": {
+                    "depositor": "",
+                    "amount": [{
+                        "denom" : "bnb",
+                        "amount" : "1000000000"
+                    }]
+                }
+            },
+            "processor": {
+                "order": "3",
+                "count": "5",
+                "from_primary_account": false,
+                "after_wait_seconds": "20"
+            }
+        },
+        {
+            "msg": {
+                "type": "hard/MsgWithdraw",
+                "value": {
+                    "depositor": "",
+                    "amount": [{
+                        "denom" : "bnb",
+                        "amount" : "1000000000"
+                    }]
+                }
+            },
+            "processor": {
+                "order": "4",
+                "count": "5",
+                "from_primary_account": false,
+                "after_wait_seconds": "0"
+            }
+        }
+    ]
 }

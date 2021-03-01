@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"sort"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -18,14 +20,7 @@ import (
 	"github.com/kava-labs/kava/app"
 )
 
-// const flagInFile = "file"
-
-const (
-	mnemonic    = ""
-	rpcAddr     = "http://3.236.68.204:26657"
-	numAccounts = 1000
-)
-
+// TODO: use these values in the config file
 var (
 	amountPerAddress = sdk.NewCoins(sdk.NewInt64Coin("xrpb", 200000000000), sdk.NewInt64Coin("ukava", 10000000), sdk.NewInt64Coin("hard", 50000000), sdk.NewInt64Coin("bnb", 200000000))
 	cdpCollateral    = sdk.NewInt64Coin("xrpb", 100000000000)
@@ -40,12 +35,6 @@ var runCmd = &cobra.Command{
 	Short:   "runs the spammer",
 	Example: "run",
 	Run: func(cmd *cobra.Command, args []string) {
-		// Parse flags
-		// filePath := viper.GetString(flagInFile)
-		// if strings.TrimSpace(filePath) == "" {
-		// 	log.Fatal("invalid --file flag")
-		// }
-
 		configPath := pflag.String("config", config.DefaultConfigPath, "path to config file")
 		pflag.Parse()
 
@@ -55,7 +44,7 @@ var runCmd = &cobra.Command{
 		cdc := app.MakeCodec()
 
 		// Load config
-		cfg, err := config.GetConfig(*configPath)
+		cfg, err := config.GetConfig(cdc, *configPath)
 		if err != nil {
 			panic(err)
 		}
@@ -80,51 +69,27 @@ var runCmd = &cobra.Command{
 
 		spamBot := spammer.NewSpammer(kavaClient, distributorKeyManager, accounts)
 
-		// Distribute coins to spammer's accounts
-		err = spamBot.DistributeCoins(amountPerAddress)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
+		// Order messages
+		messages := cfg.Messages
+		sort.Slice(messages, func(i, j int) bool {
+			return messages[i].Processor.Order < messages[j].Processor.Order
+		})
 
-		// Wait for the distribution tx to be confirmed
-		time.Sleep(20 * time.Second)
+		for i, message := range messages {
+			log.Infof(fmt.Sprintf("Processing message %d: %s...", i+1, message.Msg.Type()))
+			err = spamBot.ProcessMsg(message)
+			if err != nil {
+				log.Errorf(err.Error())
+			}
 
-		// Each account sends a CDP creation tx
-		err = spamBot.OpenCDPs(cdpCollateral, cdpPrincipal, collateralType)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-
-		// Wait for the create CDP txs to be confirmed
-		time.Sleep(120 * time.Second)
-
-		// Each account sends a Hard deposit tx
-		err = spamBot.HardDeposits(hardDeposit)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-
-		// Wait for the Deposit txs to be confirmed
-		time.Sleep(45 * time.Second)
-
-		// Each account sends a Hard borrow tx
-		err = spamBot.HardBorrows(hardBorrow)
-		if err != nil {
-			log.Errorf(err.Error())
+			log.Infof(fmt.Sprintf("Waiting %d seconds...", message.Processor.AfterWaitSeconds))
+			time.Sleep(time.Duration(message.Processor.AfterWaitSeconds) * time.Second)
 		}
 	},
 }
 
-// init : prepares required flags and adds them to the start cmd
 func init() {
 	rootCmd.AddCommand(runCmd)
-
-	// // Add flags and mark as required
-	// startCmd.PersistentFlags().String(flagInFile, "", "Path to start file")
-	// startCmd.MarkFlagRequired(flagInFile)
-
-	// // Bind flags
-	// viper.BindPFlag(flagInFile, startCmd.Flag(flagInFile))
 }
 
 func genNewAccounts(count int) ([]keys.KeyManager, error) {

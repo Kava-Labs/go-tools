@@ -1,21 +1,25 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/prometheus/common/log"
+
+	"github.com/kava-labs/go-tools/spammer/types"
 )
 
+// DefaultConfigPath is the default config path
 const DefaultConfigPath = "./config/config.json"
 
 // Config defines chain connections and mnemonics
 type Config struct {
-	Mnemonic    string `toml:"mnemonic" json:"mnemonic"`
-	RPCEndpoint string `toml:"rpc_endpoint" json:"rpc_endpoint"`
-	NumAccounts int    `toml:"num_accounts" json:"num_accounts"`
+	Mnemonic    string         `toml:"mnemonic" json:"mnemonic"`
+	RPCEndpoint string         `toml:"rpc_endpoint" json:"rpc_endpoint"`
+	NumAccounts int            `toml:"num_accounts" json:"num_accounts"`
+	Messages    types.Messages `toml:"messages" json:"messages"`
 }
 
 // NewConfig initializes a new empty config
@@ -24,14 +28,15 @@ func NewConfig() *Config {
 		Mnemonic:    "",
 		RPCEndpoint: "",
 		NumAccounts: 0,
+		Messages:    nil,
 	}
 }
 
 // GetConfig loads and validates a configuration file, returning the Config struct if valid
-func GetConfig(filePath string) (*Config, error) {
+func GetConfig(cdc *codec.Codec, filePath string) (*Config, error) {
 	var config Config
 
-	err := loadConfig(filePath, &config)
+	err := loadConfig(cdc, filePath, &config)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +49,7 @@ func GetConfig(filePath string) (*Config, error) {
 	return &config, nil
 }
 
-func loadConfig(file string, config *Config) error {
+func loadConfig(cdc *codec.Codec, file string, config *Config) error {
 	ext := filepath.Ext(file)
 	if ext != ".json" {
 		return fmt.Errorf("config file extention must be .json")
@@ -58,12 +63,9 @@ func loadConfig(file string, config *Config) error {
 	fpClean := filepath.Clean(fp)
 	log.Infof("Loading configuration path %s", fpClean)
 
-	f, err := os.Open(fpClean)
+	fileContents, _ := ioutil.ReadFile(fpClean)
+	err = cdc.UnmarshalJSON([]byte(fileContents), &config)
 	if err != nil {
-		return err
-	}
-
-	if err = json.NewDecoder(f).Decode(&config); err != nil {
 		return err
 	}
 
@@ -72,13 +74,17 @@ func loadConfig(file string, config *Config) error {
 
 func (c *Config) validate() error {
 	if c.Mnemonic == "" {
-		return fmt.Errorf("required field Core.Mnemonic is empty")
+		return fmt.Errorf("required field Mnemonic is empty")
 	}
 	if c.RPCEndpoint == "" {
-		return fmt.Errorf("required field Core.RPCEndpoint is empty")
+		return fmt.Errorf("required field RPCEndpoint is empty")
 	}
 	if c.NumAccounts < 0 {
-		return fmt.Errorf("field Core.NumAccounts must have a positive integer value")
+		return fmt.Errorf("required field NumAccounts must have a positive integer value")
+	}
+	err := c.Messages.Validate()
+	if err != nil {
+		return err
 	}
 	return nil
 }

@@ -2,7 +2,6 @@ package spammer
 
 import (
 	"fmt"
-	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -15,15 +14,12 @@ import (
 	"github.com/kava-labs/kava/x/hard"
 
 	"github.com/kava-labs/go-tools/spammer/client"
+	"github.com/kava-labs/go-tools/spammer/types"
 )
 
 const (
-	CreateCDPTxDefaultGas   = 500_000
-	DepositHardTxDefaultGas = 200_000
-	BorrowHardTxDefaultGas  = 200_000
-	// TxConfirmationTimeout is the longest time to wait for a tx confirmation before giving up
-	TxConfirmationTimeout      = 3 * 60 * time.Second
-	TxConfirmationPollInterval = 2 * time.Second
+	CreateCDPTxDefaultGas = 500_000
+	TxDefaultGas          = 200_000
 )
 
 var (
@@ -38,7 +34,8 @@ type Spammer struct {
 }
 
 // NewSpammer returns a new instance of Spammer
-func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager, accounts []keys.KeyManager) Spammer {
+func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager,
+	accounts []keys.KeyManager) Spammer {
 	return Spammer{
 		client:      kavaClient,
 		distributor: distributor,
@@ -46,37 +43,106 @@ func NewSpammer(kavaClient *client.KavaClient, distributor keys.KeyManager, acco
 	}
 }
 
-// DistributeCoins distributes coins from the spammer's distributor account to the general accounts
-func (s Spammer) DistributeCoins(perAddrAmount sdk.Coins) error {
-	log.Infof("Distributing %s to each account...", perAddrAmount)
-
-	var inputs []bank.Input
-	var outputs []bank.Output
-
-	// Construct inputs
-	totalDistCoins := sdk.NewCoins()
-	for _, coin := range perAddrAmount {
-		newAmount := coin.Amount.Mul(sdk.NewInt(int64(len(s.accounts))))
-		totalCoin := sdk.NewCoin(coin.Denom, newAmount)
-		totalDistCoins = totalDistCoins.Add(totalCoin)
+// ProcessMsg processes a spammer message consisting of an sdk.Msg and processing details
+func (s Spammer) ProcessMsg(message types.Message) error {
+	if message.Processor.FromPrimaryAccount {
+		err := s.processMsgViaPrimaryAccount(message)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
-	// TODO: check that address has enough coins
-	// if totalDistCoins.IsAllLT(senderAcc.Coins) {
-	// 	return fmt.Errorf(fmt.Sprintf("sender %s has %s coins, needs %s"), s.client.Keybase.GetAddr(), senderAcc.Coins, totalDistCoins)
-	// }
+	err := s.processMsgViaSubAccounts(message)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-	input := bank.NewInput(s.distributor.GetAddr(), totalDistCoins)
-	inputs = append(inputs, input)
+func (s Spammer) processMsgViaPrimaryAccount(message types.Message) error {
+	var msg sdk.Msg
+	switch message.Msg.Type() {
+	case "multisend": // Multisend loads all accounts
+		msgMultisend, ok := message.Msg.(bank.MsgMultiSend)
+		if !ok {
+			return fmt.Errorf("invalid message structure: %s", message.Msg.Type())
+		}
 
-	// Construct outputs
-	for _, account := range s.accounts {
-		output := bank.NewOutput(account.GetAddr(), perAddrAmount)
-		outputs = append(outputs, output)
+		if len(msgMultisend.Inputs) != 1 {
+			return fmt.Errorf("multisend msg must only have one input")
+		}
+		msgMultisend.Inputs[0].Address = s.distributor.GetAddr()
+
+		// Calculate coins per address
+		perAddrCoins := sdk.NewCoins()
+		for _, coin := range msgMultisend.Inputs[0].Coins {
+			addrAmt := coin.Amount.Quo(sdk.NewInt(int64(len(s.accounts))))
+			addrCoin := sdk.NewCoin(coin.Denom, addrAmt)
+			perAddrCoins = perAddrCoins.Add(addrCoin)
+		}
+
+		// Create outputs for each account
+		var outputs []bank.Output
+		for _, account := range s.accounts {
+			output := bank.NewOutput(account.GetAddr(), perAddrCoins)
+			outputs = append(outputs, output)
+		}
+		msgMultisend.Outputs = outputs
+
+		msg = msgMultisend
+	default:
+		return fmt.Errorf("unsupported message type: %s", message.Msg.Type())
 	}
 
-	// Construct MsgMultiSend
-	msg := bank.NewMsgMultiSend(inputs, outputs)
+	err := s.broadcastMsg(msg, s.distributor)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s Spammer) processMsgViaSubAccounts(message types.Message) error {
+	i := 0
+	for i < message.Processor.Count {
+		account := s.accounts[i]
+		var msg sdk.Msg
+		switch message.Msg.Type() {
+		case "create_cdp":
+			msgCreateCdp, ok := message.Msg.(cdp.MsgCreateCDP)
+			if !ok {
+				return fmt.Errorf("invalid message structure: %s", message.Msg.Type())
+			}
+			msgCreateCdp.Sender = account.GetAddr()
+			msg = msgCreateCdp
+		case "hard_deposit":
+			msgHardDeposit, ok := message.Msg.(hard.MsgDeposit)
+			if !ok {
+				return fmt.Errorf("invalid message structure: %s", message.Msg.Type())
+			}
+			msgHardDeposit.Depositor = account.GetAddr()
+			msg = msgHardDeposit
+		case "hard_withdraw":
+			msgHardWithdraw, ok := message.Msg.(hard.MsgWithdraw)
+			if !ok {
+				return fmt.Errorf("invalid message structure: %s", message.Msg.Type())
+			}
+			msgHardWithdraw.Depositor = account.GetAddr()
+			msg = msgHardWithdraw
+		default:
+			return fmt.Errorf("unsupported message type: %s", message.Msg.Type())
+		}
+
+		err := s.broadcastMsg(msg, account)
+		if err != nil {
+			return err
+		}
+		i++
+	}
+	return nil
+}
+
+func (s Spammer) broadcastMsg(msg sdk.Msg, account keys.KeyManager) error {
 	if err := msg.ValidateBasic(); err != nil {
 		return fmt.Errorf("msg basic validation failed: \n%v", err)
 	}
@@ -86,219 +152,51 @@ func (s Spammer) DistributeCoins(perAddrAmount sdk.Coins) error {
 		return err
 	}
 
+	var fee authtypes.StdFee
+	switch msg.Type() {
+	case "create_cdp":
+		fee = calculateFee(CreateCDPTxDefaultGas, DefaultGasPrice)
+	default:
+		fee = calculateFee(TxDefaultGas, DefaultGasPrice)
+	}
+
 	signMsg := &authtypes.StdSignMsg{
 		ChainID:       chainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           calculateFee(20000000, DefaultGasPrice),
+		Fee:           fee,
 		Msgs:          []sdk.Msg{msg},
 		Memo:          "",
 	}
 
-	sequence, accountNumber, err := getAccountNumbers(s.client, s.distributor.GetAddr())
+	sequence, accountNumber, err := getAccountNumbers(s.client, account.GetAddr())
 	if err != nil {
 		return err
 	}
 	signMsg.Sequence = sequence
 	signMsg.AccountNumber = accountNumber
 
-	signedMsg, err := s.distributor.Sign(*signMsg, s.client.Cdc)
+	signedMsg, err := account.Sign(*signMsg, s.client.Cdc)
 	if err != nil {
 		return err
 	}
 	tx := tmtypes.Tx(signedMsg)
+
+	maxTxLength := 1024 * 1024
+	if len(tx) > maxTxLength {
+		return fmt.Errorf("the tx data exceeds max length %d ", maxTxLength)
+	}
 
 	// Broadcast msg
 	res, err := s.client.Http.BroadcastTxAsync(tx)
 	if err != nil {
 		return err
 	}
-
-	// TODO:
-	// if res.CheckTx.Code != 0 {
-	// 	return fmt.Errorf("\nres.Code: %d\nLog:%s", res.CheckTx.Code, res.CheckTx.Log)
-	// }
-	log.Infof("Sent tx %s", res.Hash)
-	return nil
-}
-
-// OpenCDPs executes a series of CDP creations
-func (s Spammer) OpenCDPs(collateralCoin, principalCoin sdk.Coin, collateralType string) error {
-
-	log.Infof("\nOpening CDPs with %s collateral, %s principal on each account...", collateralCoin, principalCoin)
-
-	// Open CDPs
-	for _, account := range s.accounts {
-		fromAddr := account.GetAddr()
-
-		msg := cdp.NewMsgCreateCDP(fromAddr, collateralCoin, principalCoin, collateralType)
-		if err := msg.ValidateBasic(); err != nil {
-			return fmt.Errorf("msg basic validation failed: \n%v", err)
-		}
-
-		chainID, err := s.client.GetChainID()
-		if err != nil {
-			return err
-		}
-
-		signMsg := &authtypes.StdSignMsg{
-			ChainID:       chainID,
-			AccountNumber: 0,
-			Sequence:      0,
-			Fee:           calculateFee(500000, DefaultGasPrice),
-			Msgs:          []sdk.Msg{msg},
-			Memo:          "",
-		}
-
-		sequence, accountNumber, err := getAccountNumbers(s.client, fromAddr)
-		if err != nil {
-			return err
-		}
-		signMsg.Sequence = sequence
-		signMsg.AccountNumber = accountNumber
-
-		signedMsg, err := account.Sign(*signMsg, s.client.Cdc)
-		if err != nil {
-			return err
-		}
-		tx := tmtypes.Tx(signedMsg)
-
-		maxTxLength := 1024 * 1024
-		if len(tx) > maxTxLength {
-			return fmt.Errorf("the tx data exceeds max length %d ", maxTxLength)
-		}
-
-		// Broadcast msg
-		res, err := s.client.Http.BroadcastTxAsync(tx)
-		if err != nil {
-			return err
-		}
-		if res.Code != 0 {
-			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
-		}
-		log.Infof("Sent tx %s", res.Hash)
+	if res.Code != 0 {
+		return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
 	}
-	log.Infof("Successfully opened %d CDPs!", len(s.accounts))
-	return nil
-}
+	log.Infof("\tSent tx %s", res.Hash)
 
-// HardDeposits executes a series of Hard module deposits
-func (s Spammer) HardDeposits(depositCoins sdk.Coins) error {
-
-	log.Infof("\nSupplying %s to Hard on each account...", depositCoins)
-
-	// Open CDPs
-	for _, account := range s.accounts {
-		fromAddr := account.GetAddr()
-
-		msg := hard.NewMsgDeposit(fromAddr, depositCoins)
-		if err := msg.ValidateBasic(); err != nil {
-			return fmt.Errorf("msg basic validation failed: \n%v", err)
-		}
-
-		chainID, err := s.client.GetChainID()
-		if err != nil {
-			return err
-		}
-
-		signMsg := &authtypes.StdSignMsg{
-			ChainID:       chainID,
-			AccountNumber: 0,
-			Sequence:      0,
-			Fee:           calculateFee(DepositHardTxDefaultGas, DefaultGasPrice),
-			Msgs:          []sdk.Msg{msg},
-			Memo:          "",
-		}
-
-		sequence, accountNumber, err := getAccountNumbers(s.client, fromAddr)
-		if err != nil {
-			return err
-		}
-		signMsg.Sequence = sequence
-		signMsg.AccountNumber = accountNumber
-
-		signedMsg, err := account.Sign(*signMsg, s.client.Cdc)
-		if err != nil {
-			return err
-		}
-		tx := tmtypes.Tx(signedMsg)
-
-		maxTxLength := 1024 * 1024
-		if len(tx) > maxTxLength {
-			return fmt.Errorf("the tx data exceeds max length %d ", maxTxLength)
-		}
-
-		// Broadcast msg
-		res, err := s.client.Http.BroadcastTxAsync(tx)
-		if err != nil {
-			return err
-		}
-		if res.Code != 0 {
-			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
-		}
-		log.Infof("Sent tx %s", res.Hash)
-	}
-	log.Infof("Successfully supplied on %d accounts!", len(s.accounts))
-	return nil
-}
-
-// HardBorrows executes a series of Hard module borrows
-func (s Spammer) HardBorrows(depositCoins sdk.Coins) error {
-
-	log.Infof("\nBorrowing %s to Hard on each account...", depositCoins)
-
-	// Open CDPs
-	for _, account := range s.accounts {
-		fromAddr := account.GetAddr()
-
-		msg := hard.NewMsgBorrow(fromAddr, depositCoins)
-		if err := msg.ValidateBasic(); err != nil {
-			return fmt.Errorf("msg basic validation failed: \n%v", err)
-		}
-
-		chainID, err := s.client.GetChainID()
-		if err != nil {
-			return err
-		}
-
-		signMsg := &authtypes.StdSignMsg{
-			ChainID:       chainID,
-			AccountNumber: 0,
-			Sequence:      0,
-			Fee:           calculateFee(DepositHardTxDefaultGas, DefaultGasPrice),
-			Msgs:          []sdk.Msg{msg},
-			Memo:          "",
-		}
-
-		sequence, accountNumber, err := getAccountNumbers(s.client, fromAddr)
-		if err != nil {
-			return err
-		}
-		signMsg.Sequence = sequence
-		signMsg.AccountNumber = accountNumber
-
-		signedMsg, err := account.Sign(*signMsg, s.client.Cdc)
-		if err != nil {
-			return err
-		}
-		tx := tmtypes.Tx(signedMsg)
-
-		maxTxLength := 1024 * 1024
-		if len(tx) > maxTxLength {
-			return fmt.Errorf("the tx data exceeds max length %d ", maxTxLength)
-		}
-
-		// Broadcast msg
-		res, err := s.client.Http.BroadcastTxAsync(tx)
-		if err != nil {
-			return err
-		}
-		if res.Code != 0 {
-			return fmt.Errorf("\nres.Code: %d\nLog:%s", res.Code, res.Log)
-		}
-		log.Infof("Sent tx %s", res.Hash)
-	}
-	log.Infof("Successfully borrowed on %d accounts!", len(s.accounts))
 	return nil
 }
 
