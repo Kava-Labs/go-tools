@@ -87,10 +87,9 @@ func main() {
 
 	// channels to communicate with signer
 	requests := make(chan MsgRequest)
-	responses := make(chan MsgResponse)
 
 	// signer starts it's own go routines and returns
-	err = signer.Run(requests, responses)
+	responses, err := signer.Run(requests)
 	if err != nil {
 		logger.Error("failed to start signer")
 		logger.Error(err.Error())

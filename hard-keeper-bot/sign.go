@@ -55,10 +55,10 @@ func NewSigner(client BroadcastClient, privKey tmcrypto.PrivKey, inflightTxLimit
 	}
 }
 
-func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) error {
+func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 	chainID, err := s.client.GetChainID()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// poll account state in it's own goroutine
 	// and send status updates to the signing goroutine
@@ -76,6 +76,7 @@ func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) e
 		}
 	}()
 
+	responses := make(chan MsgResponse)
 	go func() {
 		// wait until account is loaded to start signing
 		account := <-accountState
@@ -331,7 +332,7 @@ func (s *Signer) Run(requests <-chan MsgRequest, responses chan<- MsgResponse) e
 		}
 	}()
 
-	return nil
+	return responses, nil
 }
 
 func GetAccAddress(privKey tmcrypto.PrivKey) sdk.AccAddress {
