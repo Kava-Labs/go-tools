@@ -124,6 +124,11 @@ bnb:
 
 type Addresses struct {
 	Kava struct {
+		Validators []struct {
+			Address    sdk.AccAddress `json:"address"`
+			Mnemonic   string         `json:"mnemonic"`
+			ValAddress sdk.ValAddress `json:"val_address"`
+		} `json:"validators"`
 		Deputys struct {
 			Bnb struct {
 				HotWallet struct {
@@ -156,6 +161,11 @@ type Addresses struct {
 		} `json:"users"`
 	} `json:"kava"`
 	Bnb struct {
+		Validators []struct {
+			Address    types.AccAddress `json:"address"`
+			Mnemonic   string           `json:"mnemonic"`
+			ValAddress types.ValAddress `json:"val_address"`
+		} `json:"validators"`
 		Deputys struct {
 			Bnb struct {
 				HotWallet struct {
