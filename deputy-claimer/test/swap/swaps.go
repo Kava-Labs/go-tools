@@ -77,7 +77,7 @@ type CrossChainSwap struct {
 }
 
 // NewBnbToKavaSwap creates valid bnb and kava swaps to move assets from bnb to kava chains.
-func NewBnbToKavaSwap(senderMnemonic string, recipient sdk.AccAddress, amount SwapAmount, kavaDeputyMnemonic string, bnbDeputyAddress types.AccAddress, rndHash []byte, timestamp int64, heightSpan SwapHeightSpan, rndNum []byte) CrossChainSwap {
+func NewBnbToKavaSwap(senderMnemonic string, recipient sdk.AccAddress, amount Amount, kavaDeputyMnemonic string, bnbDeputyAddress types.AccAddress, rndHash []byte, timestamp int64, heightSpan HeightSpan, rndNum []byte) CrossChainSwap {
 	return CrossChainSwap{
 		BnbSwap: NewBnbSwap(
 			senderMnemonic,
@@ -104,7 +104,7 @@ func NewBnbToKavaSwap(senderMnemonic string, recipient sdk.AccAddress, amount Sw
 }
 
 // NewKavaToBnbSwap creates valid kava and bnb swaps to move assets from kava to bnb chains.
-func NewKavaToBnbSwap(senderMnemonic string, recipient types.AccAddress, amount SwapAmount, bnbDeputyMnemonic string, kavaDeputyAddress sdk.AccAddress, rndHash []byte, timestamp int64, heightSpan SwapHeightSpan, rndNum []byte) CrossChainSwap {
+func NewKavaToBnbSwap(senderMnemonic string, recipient types.AccAddress, amount Amount, bnbDeputyMnemonic string, kavaDeputyAddress sdk.AccAddress, rndHash []byte, timestamp int64, heightSpan HeightSpan, rndNum []byte) CrossChainSwap {
 	return CrossChainSwap{
 		KavaSwap: NewKavaSwap(
 			senderMnemonic,
@@ -130,12 +130,12 @@ func NewKavaToBnbSwap(senderMnemonic string, recipient types.AccAddress, amount 
 	}
 }
 
-type SwapAmount struct {
+type Amount struct {
 	Kava sdk.Coins
 	Bnb  types.Coins
 }
 
-type SwapHeightSpan struct {
+type HeightSpan struct {
 	Kava, Bnb int64
 }
 

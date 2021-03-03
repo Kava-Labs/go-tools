@@ -35,7 +35,7 @@ func TestClaimBnb(t *testing.T) {
 
 	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
 	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
-	swapBuilder := swap.NewDefaultSwapBuilder(
+	swapBuilder := swap.NewDefaultBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
 	)
@@ -90,7 +90,7 @@ func TestClaimKava(t *testing.T) {
 
 	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
 	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
-	swapBuilder := swap.NewDefaultSwapBuilder(
+	swapBuilder := swap.NewDefaultBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
 	)
