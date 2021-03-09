@@ -3,12 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	bank "github.com/cosmos/cosmos-sdk/x/bank"
 	kava "github.com/kava-labs/kava/app"
 	"github.com/tendermint/tendermint/libs/log"
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
@@ -62,8 +61,11 @@ func main() {
 	//
 	cdc := kava.MakeCodec()
 
+	// client for fetching borrower info
+	liquidationClient := NewRpcLiquidationClient(http, cdc)
+
 	//
-	// Test Message Signing
+	// client for broadcasting txs
 	//
 	broadcastClient := NewRpcBroadcastClient(http, cdc)
 	mnemonic := "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe"
@@ -83,7 +85,8 @@ func main() {
 	}
 
 	// create signer, needs client, privkey, and inflight limit (max limit for txs in mempool)
-	signer := NewSigner(broadcastClient, privKey, 500)
+	// use 10 for kava-4
+	signer := NewSigner(broadcastClient, privKey, 10)
 
 	// channels to communicate with signer
 	requests := make(chan MsgRequest)
@@ -114,18 +117,33 @@ func main() {
 		}
 	}()
 
-	// send messages to signer
-	for i := 0; i < 1000; i++ {
-		fmt.Printf("sending request %d\n", i)
-		requests <- MsgRequest{
-			Msgs: []sdk.Msg{
-				bank.NewMsgSend(GetAccAddress(privKey), config.KavaKeeperAddress, sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(1000)}}),
-			},
-			Fee: authtypes.StdFee{
-				Gas: 75000,
-			},
-			Memo: strconv.Itoa(i),
+	for {
+		// fetch asset and position data using client
+		data, err := GetPositionData(liquidationClient)
+		if err != nil {
+			logger.Error(err.Error())
 		}
+
+		// calculate borrowers to liquidate from asset and position data
+		borrowersToLiquidate := GetBorrowersToLiquidate(data)
+
+		// create liquidation msgs
+		msgs := CreateLiquidationMsgs(config.KavaKeeperAddress, borrowersToLiquidate)
+
+		// create liquidation transactions
+		for _, msg := range msgs {
+			requests <- MsgRequest{
+				Msgs: []sdk.Msg{msg},
+				Fee: authtypes.StdFee{
+					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(50000)}},
+					Gas:    200000,
+				},
+				Memo: "",
+			}
+		}
+
+		// wait for next interval
+		time.Sleep(config.KavaLiquidationInterval)
 	}
 
 	select {}
