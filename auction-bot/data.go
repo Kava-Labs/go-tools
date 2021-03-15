@@ -6,6 +6,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
+	cdptypes "github.com/kava-labs/kava/x/cdp/types"
+	hardtypes "github.com/kava-labs/kava/x/hard/types"
 )
 
 type AssetInfo struct {
@@ -42,16 +44,26 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 		return nil, err
 	}
 
-	markets, err := client.GetMarkets(height)
+	cdpMarkets, err := client.GetMarkets(height)
 	if err != nil {
 		return nil, err
 	}
 
+	moneyMarkets, err := client.GetMoneyMarkets(height)
+	if err != nil {
+		return nil, err
+	}
+
+	markets := deduplicateMarkets(cdpMarkets, moneyMarkets)
+
+	fmt.Printf("%s\n", markets)
 	// map price data
 	priceData := make(map[string]sdk.Dec)
 	for _, price := range prices {
 		priceData[price.MarketID] = price.Price
 	}
+	fmt.Printf(`%s
+	`, priceData)
 
 	// loop markets and create AssetInfo
 	assetInfo := make(map[string]AssetInfo)
@@ -60,25 +72,50 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 		if !ok {
 			return nil, fmt.Errorf("no price for market id %s", market.SpotMarketID)
 		}
-		conversionFactor := market.ConversionFactor
-		i := big.NewInt(10)
-		i.Exp(i, conversionFactor.BigInt(), nil)
-
 		assetInfo[market.Denom] = AssetInfo{
 			Price:            price,
-			ConversionFactor: sdk.NewIntFromBigInt(i),
+			ConversionFactor: market.ConversionFactor,
 		}
 	}
-
-	usdxInfo := AssetInfo{
-		Price:            sdk.OneDec(),
-		ConversionFactor: sdk.NewInt(1000000),
-	}
-	assetInfo["usdx"] = usdxInfo
+	fmt.Printf(`%s
+	`, assetInfo)
 
 	return &AuctionData{
 		Assets:       assetInfo,
 		Auctions:     auctions,
 		BidIncrement: sdk.MustNewDecFromStr("0.01"), // TODO could fetch increment from chain
 	}, nil
+}
+
+func deduplicateMarkets(cdpMarkets cdptypes.CollateralParams, hardMarkets hardtypes.MoneyMarkets) []auctionMarket {
+	seenDenoms := make(map[string]bool)
+
+	markets := []auctionMarket{}
+
+	for _, cdpMarket := range cdpMarkets {
+		_, seen := seenDenoms[cdpMarket.Denom]
+		if seen {
+			continue
+		}
+		conversionFactor := cdpMarket.ConversionFactor
+		i := big.NewInt(10)
+		i.Exp(i, conversionFactor.BigInt(), nil)
+		markets = append(markets, auctionMarket{cdpMarket.Denom, cdpMarket.SpotMarketID, sdk.NewIntFromBigInt(i)})
+		seenDenoms[cdpMarket.Denom] = true
+	}
+	for _, hardMarket := range hardMarkets {
+		_, seen := seenDenoms[hardMarket.Denom]
+		if seen {
+			continue
+		}
+		markets = append(markets, auctionMarket{hardMarket.Denom, hardMarket.SpotMarketID, hardMarket.ConversionFactor})
+		seenDenoms[hardMarket.Denom] = true
+	}
+	return markets
+}
+
+type auctionMarket struct {
+	Denom            string
+	SpotMarketID     string
+	ConversionFactor sdk.Int
 }

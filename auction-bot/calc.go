@@ -17,6 +17,7 @@ type AuctionInfos []AuctionInfo
 
 func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionInfos {
 	var auctionBidInfos AuctionInfos
+	fmt.Printf("Checking %d auctions:\n", len(data.Auctions))
 	for _, auction := range data.Auctions {
 		switch auction.GetType() {
 		case auctiontypes.CollateralAuctionType:
@@ -135,23 +136,37 @@ func calculateProposedBid(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid Asset
 }
 
 func calculateProposedLot(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid AssetInfo, margin, increment sdk.Dec) (sdk.Coin, bool) {
+	fmt.Printf(`Calculating proposed lot:
+	incoming lot: %s
+	incoming max bid: %s
+	`, lot, maxbid,
+	)
 	bidUSDValue := calculateUSDValue(maxbid, assetInfoBid)
 	if bidUSDValue.IsZero() {
+		fmt.Printf("Exiting because of zero bid USD value\n")
 		return sdk.Coin{}, false
 	}
+	incrementsToTry := []sdk.Dec{d("0.5"), d("0.4"), d("0.3"), d("0.2"), d("0.1"), d("0.05"), d("0.04"), d("0.03"), d("0.02"), increment}
 
-	proposedLotInt := lot.Amount.ToDec().Mul(sdk.OneDec().Sub(increment)).TruncateInt()
-	proposedLotCoin := sdk.NewCoin(lot.Denom, proposedLotInt)
-	proposedLotUSDValue := calculateUSDValue(proposedLotCoin, assetInfoLot)
-	fmt.Printf(`
-	Proposed Lot: %s
-	Proposed Lot USD Value: %s
-	Bid USD Value: %s
-	Proposed Bid Margin: %s
-	`, proposedLotCoin, proposedLotUSDValue, bidUSDValue, sdk.OneDec().Sub((bidUSDValue.Quo(proposedLotUSDValue))))
-	if sdk.OneDec().Sub((bidUSDValue.Quo(proposedLotUSDValue))).GTE(margin) {
-		return proposedLotCoin, true
+	for _, lotIncrement := range incrementsToTry {
+
+		proposedLotInt := lot.Amount.ToDec().Mul(sdk.OneDec().Sub(lotIncrement)).TruncateInt()
+		proposedLotCoin := sdk.NewCoin(lot.Denom, proposedLotInt)
+		proposedLotUSDValue := calculateUSDValue(proposedLotCoin, assetInfoLot)
+		if proposedLotUSDValue.IsZero() {
+			continue
+		}
+		if sdk.OneDec().Sub((bidUSDValue.Quo(proposedLotUSDValue))).GTE(margin) {
+			fmt.Printf(`
+				Increment tried: %s
+				Proposed Lot: %s
+				Proposed Lot USD Value: %s
+				Bid USD Value: %s
+		`, lotIncrement, proposedLotCoin, proposedLotUSDValue, bidUSDValue)
+			return proposedLotCoin, true
+		}
 	}
+
 	return sdk.Coin{}, false
 }
 

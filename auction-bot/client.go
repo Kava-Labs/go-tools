@@ -8,24 +8,15 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
+	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"github.com/tendermint/tendermint/libs/bytes"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 const (
 	DefaultPageLimit = 1000
 )
-
-type RpcClient interface {
-	Status() (*ctypes.ResultStatus, error)
-	ABCIQueryWithOptions(
-		path string,
-		data bytes.HexBytes,
-		opts rpcclient.ABCIQueryOptions,
-	) (*ctypes.ResultABCIQuery, error)
-}
 
 type InfoResponse struct {
 	ChainId      string `json:"chain_id" yaml:"chain_id"`
@@ -37,6 +28,7 @@ type AuctionClient interface {
 	GetPrices(height int64) (pricefeedtypes.CurrentPrices, error)
 	GetAuctions(height int64) (auctiontypes.Auctions, error)
 	GetMarkets(height int64) (cdptypes.CollateralParams, error)
+	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
 type RpcAuctionClient struct {
@@ -99,6 +91,21 @@ func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, 
 	}
 
 	return params.CollateralParams, nil
+}
+
+func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
+	path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
+	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
+	if err != nil {
+		return nil, err
+	}
+
+	var params hardtypes.Params
+	err = c.cdc.UnmarshalJSON(data, &params)
+	if err != nil {
+		return nil, err
+	}
+	return params.MoneyMarkets, nil
 }
 
 func (c *RpcAuctionClient) GetAuctions(height int64) (auctiontypes.Auctions, error) {

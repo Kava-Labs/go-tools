@@ -3,11 +3,22 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/hd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+
 	kava "github.com/kava-labs/kava/app"
 	"github.com/tendermint/tendermint/libs/log"
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
+)
+
+const (
+	kavaRpcUrlEnvKey = "KAVA_RPC_URL"
+	mnemonicEnvKey   = "KEEPER_MNEMONIC"
+	profitMargin     = "BID_MARGIN"
 )
 
 func main() {
@@ -23,6 +34,7 @@ func main() {
 	//
 	kavaConfig := sdk.GetConfig()
 	kava.SetBech32AddressPrefixes(kavaConfig)
+	kava.SetBip44CoinType(kavaConfig)
 	kavaConfig.Seal()
 
 	//
@@ -62,20 +74,85 @@ func main() {
 	// required for bidding
 	//
 	logger.Info("creating rpc client")
-	client := NewRpcAuctionClient(http, cdc)
+	auctionClient := NewRpcAuctionClient(http, cdc)
 
-	logger.Info("getting auction data")
-	data, err := GetAuctionData(client)
+	//
+	// client for broadcasting txs
+	//
+	broadcastClient := NewRpcBroadcastClient(http, cdc)
+	params := *hd.NewFundraiserParams(0, 459, 0)
+	hdPath := params.String()
+
+	derivedPriv, err := keys.StdDeriveKey(config.KavaKeeperMnemonic, "", hdPath, keys.Secp256k1)
 	if err != nil {
+		logger.Error("failed to derive key")
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+	privKey, err := keys.StdPrivKeyGen(derivedPriv, keys.Secp256k1)
+	if err != nil {
+		logger.Error("failed to generate private key")
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+	logger.Info(fmt.Sprintf("signing address: %s", sdk.AccAddress(privKey.PubKey().Address()).String()))
+
+	signer := NewSigner(broadcastClient, privKey, 10)
+
+	// channels to communicate with signer
+	requests := make(chan MsgRequest)
+
+	// signer starts it's own go routines and returns
+	responses, err := signer.Run(requests)
+	if err != nil {
+		logger.Error("failed to start signer")
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
 
-	auctionBids := GetBids(data, config.KavaKeeperAddress, config.ProfitMargin)
+	// log responses, if responses are not read, requests will block
+	go func() {
+		for {
+			// response is not returned until the msg is committed to a block
+			response := <-responses
 
-	msgs := CreateBidMsgs(config.KavaKeeperAddress, auctionBids)
+			// error will be set if response is not Code 0 (success) or Code 19 (already in mempool)
+			if response.Err != nil {
+				fmt.Printf("response code: %d error %s\n", response.Result.Code, response.Err)
+				continue
+			}
 
-	// print number of borrowers that need to be liquidated
-	fmt.Printf("%d bids to make\n", len(auctionBids))
-	fmt.Println(msgs)
+			// code and result are from broadcast, not deliver tx
+			// it is up to the caller/requester to check the deliver tx code and deal with failure
+			fmt.Printf("response code: %d, hash %s\n", response.Result.Code, response.Result.Hash)
+		}
+	}()
+
+	logger.Info("getting auction data")
+
+	for {
+		data, err := GetAuctionData(auctionClient)
+		if err != nil {
+			logger.Error(err.Error())
+			os.Exit(1)
+		}
+
+		auctionBids := GetBids(data, sdk.AccAddress(privKey.PubKey().Address()), config.ProfitMargin)
+
+		msgs := CreateBidMsgs(sdk.AccAddress(privKey.PubKey().Address()), auctionBids)
+
+		for _, msg := range msgs {
+			requests <- MsgRequest{
+				Msgs: []sdk.Msg{msg},
+				Fee: authtypes.StdFee{
+					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(10000)}},
+					Gas:    200000,
+				},
+				Memo: "",
+			}
+		}
+
+		// wait for next interval
+		time.Sleep(config.KavaBidInterval)
+	}
 }

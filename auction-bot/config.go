@@ -5,14 +5,9 @@ import (
 	"os"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
-)
+	"github.com/joho/godotenv"
 
-const (
-	kavaRpcUrlEnvKey        = "KAVA_RPC_URL"
-	kavaBidIntervalEnvKey   = "KAVA_BID_INTERVAL"
-	kavaKeeperAddressEnvKey = "KAVA_KEEPER_ADDRESS"
-	profitMargin            = "BID_MARGIN"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // ConfigLoader provides an interface for
@@ -23,34 +18,25 @@ type ConfigLoader interface {
 
 // Config provides application configuration
 type Config struct {
-	KavaRpcUrl        string
-	KavaBidInterval   time.Duration
-	KavaKeeperAddress sdk.AccAddress
-	ProfitMargin      sdk.Dec
+	KavaRpcUrl         string
+	KavaBidInterval    time.Duration
+	KavaKeeperMnemonic string
+	ProfitMargin       sdk.Dec
 }
 
 // LoadConfig loads key values from a ConfigLoader
 // and returns a new Config
 func LoadConfig(loader ConfigLoader) (Config, error) {
+	err := godotenv.Load()
+	if err != nil {
+		return Config{}, err
+	}
 	rpcURL := loader.Get(kavaRpcUrlEnvKey)
 	if rpcURL == "" {
 		return Config{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
 	}
 
-	bidInterval, err := time.ParseDuration(loader.Get(kavaBidIntervalEnvKey))
-	if err != nil {
-		bidInterval = time.Duration(10 * time.Minute)
-	}
-
-	keeperBech32Address := loader.Get(kavaKeeperAddressEnvKey)
-	if keeperBech32Address == "" {
-		return Config{}, fmt.Errorf("%s not set", kavaKeeperAddressEnvKey)
-	}
-
-	keeperAddress, err := sdk.AccAddressFromBech32(keeperBech32Address)
-	if err != nil {
-		return Config{}, err
-	}
+	keeperMnemonic := loader.Get(mnemonicEnvKey)
 
 	marginStr := loader.Get(profitMargin)
 
@@ -60,10 +46,10 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	}
 
 	return Config{
-		KavaRpcUrl:        rpcURL,
-		KavaBidInterval:   bidInterval,
-		KavaKeeperAddress: keeperAddress,
-		ProfitMargin:      marginDec,
+		KavaRpcUrl:         rpcURL,
+		KavaBidInterval:    time.Duration(10 * time.Minute),
+		KavaKeeperMnemonic: keeperMnemonic,
+		ProfitMargin:       marginDec,
 	}, nil
 }
 
