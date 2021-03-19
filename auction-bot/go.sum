@@ -226,6 +226,8 @@ github.com/kava-labs/kava v0.13.0-alpha.0 h1:qHgEztPdDST2ZFvwbLtl3pCbYtokXngkIli
 github.com/kava-labs/kava v0.13.0-alpha.0/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
 github.com/kava-labs/kava v0.13.0 h1:gdLtxfTLhGInUBdwsT7RhjnCvynJUgnGscPB57Y8gSk=
 github.com/kava-labs/kava v0.13.0/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
+github.com/kava-labs/kava v0.14.0-rc1 h1:B8CbTPeNJMUQe3ov2zX9GkMfLqAx0yqB9Nbh+Ea79EY=
+github.com/kava-labs/kava v0.14.0-rc1/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d h1:Z+RDyXzjKE0i2sTjZ/b1uxiGtPhFy34Ou/Tk0qwN0kM=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d/go.mod h1:JJNrCn9otv/2QP4D7SMJBgaleKpOf66PnW6F5WGNRIc=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
