@@ -20,3 +20,5 @@ BID_MARGIN="0.015"
 ```
 go run .
 ```
+
+Bot will bid attempt to bid on all auctions where the profit margin is greater than what is specified in `BID_MARGIN`. Note, bot does not currently track account balances, so it will attempt to create bids even for auctions for which it doesn't have sufficient funds.  
