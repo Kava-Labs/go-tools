@@ -9,7 +9,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	kava "github.com/kava-labs/kava/app"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
-	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"github.com/stretchr/testify/assert"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
@@ -119,74 +118,74 @@ func TestGetInfo(t *testing.T) {
 	assert.Equal(t, responseErr, err)
 }
 
-func TestGetPrices(t *testing.T) {
-	rpc := &MockRpcClient{}
-	cdc := kava.MakeCodec()
-	client := NewRpcAuctionClient(rpc, cdc)
+// func TestGetPrices(t *testing.T) {
+// 	rpc := &MockRpcClient{}
+// 	cdc := kava.MakeCodec()
+// 	client := NewRpcAuctionClient(rpc, cdc)
 
-	height := int64(1001)
+// 	height := int64(1001)
 
-	prices := pricefeedtypes.CurrentPrices{
-		pricefeedtypes.CurrentPrice{
-			MarketID: "busd:usd",
-			Price:    sdk.MustNewDecFromStr("1.004"),
-		},
-		pricefeedtypes.CurrentPrice{
-			MarketID: "busd:usd:30",
-			Price:    sdk.MustNewDecFromStr("1.003"),
-		},
-	}
+// 	prices := pricefeedtypes.CurrentPrices{
+// 		pricefeedtypes.CurrentPrice{
+// 			MarketID: "busd:usd",
+// 			Price:    sdk.MustNewDecFromStr("1.004"),
+// 		},
+// 		pricefeedtypes.CurrentPrice{
+// 			MarketID: "busd:usd:30",
+// 			Price:    sdk.MustNewDecFromStr("1.003"),
+// 		},
+// 	}
 
-	pricesData, err := cdc.MarshalJSON(&prices)
-	assert.Nil(t, err)
+// 	pricesData, err := cdc.MarshalJSON(&prices)
+// 	assert.Nil(t, err)
 
-	// check correct parameters are called
-	rpc.ABCICheckFunc = func(
-		path string,
-		data bytes.HexBytes,
-		opts rpcclient.ABCIQueryOptions,
-	) {
-		// prices query
-		assert.Equal(t, fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrices), path)
-		// no parameters
-		assert.Equal(t, bytes.HexBytes{}, data)
-		// queries at provided height
-		assert.Equal(t, rpcclient.ABCIQueryOptions{Height: height, Prove: false}, opts)
-	}
+// 	// check correct parameters are called
+// 	rpc.ABCICheckFunc = func(
+// 		path string,
+// 		data bytes.HexBytes,
+// 		opts rpcclient.ABCIQueryOptions,
+// 	) {
+// 		// prices query
+// 		assert.Equal(t, fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrices), path)
+// 		// no parameters
+// 		assert.Equal(t, bytes.HexBytes{}, data)
+// 		// queries at provided height
+// 		assert.Equal(t, rpcclient.ABCIQueryOptions{Height: height, Prove: false}, opts)
+// 	}
 
-	// return prices data from abci query
-	rpc.ABCIQueryDataFunc = func(data bytes.HexBytes) []byte {
-		return pricesData
-	}
+// 	// return prices data from abci query
+// 	rpc.ABCIQueryDataFunc = func(data bytes.HexBytes) []byte {
+// 		return pricesData
+// 	}
 
-	type getPricesTest struct {
-		code uint32
-		log  string
-		err  error
-		data pricefeedtypes.CurrentPrices
-	}
+// 	type getPricesTest struct {
+// 		code uint32
+// 		log  string
+// 		err  error
+// 		data pricefeedtypes.CurrentPrices
+// 	}
 
-	tests := []getPricesTest{
-		{code: 0, log: "", err: nil, data: prices},
-		{code: 0, log: "", err: errors.New("abci error"), data: nil},
-		{code: 1, log: "argument error", err: nil, data: nil},
-	}
+// 	tests := []getPricesTest{
+// 		{code: 0, log: "", err: nil, data: prices},
+// 		{code: 0, log: "", err: errors.New("abci error"), data: nil},
+// 		{code: 1, log: "argument error", err: nil, data: nil},
+// 	}
 
-	for _, tc := range tests {
-		rpc.ABCIResponseQueryCode = tc.code
-		rpc.ABCIResponseQueryLog = tc.log
-		rpc.ABCIResponseErr = tc.err
+// 	for _, tc := range tests {
+// 		rpc.ABCIResponseQueryCode = tc.code
+// 		rpc.ABCIResponseQueryLog = tc.log
+// 		rpc.ABCIResponseErr = tc.err
 
-		resp, err := client.GetPrices(height)
+// 		resp, err := client.GetPrices(height)
 
-		if tc.log != "" {
-			tc.err = errors.New(tc.log)
-		}
+// 		if tc.log != "" {
+// 			tc.err = errors.New(tc.log)
+// 		}
 
-		assert.Equal(t, tc.data, resp)
-		assert.Equal(t, tc.err, err)
-	}
-}
+// 		assert.Equal(t, tc.data, resp)
+// 		assert.Equal(t, tc.err, err)
+// 	}
+// }
 
 func TestGetAuctions(t *testing.T) {
 	rpc := &MockRpcClient{}

@@ -88,12 +88,12 @@ func handleReverseCollateralAuction(auction auctiontypes.Auction, keeper sdk.Acc
 	}
 	assetInfoLot, ok := assetInfo[collateralAuction.Lot.Denom]
 	if !ok {
-		fmt.Printf("lot asset info missing, exiting")
+		fmt.Printf("lot asset info missing for %s, exiting\n", collateralAuction.Lot.Denom)
 		return AuctionInfo{}, false
 	}
 	assetInfoBid, ok := assetInfo[collateralAuction.MaxBid.Denom]
 	if !ok {
-		fmt.Printf("bid asset info missing, exiting")
+		fmt.Printf("bid asset info missing for %s, exiting\n", collateralAuction.MaxBid.Denom)
 		return AuctionInfo{}, false
 	}
 
@@ -136,11 +136,6 @@ func calculateProposedBid(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid Asset
 }
 
 func calculateProposedLot(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid AssetInfo, margin, increment sdk.Dec) (sdk.Coin, bool) {
-	fmt.Printf(`Calculating proposed lot:
-	incoming lot: %s
-	incoming max bid: %s
-	`, lot, maxbid,
-	)
 	bidUSDValue := calculateUSDValue(maxbid, assetInfoBid)
 	if bidUSDValue.IsZero() {
 		fmt.Printf("Exiting because of zero bid USD value\n")

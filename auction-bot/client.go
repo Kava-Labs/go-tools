@@ -8,7 +8,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
-	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"github.com/tendermint/tendermint/libs/bytes"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
@@ -28,7 +27,6 @@ type AuctionClient interface {
 	GetPrices(height int64) (pricefeedtypes.CurrentPrices, error)
 	GetAuctions(height int64) (auctiontypes.Auctions, error)
 	GetMarkets(height int64) (cdptypes.CollateralParams, error)
-	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
 type RpcAuctionClient struct {
@@ -60,19 +58,40 @@ func (c *RpcAuctionClient) GetInfo() (*InfoResponse, error) {
 }
 
 func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices, error) {
-	path := fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrices)
-
-	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
-	if err != nil {
-		return nil, err
-	}
+	markets := []string{"btc:usd", "hard:usd", "kava:usd", "xrp:usd", "bnb:usd", "busd:usd"}
 
 	var currentPrices pricefeedtypes.CurrentPrices
-	err = c.cdc.UnmarshalJSON(data, &currentPrices)
-	if err != nil {
-		return nil, err
-	}
+	for _, market := range markets {
+		marketQueryParams := pricefeedtypes.NewQueryWithMarketIDParams(market)
+		bz, err := c.cdc.MarshalJSON(&marketQueryParams)
+		if err != nil {
+			return nil, err
+		}
 
+		path := fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrice)
+
+		exitLoop := false
+		data := []byte{}
+		for {
+			queryData, err := c.abciQuery(path, bz, height)
+			if err == nil {
+				data = queryData
+				exitLoop = true
+			}
+			if exitLoop {
+				break
+			}
+		}
+
+		var cp pricefeedtypes.CurrentPrice
+		err = c.cdc.UnmarshalJSON(data, &cp)
+		if err != nil {
+			return nil, err
+		}
+		currentPrices = append(currentPrices, cp)
+	}
+	currentUSDXPrice := pricefeedtypes.NewCurrentPrice("usdx:usd", sdk.OneDec())
+	currentPrices = append(currentPrices, currentUSDXPrice)
 	return currentPrices, nil
 }
 
@@ -91,21 +110,6 @@ func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, 
 	}
 
 	return params.CollateralParams, nil
-}
-
-func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
-	path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
-	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
-	if err != nil {
-		return nil, err
-	}
-
-	var params hardtypes.Params
-	err = c.cdc.UnmarshalJSON(data, &params)
-	if err != nil {
-		return nil, err
-	}
-	return params.MoneyMarkets, nil
 }
 
 func (c *RpcAuctionClient) GetAuctions(height int64) (auctiontypes.Auctions, error) {

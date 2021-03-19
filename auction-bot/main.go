@@ -139,9 +139,12 @@ func main() {
 
 		auctionBids := GetBids(data, sdk.AccAddress(privKey.PubKey().Address()), config.ProfitMargin)
 
+		logger.Info(fmt.Sprintf("creating %d bids", len(auctionBids)))
+
 		msgs := CreateBidMsgs(sdk.AccAddress(privKey.PubKey().Address()), auctionBids)
 
 		for _, msg := range msgs {
+			logger.Info(fmt.Sprintf("Bid: %s", msg))
 			requests <- MsgRequest{
 				Msgs: []sdk.Msg{msg},
 				Fee: authtypes.StdFee{

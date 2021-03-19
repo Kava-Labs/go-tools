@@ -7,7 +7,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
-	hardtypes "github.com/kava-labs/kava/x/hard/types"
 )
 
 type AssetInfo struct {
@@ -36,6 +35,7 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 
 	prices, err := client.GetPrices(height)
 	if err != nil {
+		fmt.Printf("Errored querying market prices: %v\n", err)
 		return nil, err
 	}
 
@@ -48,22 +48,12 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	moneyMarkets, err := client.GetMoneyMarkets(height)
-	if err != nil {
-		return nil, err
-	}
-
-	markets := deduplicateMarkets(cdpMarkets, moneyMarkets)
-
-	fmt.Printf("%s\n", markets)
+	markets := filterMarkets(cdpMarkets)
 	// map price data
 	priceData := make(map[string]sdk.Dec)
 	for _, price := range prices {
 		priceData[price.MarketID] = price.Price
 	}
-	fmt.Printf(`%s
-	`, priceData)
 
 	// loop markets and create AssetInfo
 	assetInfo := make(map[string]AssetInfo)
@@ -77,8 +67,6 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 			ConversionFactor: market.ConversionFactor,
 		}
 	}
-	fmt.Printf(`%s
-	`, assetInfo)
 
 	return &AuctionData{
 		Assets:       assetInfo,
@@ -87,7 +75,7 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 	}, nil
 }
 
-func deduplicateMarkets(cdpMarkets cdptypes.CollateralParams, hardMarkets hardtypes.MoneyMarkets) []auctionMarket {
+func filterMarkets(cdpMarkets cdptypes.CollateralParams) []auctionMarket {
 	seenDenoms := make(map[string]bool)
 
 	markets := []auctionMarket{}
@@ -103,14 +91,8 @@ func deduplicateMarkets(cdpMarkets cdptypes.CollateralParams, hardMarkets hardty
 		markets = append(markets, auctionMarket{cdpMarket.Denom, cdpMarket.SpotMarketID, sdk.NewIntFromBigInt(i)})
 		seenDenoms[cdpMarket.Denom] = true
 	}
-	for _, hardMarket := range hardMarkets {
-		_, seen := seenDenoms[hardMarket.Denom]
-		if seen {
-			continue
-		}
-		markets = append(markets, auctionMarket{hardMarket.Denom, hardMarket.SpotMarketID, hardMarket.ConversionFactor})
-		seenDenoms[hardMarket.Denom] = true
-	}
+	usdxMarket := auctionMarket{Denom: "usdx", SpotMarketID: "usdx:usd", ConversionFactor: sdk.NewInt(1000000)}
+	markets = append(markets, usdxMarket)
 	return markets
 }
 
