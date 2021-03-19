@@ -45,9 +45,14 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 		return Config{}, err
 	}
 
+	keeperBidInterval, err := time.ParseDuration(loader.Get(bidInterval))
+	if err != nil {
+		keeperBidInterval = time.Duration(10 * time.Minute)
+	}
+
 	return Config{
 		KavaRpcUrl:         rpcURL,
-		KavaBidInterval:    time.Duration(10 * time.Minute),
+		KavaBidInterval:    keeperBidInterval,
 		KavaKeeperMnemonic: keeperMnemonic,
 		ProfitMargin:       marginDec,
 	}, nil

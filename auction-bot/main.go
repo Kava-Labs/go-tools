@@ -19,6 +19,7 @@ const (
 	kavaRpcUrlEnvKey = "KAVA_RPC_URL"
 	mnemonicEnvKey   = "KEEPER_MNEMONIC"
 	profitMargin     = "BID_MARGIN"
+	bidInterval      = "BID_INTERVAL"
 )
 
 func main() {
