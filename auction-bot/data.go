@@ -32,8 +32,6 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 	// use height to get consistent state from rpc client
 	height := info.LatestHeight
 
-	fmt.Printf("latest height: %d\n", info.LatestHeight)
-
 	prices, err := client.GetPrices(height)
 	if err != nil {
 		return nil, err
@@ -56,14 +54,11 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 
 	markets := deduplicateMarkets(cdpMarkets, moneyMarkets)
 
-	fmt.Printf("%s\n", markets)
 	// map price data
 	priceData := make(map[string]sdk.Dec)
 	for _, price := range prices {
 		priceData[price.MarketID] = price.Price
 	}
-	fmt.Printf(`%s
-	`, priceData)
 
 	// loop markets and create AssetInfo
 	assetInfo := make(map[string]AssetInfo)
@@ -77,8 +72,6 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 			ConversionFactor: market.ConversionFactor,
 		}
 	}
-	fmt.Printf(`%s
-	`, assetInfo)
 
 	return &AuctionData{
 		Assets:       assetInfo,

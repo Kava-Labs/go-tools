@@ -128,8 +128,6 @@ func main() {
 		}
 	}()
 
-	logger.Info("getting auction data")
-
 	for {
 		data, err := GetAuctionData(auctionClient)
 		if err != nil {
@@ -137,9 +135,20 @@ func main() {
 			os.Exit(1)
 		}
 
+		info, err := auctionClient.GetInfo()
+		if err != nil {
+			logger.Error(err.Error())
+			os.Exit(1)
+		}
+		logger.Info(fmt.Sprintf("latest height: %d", info.LatestHeight))
+
+		logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
+
 		auctionBids := GetBids(data, sdk.AccAddress(privKey.PubKey().Address()), config.ProfitMargin)
 
 		msgs := CreateBidMsgs(sdk.AccAddress(privKey.PubKey().Address()), auctionBids)
+
+		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
 
 		for _, msg := range msgs {
 			requests <- MsgRequest{

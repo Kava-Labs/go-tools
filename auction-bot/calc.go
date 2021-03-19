@@ -17,7 +17,6 @@ type AuctionInfos []AuctionInfo
 
 func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionInfos {
 	var auctionBidInfos AuctionInfos
-	fmt.Printf("Checking %d auctions:\n", len(data.Auctions))
 	for _, auction := range data.Auctions {
 		switch auction.GetType() {
 		case auctiontypes.CollateralAuctionType:
@@ -35,10 +34,16 @@ func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionIn
 				}
 				auctionBidInfos = append(auctionBidInfos, bidInfo)
 			default:
-				fmt.Printf("invalid collateral auction phase: %s", auction.GetPhase())
+				fmt.Printf("invalid collateral auction phase: %s\n", auction.GetPhase())
 			}
+		case auctiontypes.DebtAuctionType:
+			bidInfo, shouldBid := handleReverseDebtAuction(auction, keeper, data.Assets, data.BidIncrement, margin)
+			if !shouldBid {
+				continue
+			}
+			auctionBidInfos = append(auctionBidInfos, bidInfo)
 		default:
-			fmt.Printf("unsupported auction type: %s", auction.GetType())
+			fmt.Printf("unsupported auction type: %s\n", auction.GetType())
 		}
 	}
 
@@ -113,6 +118,39 @@ func handleReverseCollateralAuction(auction auctiontypes.Auction, keeper sdk.Acc
 	}, true
 }
 
+func handleReverseDebtAuction(auction auctiontypes.Auction, keeper sdk.AccAddress, assetInfo map[string]AssetInfo, increment, margin sdk.Dec) (AuctionInfo, bool) {
+	debtAuction := auction.(auctiontypes.DebtAuction)
+	// check bidder
+	if debtAuction.Bidder.Equals(keeper) {
+		return AuctionInfo{}, false
+	}
+	assetInfoLot, ok := assetInfo[debtAuction.Lot.Denom]
+	if !ok {
+		fmt.Printf("lot asset info missing, exiting")
+		return AuctionInfo{}, false
+	}
+	assetInfoBid, ok := assetInfo[debtAuction.Bid.Denom]
+	if !ok {
+		fmt.Printf("bid asset info missing, exiting")
+		return AuctionInfo{}, false
+	}
+
+	proposedLot, ok := calculateProposedLot(debtAuction.Lot, debtAuction.Bid, assetInfoLot, assetInfoBid, margin, increment)
+	if !ok {
+		return AuctionInfo{}, false
+	}
+
+	if proposedLot.IsZero() {
+		return AuctionInfo{}, false
+	}
+
+	return AuctionInfo{
+		ID:     debtAuction.ID,
+		Bidder: keeper,
+		Amount: proposedLot,
+	}, true
+}
+
 func calculateUSDValue(coin sdk.Coin, assetInfo AssetInfo) sdk.Dec {
 	return coin.Amount.ToDec().Quo(assetInfo.ConversionFactor.ToDec()).Mul(assetInfo.Price)
 }
@@ -136,11 +174,6 @@ func calculateProposedBid(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid Asset
 }
 
 func calculateProposedLot(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid AssetInfo, margin, increment sdk.Dec) (sdk.Coin, bool) {
-	fmt.Printf(`Calculating proposed lot:
-	incoming lot: %s
-	incoming max bid: %s
-	`, lot, maxbid,
-	)
 	bidUSDValue := calculateUSDValue(maxbid, assetInfoBid)
 	if bidUSDValue.IsZero() {
 		fmt.Printf("Exiting because of zero bid USD value\n")
