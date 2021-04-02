@@ -53,7 +53,7 @@ func NewBnbClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAdd
 		deputyAddresses: depAddrs,
 	}
 }
-func (bc BnbClaimer) Run(ctx context.Context) {
+func (bc BnbClaimer) Start(ctx context.Context) {
 	go func(ctx context.Context) {
 		nextPoll := time.After(0) // set wait to zero so it fires on startup
 		for {
@@ -134,7 +134,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 }
 
 type bnbClaimableSwap struct {
-	swapID       tmbytes.HexBytes // XXX should define my own byte type to abstract the different ones each chain uses
+	swapID       tmbytes.HexBytes
 	destSwapID   tmbytes.HexBytes
 	randomNumber tmbytes.HexBytes
 	amount       types.Coins

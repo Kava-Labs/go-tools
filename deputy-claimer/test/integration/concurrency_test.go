@@ -69,7 +69,7 @@ func TestMultipleClaimBnb(t *testing.T) {
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.BnbUserMnemonics()[:2],
-	).Run(ctx)
+	).Start(ctx)
 	defer shutdownClaimer()
 
 	time.Sleep(30 * time.Second) // TODO
@@ -133,7 +133,7 @@ func TestMultipleClaimKava(t *testing.T) {
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.KavaUserMnemonics()[:2],
-	).Run(ctx)
+	).Start(ctx)
 	defer shutdownClaimer()
 
 	time.Sleep(30 * time.Second) // TODO

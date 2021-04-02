@@ -53,14 +53,14 @@ type KavaClaimer struct {
 func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAddresses, mnemonics []string) KavaClaimer {
 	cdc := app.MakeCodec()
 	return KavaClaimer{
-		kavaClient:      NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc), // XXX hard dependency makes testing hard
+		kavaClient:      NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc),
 		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
 		mnemonics:       mnemonics,
 		deputyAddresses: depAddrs,
 	}
 }
 
-func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate this starts a goroutine
+func (kc KavaClaimer) Start(ctx context.Context) {
 	go func(ctx context.Context) {
 		nextPoll := time.After(0) // set wait to zero so it fires on startup
 		for {
@@ -68,7 +68,6 @@ func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate 
 			case <-ctx.Done():
 				return
 			case <-nextPoll:
-				// XXX G34 too many levels of abstraction
 				log.Println("finding available deputy claims for kava")
 				err := kc.fetchAndClaimSwaps()
 				if err != nil {
@@ -80,9 +79,6 @@ func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate 
 	}(ctx)
 }
 
-// XXX G30 functions should do one thing
-// XXX G34 descend only one level of abstraction, several times over
-// these also make it hard to test
 func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.deputyAddresses)
 	if err != nil {
@@ -130,7 +126,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	for i := 0; i < len(kc.mnemonics); i++ {
 		<-availableMnemonics
 	}
-	// report any errors // XXX C1 inappropriate information
+	// return all errors
 	var concatenatedErrs string
 	close(errs)
 	for e := range errs {
@@ -144,7 +140,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 }
 
 type kavaClaimableSwap struct {
-	swapID       tmbytes.HexBytes // XXX should define my own byte type to abstract the different ones each chain uses
+	swapID       tmbytes.HexBytes
 	destSwapID   tmbytes.HexBytes
 	randomNumber tmbytes.HexBytes
 	amount       sdk.Coins
@@ -157,10 +153,10 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 	}
 	log.Printf("found %d open kava swaps", len(swaps))
 
-	// filter out new swaps // XXX C1 inappropriate information // XXX G34 too many levels of abstraction
+	// filter out new swaps
 	var filteredSwaps bep3types.AtomicSwaps
 	for _, s := range swaps {
-		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) { // XXX should abstract time to allow for easier testing
+		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
 			filteredSwaps = append(filteredSwaps, s)
 		}
 	}

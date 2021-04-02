@@ -69,7 +69,7 @@ func main() {
 
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
-	app.SetBech32AddressPrefixes(kavaConfig) // XXX G34 descend only one level of abstraction
+	app.SetBech32AddressPrefixes(kavaConfig)
 	kavaConfig.Seal()
 
 	cfg, err := loadConfig()
@@ -77,16 +77,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// XXX G30 functions should do one thing
-
-	// XXX F1 too many arguments
-	// XXX G5 duplication
 	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.KavaMnemonics)
 	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.BnbMnemonics)
 
-	ctx := context.Background() // XXX G34 too many levels of abstraction
-	kavaClaimer.Run(ctx)
-	bnbClaimer.Run(ctx) // XXX G5 duplication
+	ctx := context.Background()
+	kavaClaimer.Start(ctx)
+	bnbClaimer.Start(ctx)
 
 	select {}
 }
