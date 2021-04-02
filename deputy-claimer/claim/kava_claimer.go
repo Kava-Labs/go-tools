@@ -17,8 +17,13 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
+const (
+	defaultGas       uint64        = 250_000
+	kavaTxTimeout    time.Duration = 1 * time.Minute
+	kavaLoopInterval time.Duration = 5 * time.Minute
+)
+
 var (
-	defaultGas      uint64      = 250_000
 	defaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
 )
 
@@ -57,20 +62,20 @@ func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAd
 
 func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate this starts a goroutine
 	go func(ctx context.Context) {
+		nextPoll := time.After(0) // set wait to zero so it fires on startup
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
+			case <-nextPoll:
 				// XXX G34 too many levels of abstraction
 				log.Println("finding available deputy claims for kava")
 				err := kc.fetchAndClaimSwaps()
 				if err != nil {
 					log.Printf("error fetching and claiming bnb swaps: %v\n", err)
 				}
-				time.Sleep(5 * time.Minute)
-				continue
 			}
+			nextPoll = time.After(kavaLoopInterval)
 		}
 	}(ctx)
 }
@@ -104,7 +109,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
 			}
-			err = Wait(15*time.Second, func() (bool, error) {
+			err = Wait(kavaTxTimeout, func() (bool, error) {
 				res, err := kc.kavaClient.GetTxConfirmation(txHash)
 				if err != nil {
 					return false, nil

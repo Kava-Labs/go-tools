@@ -16,6 +16,11 @@ import (
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
+const (
+	bnbTxTimeout    time.Duration = 1 * time.Minute
+	bnbLoopInterval time.Duration = 5 * time.Minute
+)
+
 type BnbClaimError struct {
 	Swap bnbClaimableSwap
 	Err  error
@@ -50,19 +55,19 @@ func NewBnbClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAdd
 }
 func (bc BnbClaimer) Run(ctx context.Context) {
 	go func(ctx context.Context) {
+		nextPoll := time.After(0) // set wait to zero so it fires on startup
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
+			case <-nextPoll:
 				log.Println("finding available deputy claims for bnb")
 				err := bc.fetchAndClaimSwaps()
 				if err != nil {
 					log.Printf("error fetching and claiming bnb swaps: %v\n", err)
 				}
-				time.Sleep(5 * time.Minute)
-				continue
 			}
+			nextPoll = time.After(bnbLoopInterval)
 		}
 	}(ctx)
 }
@@ -94,7 +99,7 @@ func (bc BnbClaimer) fetchAndClaimSwaps() error {
 				errs <- BnbClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
 			}
-			err = Wait(15*time.Second, func() (bool, error) {
+			err = Wait(bnbTxTimeout, func() (bool, error) {
 				res, err := bc.bnbClient.GetTxConfirmation(txHash)
 				if err != nil {
 					return false, nil
