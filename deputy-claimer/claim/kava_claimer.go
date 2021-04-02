@@ -17,8 +17,13 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 )
 
+const (
+	defaultGas       uint64        = 250_000
+	kavaTxTimeout    time.Duration = 1 * time.Minute
+	kavaLoopInterval time.Duration = 5 * time.Minute
+)
+
 var (
-	defaultGas      uint64      = 250_000
 	defaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
 )
 
@@ -48,36 +53,32 @@ type KavaClaimer struct {
 func NewKavaClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAddresses, mnemonics []string) KavaClaimer {
 	cdc := app.MakeCodec()
 	return KavaClaimer{
-		kavaClient:      NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc), // XXX hard dependency makes testing hard
+		kavaClient:      NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc),
 		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
 		mnemonics:       mnemonics,
 		deputyAddresses: depAddrs,
 	}
 }
 
-func (kc KavaClaimer) Run(ctx context.Context) { // XXX name should communicate this starts a goroutine
+func (kc KavaClaimer) Start(ctx context.Context) {
 	go func(ctx context.Context) {
+		nextPoll := time.After(0) // set wait to zero so it fires on startup
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				// XXX G34 too many levels of abstraction
+			case <-nextPoll:
 				log.Println("finding available deputy claims for kava")
 				err := kc.fetchAndClaimSwaps()
 				if err != nil {
 					log.Printf("error fetching and claiming bnb swaps: %v\n", err)
 				}
-				time.Sleep(5 * time.Minute)
-				continue
 			}
+			nextPoll = time.After(kavaLoopInterval)
 		}
 	}(ctx)
 }
 
-// XXX G30 functions should do one thing
-// XXX G34 descend only one level of abstraction, several times over
-// these also make it hard to test
 func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.deputyAddresses)
 	if err != nil {
@@ -104,7 +105,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
 			}
-			err = Wait(15*time.Second, func() (bool, error) {
+			err = Wait(kavaTxTimeout, func() (bool, error) {
 				res, err := kc.kavaClient.GetTxConfirmation(txHash)
 				if err != nil {
 					return false, nil
@@ -125,7 +126,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	for i := 0; i < len(kc.mnemonics); i++ {
 		<-availableMnemonics
 	}
-	// report any errors // XXX C1 inappropriate information
+	// return all errors
 	var concatenatedErrs string
 	close(errs)
 	for e := range errs {
@@ -139,7 +140,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 }
 
 type kavaClaimableSwap struct {
-	swapID       tmbytes.HexBytes // XXX should define my own byte type to abstract the different ones each chain uses
+	swapID       tmbytes.HexBytes
 	destSwapID   tmbytes.HexBytes
 	randomNumber tmbytes.HexBytes
 	amount       sdk.Coins
@@ -152,10 +153,10 @@ func getClaimableKavaSwaps(kavaClient KavaChainClient, bnbClient BnbChainClient,
 	}
 	log.Printf("found %d open kava swaps", len(swaps))
 
-	// filter out new swaps // XXX C1 inappropriate information // XXX G34 too many levels of abstraction
+	// filter out new swaps
 	var filteredSwaps bep3types.AtomicSwaps
 	for _, s := range swaps {
-		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) { // XXX should abstract time to allow for easier testing
+		if time.Unix(s.Timestamp, 0).Add(10 * time.Minute).Before(time.Now()) {
 			filteredSwaps = append(filteredSwaps, s)
 		}
 	}
