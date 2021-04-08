@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -10,21 +9,11 @@ import (
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"github.com/tendermint/tendermint/libs/bytes"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
 const (
 	DefaultPageLimit = 1000
 )
-
-type RpcClient interface {
-	Status() (*ctypes.ResultStatus, error)
-	ABCIQueryWithOptions(
-		path string,
-		data bytes.HexBytes,
-		opts rpcclient.ABCIQueryOptions,
-	) (*ctypes.ResultABCIQuery, error)
-}
 
 type InfoResponse struct {
 	ChainId      string
@@ -182,21 +171,5 @@ func (c *RpcLiquidationClient) abciQuery(
 	opts := rpcclient.ABCIQueryOptions{Height: height, Prove: false}
 
 	result, err := c.rpc.ABCIQueryWithOptions(path, data, opts)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	resp := result.Response
-	if !resp.IsOK() {
-		return []byte{}, errors.New(resp.Log)
-	}
-
-	// TODO: why do we check length here?
-	value := result.Response.GetValue()
-	// TODO: untested logic case
-	if len(value) == 0 {
-		return []byte{}, nil
-	}
-
-	return value, nil
+	return ParseABCIResult(result, err)
 }

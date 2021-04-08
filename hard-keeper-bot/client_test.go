@@ -16,6 +16,7 @@ import (
 	"github.com/tendermint/tendermint/p2p"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 func init() {
@@ -48,6 +49,23 @@ func (m *MockRpcClient) Status() (*ctypes.ResultStatus, error) {
 	return &m.StatusResponse, m.StatusResponseErr
 }
 
+func (m *MockRpcClient) ABCIQuery(
+	path string,
+	data bytes.HexBytes,
+) (*ctypes.ResultABCIQuery, error) {
+	// allow test code to check path, data, opts globally
+	m.ABCICheckFunc(path, data, rpcclient.DefaultABCIQueryOptions)
+
+	// build response and allow injection of return value
+	return &ctypes.ResultABCIQuery{
+		Response: abci.ResponseQuery{
+			Code:  m.ABCIResponseQueryCode,
+			Log:   m.ABCIResponseQueryLog,
+			Value: m.ABCIQueryDataFunc(data),
+		},
+	}, m.ABCIResponseErr
+}
+
 func (m *MockRpcClient) ABCIQueryWithOptions(
 	path string,
 	data bytes.HexBytes,
@@ -64,6 +82,10 @@ func (m *MockRpcClient) ABCIQueryWithOptions(
 			Value: m.ABCIQueryDataFunc(data),
 		},
 	}, m.ABCIResponseErr
+}
+
+func (m *MockRpcClient) BroadcastTxSync(tx tmtypes.Tx) (*ctypes.ResultBroadcastTx, error) {
+	return nil, nil
 }
 
 func TestGetInfo(t *testing.T) {
