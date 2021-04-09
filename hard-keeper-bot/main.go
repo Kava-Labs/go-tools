@@ -68,10 +68,9 @@ func main() {
 	// client for broadcasting txs
 	//
 	broadcastClient := NewRpcBroadcastClient(http, cdc)
-	mnemonic := "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe"
 	hdPath := keys.CreateHDPath(0, 0)
 
-	derivedPriv, err := keys.StdDeriveKey(mnemonic, "", hdPath.String(), keys.Secp256k1)
+	derivedPriv, err := keys.StdDeriveKey(config.KavaSignerMnemonic, "", hdPath.String(), keys.Secp256k1)
 	if err != nil {
 		logger.Error("failed to derive key")
 		logger.Error(err.Error())
@@ -85,7 +84,6 @@ func main() {
 	}
 
 	// create signer, needs client, privkey, and inflight limit (max limit for txs in mempool)
-	// use 10 for kava-4
 	signer := NewSigner(broadcastClient, privKey, 10)
 
 	// channels to communicate with signer
@@ -122,16 +120,20 @@ func main() {
 		data, err := GetPositionData(liquidationClient)
 		if err != nil {
 			logger.Error(err.Error())
+			continue
 		}
 
 		// calculate borrowers to liquidate from asset and position data
 		borrowersToLiquidate := GetBorrowersToLiquidate(data)
+		fmt.Printf("%d borrowers to liquidate\n", len(borrowersToLiquidate))
 
 		// create liquidation msgs
 		msgs := CreateLiquidationMsgs(config.KavaKeeperAddress, borrowersToLiquidate)
 
 		// create liquidation transactions
 		for _, msg := range msgs {
+			fmt.Printf("sending liquidation for %s\n", msg.Borrower.String())
+
 			requests <- MsgRequest{
 				Msgs: []sdk.Msg{msg},
 				Fee: authtypes.StdFee{

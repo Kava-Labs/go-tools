@@ -30,8 +30,9 @@ func TestConfigLoading(t *testing.T) {
 	loader := &testEnvLoader{
 		t: t,
 		Env: map[string]string{
-			"KAVA_RPC_URL":        "https://rpc.testnet.kava.io",
-			"KAVA_KEEPER_ADDRESS": sdk.AccAddress(crypto.AddressHash([]byte("keeper"))).String(),
+			"KAVA_RPC_URL":         "https://rpc.testnet.kava.io",
+			"KAVA_KEEPER_ADDRESS":  sdk.AccAddress(crypto.AddressHash([]byte("keeper"))).String(),
+			"KAVA_SIGNER_MNEMONIC": "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
 		},
 	}
 
@@ -52,12 +53,17 @@ func TestConfigLoading(t *testing.T) {
 		t.Fatalf("bad value %s for KavaKeeperAddress", defaultConfig.KavaKeeperAddress)
 	}
 
+	if defaultConfig.KavaSignerMnemonic != loader.Env["KAVA_SIGNER_MNEMONIC"] {
+		t.Fatalf("bad value %s for KavaSignerMnemonic", defaultConfig.KavaSignerMnemonic)
+	}
+
 	loader = &testEnvLoader{
 		t: t,
 		Env: map[string]string{
 			"KAVA_RPC_URL":              "https://rpc.testnet.kava.io",
 			"KAVA_KEEPER_ADDRESS":       sdk.AccAddress(crypto.AddressHash([]byte("keeper"))).String(),
 			"KAVA_LIQUIDATION_INTERVAL": "30m",
+			"KAVA_SIGNER_MNEMONIC":      "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
 		},
 	}
 
@@ -75,8 +81,9 @@ func TestInvalidKeeperAddress(t *testing.T) {
 	loader := &testEnvLoader{
 		t: t,
 		Env: map[string]string{
-			"KAVA_RPC_URL":        "https://rpc.testnet.kava.io",
-			"KAVA_KEEPER_ADDRESS": "kava1invalidaddress",
+			"KAVA_RPC_URL":         "https://rpc.testnet.kava.io",
+			"KAVA_KEEPER_ADDRESS":  "kava1invalidaddress",
+			"KAVA_SIGNER_MNEMONIC": "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
 		},
 	}
 

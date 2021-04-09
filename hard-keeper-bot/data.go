@@ -33,21 +33,25 @@ func GetPositionData(client LiquidationClient) (*PositionData, error) {
 	// use height to get consistent state from rpc client
 	height := info.LatestHeight
 
+	fmt.Printf("getting market data at %d\n", height)
 	markets, err := client.GetMarkets(height)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("getting price data at %d\n", height)
 	prices, err := client.GetPrices(height)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("getting borrow data at %d\n", height)
 	borrows, err := client.GetBorrows(height)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Printf("getting deposit data at %d\n", height)
 	deposits, err := client.GetDeposits(height)
 	if err != nil {
 		return nil, err
@@ -98,6 +102,8 @@ func GetPositionData(client LiquidationClient) (*PositionData, error) {
 			DepositedAmount: depositAmount,
 		}
 	}
+
+	fmt.Printf("%d positions fetched\n", len(positions))
 
 	return &PositionData{
 		Assets:    assetInfo,

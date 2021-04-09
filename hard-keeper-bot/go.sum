@@ -220,6 +220,8 @@ github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfV
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/kava-labs/kava v0.13.0-alpha.0 h1:qHgEztPdDST2ZFvwbLtl3pCbYtokXngkIlik2veILJ8=
 github.com/kava-labs/kava v0.13.0-alpha.0/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
+github.com/kava-labs/kava v0.14.1 h1:lb7e5N6dgzL4Z8KIK+MYiX/7hydoPhHYbCFHz1Rfw4M=
+github.com/kava-labs/kava v0.14.1/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d h1:Z+RDyXzjKE0i2sTjZ/b1uxiGtPhFy34Ou/Tk0qwN0kM=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d/go.mod h1:JJNrCn9otv/2QP4D7SMJBgaleKpOf66PnW6F5WGNRIc=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
