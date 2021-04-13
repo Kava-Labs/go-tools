@@ -164,10 +164,9 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 			// if currentRequest then lastRequestTxSeq == checkTxSeq
 			// if not currentRequest then lastRequestTxSeq == checkTxSeq - 1
 			lastRequestTxSeq := checkTxSeq
-			if currentRequest == nil {
+			if currentRequest == nil && lastRequestTxSeq > 0 {
 				lastRequestTxSeq--
 			}
-
 			// reset broadcast seq if iterated over last request seq
 			// we always want to broadcast the current or last request
 			// to heartbeat the mempool
