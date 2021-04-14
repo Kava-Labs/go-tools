@@ -138,7 +138,7 @@ func main() {
 				Msgs: []sdk.Msg{msg},
 				Fee: authtypes.StdFee{
 					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(50000)}},
-					Gas:    200000,
+					Gas:    1000000,
 				},
 				Memo: "",
 			}
