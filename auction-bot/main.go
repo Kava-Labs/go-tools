@@ -155,8 +155,8 @@ func main() {
 			requests <- MsgRequest{
 				Msgs: []sdk.Msg{msg},
 				Fee: authtypes.StdFee{
-					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(10000)}},
-					Gas:    200000,
+					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(15000)}},
+					Gas:    300000,
 				},
 				Memo: "",
 			}
