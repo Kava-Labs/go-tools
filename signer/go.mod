@@ -1,4 +1,4 @@
-module signer
+module github.com/kava-labs/go-tools/signer
 
 go 1.15
 require (
