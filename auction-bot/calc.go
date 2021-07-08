@@ -68,7 +68,7 @@ func handleForwardCollateralAuction(auction auctiontypes.Auction, keeper sdk.Acc
 		return AuctionInfo{}, false
 	}
 
-	proposedBid, ok := calculateProposedBid(collateralAuction.Lot, collateralAuction.MaxBid, assetInfoLot, assetInfoBid, margin)
+	proposedBid, ok := calculateProposedBid(collateralAuction.Bid, collateralAuction.Lot, collateralAuction.MaxBid, assetInfoLot, assetInfoBid, margin)
 
 	if !ok {
 		return AuctionInfo{}, false
@@ -155,15 +155,19 @@ func calculateUSDValue(coin sdk.Coin, assetInfo AssetInfo) sdk.Dec {
 	return coin.Amount.ToDec().Quo(assetInfo.ConversionFactor.ToDec()).Mul(assetInfo.Price)
 }
 
-func calculateProposedBid(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid AssetInfo, margin sdk.Dec) (sdk.Coin, bool) {
+func calculateProposedBid(currentBid, lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid AssetInfo, margin sdk.Dec) (sdk.Coin, bool) {
 	bidsToTry := []sdk.Dec{d("1.0"), d("0.95"), d("0.9"), d("0.8"), d("0.7"), d("0.6"), d("0.5"), d("0.4"), d("0.3"), d("0.2"), d("0.1")}
 	lotUSDValue := calculateUSDValue(lot, assetInfoLot)
 	if lotUSDValue.IsZero() {
 		return sdk.Coin{}, false
 	}
+	minBid := currentBid.Amount.ToDec().Mul(d("1.0105")).RoundInt()
 
 	for _, bid := range bidsToTry {
 		bidAmountInt := maxbid.Amount.ToDec().Mul(bid).TruncateInt()
+		if bidAmountInt.LT(minBid) {
+			bidAmountInt = minBid
+		}
 		bidCoin := sdk.NewCoin(maxbid.Denom, bidAmountInt)
 		bidUSDValue := calculateUSDValue(bidCoin, assetInfoBid)
 		if sdk.OneDec().Sub((bidUSDValue.Quo(lotUSDValue))).GTE(margin) {
