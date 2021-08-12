@@ -1,0 +1,107 @@
+{
+    "mnemonic": "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
+    "rpc_endpoint": "http://localhost:26657",
+    "num_accounts": "100",
+    "messages": [
+        {
+            "msg": {
+                "type": "cosmos-sdk/MsgMultiSend",
+                "value": {
+                    "inputs": [
+                        {
+                            "address": "",
+                            "coins": [
+                                {
+                                    "denom": "bnb",
+                                    "amount": "20000000000"
+                                },
+                                {
+                                    "denom": "ukava",
+                                    "amount": "1000000000"
+                                },
+                                {
+                                    "denom": "xrpb",
+                                    "amount": "110000000000000"
+                                }
+                            ]
+                        }
+                    ],
+                    "outputs": []
+                }
+            },
+            "processor": {
+                "order": "1",
+                "count": "1",
+                "from_primary_account": true,
+                "after_wait_seconds": "30"
+            }
+        },
+        {
+            "msg": {
+                "type": "cdp/MsgCreateCDP",
+                "value": {
+                    "sender": "",
+                    "collateral": {
+                        "denom" : "xrpb",
+                        "amount" : "1000000000000"
+                    },
+                    "principal": {
+                        "denom" : "usdx",
+                        "amount" : "260000000"
+                    },
+                    "collateral_type": "xrpb-a"
+                }
+            },
+            "processor": {
+                "order": "2",
+                "count": "100",
+                "from_primary_account": false,
+                "after_wait_seconds": "30"
+            }
+        },
+        {
+            "msg": {
+                "type": "hard/MsgDeposit",
+                "value": {
+                    "depositor": "",
+                    "amount": [
+                        {
+                            "denom" : "bnb",
+                            "amount" : "200000000"
+                        },
+                        {
+                            "denom" : "xrpb",
+                            "amount" : "100000000000"
+                        }
+                    ]
+                }
+            },
+            "processor": {
+                "order": "3",
+                "count": "100",
+                "from_primary_account": false,
+                "after_wait_seconds": "30"
+            }
+        },
+        {
+            "msg": {
+                "type": "hard/MsgWithdraw",
+                "value": {
+                    "depositor": "",
+                    "amount": [
+                        {
+                            "denom": "bnb",
+                            "amount": "100000000"
+                        }
+                    ]
+                }
+            },
+            "processor": {
+                "order": "4",
+                "count": "100",
+                "from_primary_account": false,
+                "after_wait_seconds": "0"
+            }
+        }
+    ]
+}
