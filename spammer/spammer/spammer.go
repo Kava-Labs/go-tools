@@ -14,6 +14,7 @@ import (
 	"github.com/kava-labs/kava/app"
 	"github.com/kava-labs/kava/x/cdp"
 	"github.com/kava-labs/kava/x/hard"
+	"github.com/kava-labs/kava/x/swap"
 
 	"github.com/kava-labs/go-tools/spammer/client"
 	"github.com/kava-labs/go-tools/spammer/types"
@@ -117,7 +118,7 @@ func (s Spammer) processMsgViaPrimaryAccount(message types.Message) error {
 func (s Spammer) processMsgViaSubAccounts(message types.Message) error {
 	i := 0
 	for i < message.Processor.Count {
-		account := s.accounts[i]
+		account := s.accounts[i] // TODO: randomly assign accounts to messages?
 		var msg sdk.Msg
 		switch message.Msg.Type() {
 		case "create_cdp":
@@ -141,6 +142,27 @@ func (s Spammer) processMsgViaSubAccounts(message types.Message) error {
 			}
 			msgHardWithdraw.Depositor = account.GetAddr()
 			msg = msgHardWithdraw
+		case "swap_deposit":
+			msgSwapDeposit, ok := message.Msg.(swap.MsgDeposit)
+			if !ok {
+				return fmt.Errorf("invalid message structure: %s", message.Msg.Type())
+			}
+			msgSwapDeposit.Depositor = account.GetAddr()
+			msg = msgSwapDeposit
+		case "swap_exact_for_tokens":
+			msgSwapExactForTokens, ok := message.Msg.(swap.MsgSwapExactForTokens)
+			if !ok {
+				return fmt.Errorf("invalid message structure: %s", message.Msg.Type())
+			}
+			msgSwapExactForTokens.Requester = account.GetAddr()
+			msg = msgSwapExactForTokens
+		case "swap_withdraw":
+			msgSwapWithdraw, ok := message.Msg.(swap.MsgWithdraw)
+			if !ok {
+				return fmt.Errorf("invalid message structure: %s", message.Msg.Type())
+			}
+			msgSwapWithdraw.From = account.GetAddr()
+			msg = msgSwapWithdraw
 		default:
 			return fmt.Errorf("unsupported message type: %s", message.Msg.Type())
 		}
