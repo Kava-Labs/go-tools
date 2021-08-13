@@ -1,0 +1,132 @@
+{
+  "mnemonic": "",
+  "rpc_endpoint": "http://localhost:26657",
+  "num_accounts": "100",
+  "messages": [
+    {
+      "msg": {
+        "type": "cosmos-sdk/MsgMultiSend",
+        "value": {
+          "inputs": [
+            {
+              "address": "",
+              "coins": [
+                {
+                  "denom": "ukava",
+                  "amount": "40000000000"
+                },
+                {
+                  "denom": "usdx",
+                  "amount": "40000000000"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        }
+      },
+      "processor": {
+        "order": "1",
+        "count": "1",
+        "from_primary_account": true,
+        "after_wait_seconds": "30"
+      }
+    },
+    {
+      "msg": {
+        "type": "swap/MsgDeposit",
+        "value": {
+          "depositor": "",
+          "token_a": {
+            "denom": "ukava",
+            "amount": "100000000"
+          },
+          "token_b": {
+            "denom": "usdx",
+            "amount": "200000000"
+          },
+          "slippage": "0.15",
+          "deadline": "64742671490"
+        }
+      },
+      "processor": {
+        "order": "2",
+        "count": "100",
+        "from_primary_account": false,
+        "after_wait_seconds": "15"
+      }
+    },
+    {
+      "msg": {
+        "type": "swap/MsgSwapExactForTokens",
+        "value": {
+          "requester": "",
+          "exact_token_a": {
+            "denom": "ukava",
+            "amount": "50000000"
+          },
+          "token_b": {
+            "denom": "usdx",
+            "amount": "100000000"
+          },
+          "slippage": "0.99",
+          "deadline": "64742671490"
+        }
+      },
+      "processor": {
+        "order": "4",
+        "count": "50",
+        "from_primary_account": false,
+        "after_wait_seconds": "15"
+      }
+    },
+    {
+      "msg": {
+        "type": "swap/MsgSwapExactForTokens",
+        "value": {
+          "requester": "",
+          "exact_token_a": {
+            "denom": "usdx",
+            "amount": "100000000"
+          },
+          "token_b": {
+            "denom": "ukava",
+            "amount": "50000000"
+          },
+          "slippage": "0.99",
+          "deadline": "64742671490"
+        }
+      },
+      "processor": {
+        "order": "5",
+        "count": "50",
+        "from_primary_account": false,
+        "after_wait_seconds": "15"
+      }
+    },
+    {
+      "msg": {
+        "type": "swap/MsgWithdraw",
+        "value": {
+          "from": "",
+          "shares": "141421356",
+          "min_token_a": {
+            "denom": "ukava",
+            "amount": "90000000"
+          },
+          "min_token_b": {
+            "denom": "usdx",
+            "amount": "190000000"
+          },
+          "deadline": "64742671490"
+        }
+      },
+      "processor": {
+        "order": "6",
+        "count": "50",
+        "from_primary_account": false,
+        "after_wait_seconds": "0"
+      }
+    }
+  ]
+}
