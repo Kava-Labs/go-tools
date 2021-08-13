@@ -13,6 +13,7 @@ import (
 
 // DefaultConfigPath is the default config path
 const DefaultConfigPath = "./config/config.json"
+const SwapConfigPath = "./config/config_swap.json"
 
 // Config defines chain connections and mnemonics
 type Config struct {

@@ -24,7 +24,7 @@ var runCmd = &cobra.Command{
 	Short:   "runs the spammer",
 	Example: "run",
 	Run: func(cmd *cobra.Command, args []string) {
-		configPath := pflag.String("config", config.DefaultConfigPath, "path to config file")
+		configPath := pflag.String("config", config.SwapConfigPath, "path to config file")
 		pflag.Parse()
 
 		// Load kava claimers
