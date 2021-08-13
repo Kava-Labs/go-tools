@@ -356,10 +356,10 @@ github.com/kava-labs/go-sdk v0.3.1-0.20210222184904-bf4c2969bc0d/go.mod h1:zyIOO
 github.com/kava-labs/iavl v0.13.4-0.20200520222038-6fa4fba8921e h1:MZZqo9oxf/c69fNje3K9Bd0rjBca76qmycYcnNphWzk=
 github.com/kava-labs/iavl v0.13.4-0.20200520222038-6fa4fba8921e/go.mod h1:MhuTGVny8uFF0Fe7sTbC8pj/5sncuSRBSOc1G2mrrJo=
 github.com/kava-labs/kava v0.12.0/go.mod h1:1AYBNxuelDdwzZzWFsgPUMVwZ9qfKSjgT6UEEhTe/ys=
-github.com/kava-labs/kava v0.12.2 h1:RSB+BhY3tzeNgRubsIeHExGN88w/5H+vJrsfRYFgXZI=
-github.com/kava-labs/kava v0.12.2/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
-github.com/kava-labs/kava v0.13.0-alpha.1 h1:DfDtGKH5WyBAVi4PXyiTsTU/K1N6lzQRRPZy9goGC2A=
-github.com/kava-labs/kava v0.13.0-alpha.1/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
+github.com/kava-labs/kava v0.14.2 h1:9Roe5fGgAQSFqnN4yFYYgqLF5LXw6jH26ZFa/eVXSmE=
+github.com/kava-labs/kava v0.14.2/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
+github.com/kava-labs/kava v0.15.0-beta.1.0.20210812153158-8b54fdafa483 h1:81SOQ5U3M4BRT8Tquu5GblHoHTT5mDGSaITkgnf2GXY=
+github.com/kava-labs/kava v0.15.0-beta.1.0.20210812153158-8b54fdafa483/go.mod h1:mG0tn4xXeUDwP4lHCRluPcFKbEQCFHwROA1vuFLu448=
 github.com/kava-labs/tendermint v0.33.4-0.20200520221629-77480532c622 h1:uqsJITDXMP5Lm4ZHhDWP7QuI1XvoNn9zptTbp7/wrFg=
 github.com/kava-labs/tendermint v0.33.4-0.20200520221629-77480532c622/go.mod h1:y7GZOfZgPhiOeIWjfHo6MWA/+n1NHYM/CCbdkc1ZiCI=
 github.com/kava-labs/tm-db v0.4.2-0.20200506040135-3f7b09feebcd h1:2ez2kbAN34BjuS9Op8CJ2GJo8DrpmicOiY3BY3bagKo=
