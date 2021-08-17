@@ -1,6 +1,10 @@
 package slack_alerts
 
-import "github.com/slack-go/slack"
+import (
+	"fmt"
+
+	"github.com/slack-go/slack"
+)
 
 // A reusable client with helpful methods for a simple way to send messages
 type SlackAlerter struct {
@@ -11,19 +15,23 @@ func NewClient(slackToken string) SlackAlerter {
 	return SlackAlerter{*slack.New(slackToken)}
 }
 
-func (s *SlackAlerter) Info(channelId string, title string, content string) error {
-	headerText := slack.NewTextBlockObject("plain_text", title, true, false)
-	headerBlock := slack.NewHeaderBlock(headerText)
-
-	divSection := slack.NewDividerBlock()
-
-	contentText := slack.NewTextBlockObject("plain_text", content, true, false)
-	contentSection := slack.NewSectionBlock(contentText, nil, nil)
-
+func (s *SlackAlerter) SendMessage(channelId string, text string) error {
 	channelId, _, err := s.SlackClient.PostMessage(
 		channelId,
-		slack.MsgOptionBlocks(headerBlock, divSection, contentSection),
+		slack.MsgOptionText(text, true),
 	)
 
 	return err
+}
+
+func (s *SlackAlerter) Info(channelId string, text string) error {
+	return s.SendMessage(channelId, fmt.Sprintf("*`[INFO]`* %s", text))
+}
+
+func (s *SlackAlerter) Warn(channelId string, text string) error {
+	return s.SendMessage(channelId, fmt.Sprintf(":warning: *`[WARN]`* %s", text))
+}
+
+func (s *SlackAlerter) Error(channelId string, text string) error {
+	return s.SendMessage(channelId, fmt.Sprintf(":alert: *`[ERROR]`* %s", text))
 }
