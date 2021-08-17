@@ -8,10 +8,12 @@ import (
 )
 
 func main() {
-	webhook_url := os.Getenv("WEBHOOK_URL")
-	err := slack_alerts.SendTextMessage(webhook_url, "Hello World")
+	slackToken := os.Getenv("SLACK_TOKEN")
+	alertClient := slack_alerts.NewClient(slackToken)
+
+	err := alertClient.Info("C02AWS3BBGX", "Some title", "something happened")
 
 	if err != nil {
-		log.Print("Error sending message", err)
+		log.Print("Error sending message ", err)
 	}
 }

@@ -1,14 +1,24 @@
 package slack_alerts
 
 import (
+	"fmt"
+
 	"github.com/slack-go/slack"
 )
 
-// Sends a simple message to a webhook
-func SendTextMessage(url string, text string) error {
-	return SendMessage(url, &slack.WebhookMessage{Text: text})
-}
+// Send a one off message to a given slack channel
+func SendMessage(token string, channel_id string, options ...slack.MsgOption) error {
+	api := slack.New(token)
 
-func SendMessage(url string, msg *slack.WebhookMessage) error {
-	return slack.PostWebhook(url, msg)
+	channelID, timestamp, err := api.PostMessage(
+		channel_id,
+		options...,
+	)
+
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
+
+	return nil
 }

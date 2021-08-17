@@ -2,19 +2,28 @@ package slack_alerts
 
 import "github.com/slack-go/slack"
 
-// A reusable client to send messages so that you do not need to keep passing a webhook url around
-type Client struct {
-	webhookUrl string
+// A reusable client with helpful methods for a simple way to send messages
+type SlackAlerter struct {
+	SlackClient slack.Client
 }
 
-func NewClient(webhookUrl string) Client {
-	return Client{webhookUrl}
+func NewClient(slackToken string) SlackAlerter {
+	return SlackAlerter{*slack.New(slackToken)}
 }
 
-func (c *Client) SendMessage(msg *slack.WebhookMessage) error {
-	return SendMessage(c.webhookUrl, msg)
-}
+func (s *SlackAlerter) Info(channelId string, title string, content string) error {
+	headerText := slack.NewTextBlockObject("plain_text", title, true, false)
+	headerBlock := slack.NewHeaderBlock(headerText)
 
-func (c *Client) SendTextMessage(text string) error {
-	return c.SendMessage(&slack.WebhookMessage{Text: text})
+	divSection := slack.NewDividerBlock()
+
+	contentText := slack.NewTextBlockObject("plain_text", content, true, false)
+	contentSection := slack.NewSectionBlock(contentText, nil, nil)
+
+	channelId, _, err := s.SlackClient.PostMessage(
+		channelId,
+		slack.MsgOptionBlocks(headerBlock, divSection, contentSection),
+	)
+
+	return err
 }
