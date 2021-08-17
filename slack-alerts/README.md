@@ -5,27 +5,9 @@ Package for easily sending messages to a Slack channel.
 ## Slack Setup
 
 1. [Create a Slack app](https://api.slack.com/apps/new)
-2. Activate incoming webhooks and add a new webhook to your workspace
-3. Copy your webhook URL
+2. Add the `chat:write` bot token scope
+3. Add the bot to the desired Slack channel
 
-## Basic Example
+You will need your Bot User OAuth Token to authenticate.
 
-```golang
-package main
-
-import (
-	"log"
-	"os"
-
-	slack_alerts "github.com/kava-labs/go-tools/slack-alerts"
-)
-
-func main() {
-	webhook_url := os.Getenv("WEBHOOK_URL")
-	err := slack_alerts.SendTextMessage(webhook_url, "Hello World")
-
-	if err != nil {
-		log.Print("Error sending message", err)
-	}
-}
-```
+A basic example can be found in [`example/main.go`](./example.main.go)
