@@ -7,6 +7,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
+	slack_alerts "github.com/kava-labs/go-tools/slack-alerts"
 	kava "github.com/kava-labs/kava/app"
 	"github.com/tendermint/tendermint/libs/log"
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
@@ -47,6 +48,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create slack alerts client
+	slackClient := slack_alerts.NewSlackAlerter(config.SlackToken)
+
 	logger.With(
 		"rpcUrl", config.KavaRpcUrl,
 		"Interval", config.Interval.String(),
@@ -84,8 +88,6 @@ func main() {
 
 		logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
 
-		fmt.Println(data.Assets)
-
 		totalValue := sdk.NewDec(0)
 
 		for _, auction := range data.Auctions {
@@ -97,13 +99,31 @@ func main() {
 			}
 
 			usdValue := calculateUSDValue(lot, assetInfo)
-
 			totalValue = totalValue.Add(usdValue)
-
-			fmt.Println(lot.String())
 		}
 
-		fmt.Println("Total auction value", totalValue)
+		logger.Info(fmt.Sprintf("Total auction value %s", totalValue))
+
+		// If total value exceeds the set threshold
+		// +1 if x > y
+		if totalValue.Cmp(config.UsdThreshold.Int) == 1 {
+			warningMsg := fmt.Sprintf(
+				"Auctions exceeded total USD value!\nTotal: %s Threshold: %s",
+				totalValue.String(),
+				config.UsdThreshold.String(),
+			)
+
+			logger.Info(warningMsg)
+			logger.Info("Sending alert to Slack")
+			err := slackClient.Warn(
+				config.SlackChannelId,
+				warningMsg,
+			)
+
+			if err != nil {
+				logger.Error("Failed to send Slack alert", err.Error())
+			}
+		}
 
 		// wait for next interval
 		time.Sleep(config.Interval)

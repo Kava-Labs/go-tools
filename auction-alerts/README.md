@@ -9,8 +9,6 @@ Create a `.env` file:
 ```
 # RPC endpoint
 KAVA_RPC_URL="https://rpc.data.kava.io:443"
-
-
 # Slack bot token
 SLACK_TOKEN="slack_token"
 SLACK_CHANNEL_ID="channel_id"
