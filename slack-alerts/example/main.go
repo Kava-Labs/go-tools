@@ -10,7 +10,7 @@ import (
 func main() {
 	slackToken := os.Getenv("SLACK_TOKEN")
 	channelId := os.Getenv("SLACK_CHANNEL")
-	alertClient := slack_alerts.NewClient(slackToken)
+	alertClient := slack_alerts.NewSlackAlerter(slackToken)
 
 	if err := alertClient.Info(channelId, "something happened"); err != nil {
 		log.Print("Failed to send message")

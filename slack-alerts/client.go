@@ -11,7 +11,7 @@ type SlackAlerter struct {
 	SlackClient slack.Client
 }
 
-func NewClient(slackToken string) SlackAlerter {
+func NewSlackAlerter(slackToken string) SlackAlerter {
 	return SlackAlerter{*slack.New(slackToken)}
 }
 
