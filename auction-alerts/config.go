@@ -21,10 +21,12 @@ type Config struct {
 	KavaRpcUrl string
 	// Interval at which the process runs to check ongoing auctions
 	Interval       time.Duration
+	AlertFrequency time.Duration
 	SlackToken     string
 	SlackChannelId string
 	// US dollar value of auctions that triggers alert
-	UsdThreshold sdk.Dec
+	UsdThreshold      sdk.Dec
+	DynamoDbTableName string
 }
 
 // LoadConfig loads key values from a ConfigLoader
@@ -39,26 +41,35 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 		return Config{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
 	}
 
-	slackToken := loader.Get(slackToken)
-	slackChannelId := loader.Get(slackChannelId)
-	usdThreshold := loader.Get(usdThreshold)
+	dynamoDbTableName := loader.Get(dynamoDbTableNameEnvKey)
+
+	slackToken := loader.Get(slackTokenEnvKey)
+	slackChannelId := loader.Get(slackChannelIdEnvKey)
+	usdThreshold := loader.Get(usdThresholdEnvKey)
 
 	usdThresholdDec, err := sdk.NewDecFromStr(usdThreshold)
 	if err != nil {
 		return Config{}, err
 	}
 
-	updateInterval, err := time.ParseDuration(loader.Get(interval))
+	updateInterval, err := time.ParseDuration(loader.Get(intervalEnvKey))
+	if err != nil {
+		updateInterval = time.Duration(10 * time.Minute)
+	}
+
+	alertFrequency, err := time.ParseDuration(loader.Get(alertFrequencyEnvKey))
 	if err != nil {
 		updateInterval = time.Duration(10 * time.Minute)
 	}
 
 	return Config{
-		KavaRpcUrl:     rpcURL,
-		Interval:       updateInterval,
-		SlackToken:     slackToken,
-		SlackChannelId: slackChannelId,
-		UsdThreshold:   usdThresholdDec,
+		KavaRpcUrl:        rpcURL,
+		Interval:          updateInterval,
+		AlertFrequency:    alertFrequency,
+		SlackToken:        slackToken,
+		SlackChannelId:    slackChannelId,
+		UsdThreshold:      usdThresholdDec,
+		DynamoDbTableName: dynamoDbTableName,
 	}, nil
 }
 

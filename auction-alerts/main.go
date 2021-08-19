@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	aws_config "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -14,16 +20,51 @@ import (
 )
 
 const (
-	kavaRpcUrlEnvKey = "KAVA_RPC_URL"
-	slackToken       = "SLACK_TOKEN"
-	slackChannelId   = "SLACK_CHANNEL_ID"
-	interval         = "INTERVAL"
-	usdThreshold     = "USD_THRESHOLD"
+	kavaRpcUrlEnvKey        = "KAVA_RPC_URL"
+	slackTokenEnvKey        = "SLACK_TOKEN"
+	slackChannelIdEnvKey    = "SLACK_CHANNEL_ID"
+	intervalEnvKey          = "INTERVAL"
+	alertFrequencyEnvKey    = "ALERT_FREQUENCY"
+	usdThresholdEnvKey      = "USD_THRESHOLD"
+	dynamoDbTableNameEnvKey = "DYNAMODB_TABLE_NAME"
 )
 
 func main() {
 	// create base logger
 	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+
+	//
+	// Load config
+	//
+	// if config is not valid, exit with fatal error
+	//
+	config, err := LoadConfig(&EnvLoader{})
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+
+	awsCfg, err := aws_config.LoadDefaultConfig(context.TODO(), aws_config.WithRegion("us-east-1"))
+	if err != nil {
+		logger.Error("Unable to load AWS SDK config, %v", err)
+		os.Exit(1)
+	}
+
+	svc := dynamodb.NewFromConfig(awsCfg)
+
+	output, err := svc.GetItem(context.TODO(), &dynamodb.GetItemInput{
+		TableName: aws.String(config.DynamoDbTableName),
+		Key: map[string]types.AttributeValue{
+			"Id": &types.AttributeValueMemberS{Value: "lastupdate"},
+		},
+	})
+
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+
+	fmt.Println(output)
 
 	//
 	// bootstrap kava chain config
@@ -36,17 +77,6 @@ func main() {
 	kava.SetBech32AddressPrefixes(kavaConfig)
 	kava.SetBip44CoinType(kavaConfig)
 	kavaConfig.Seal()
-
-	//
-	// Load config
-	//
-	// if config is not valid, exit with fatal error
-	//
-	config, err := LoadConfig(&EnvLoader{})
-	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
 
 	// Create slack alerts client
 	slackClient := slack_alerts.NewSlackAlerter(config.SlackToken)

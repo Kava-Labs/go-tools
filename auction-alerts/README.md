@@ -15,11 +15,14 @@ Create a `.env` file:
 ```
 # RPC endpoint
 KAVA_RPC_URL="https://rpc.data.kava.io:443"
+DYNAMODB_TABLE_NAME="auction_alerts"
 # Slack bot user OAuth token
 SLACK_TOKEN="slack_token"
 SLACK_CHANNEL_ID="channel_id"
 # Interval at which the process runs to check ongoing auctions
 INTERVAL="10m"
+# How frequent an alert will be sent when ongoing auctions exceed threshold
+ALERT_FREQUENCY="8h"
 # US dollar value of auctions that triggers alert
 USD_THRESHOLD="100000"
 ```
