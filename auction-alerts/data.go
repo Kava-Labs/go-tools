@@ -16,10 +16,8 @@ type AssetInfo struct {
 }
 
 type AuctionData struct {
-	Assets       map[string]AssetInfo
-	Auctions     auctiontypes.Auctions
-	BidIncrement sdk.Dec
-	BidMargin    sdk.Dec
+	Assets   map[string]AssetInfo
+	Auctions auctiontypes.Auctions
 }
 
 func GetAuctionData(client AuctionClient) (*AuctionData, error) {
@@ -74,9 +72,8 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 	}
 
 	return &AuctionData{
-		Assets:       assetInfo,
-		Auctions:     auctions,
-		BidIncrement: sdk.MustNewDecFromStr("0.01"), // TODO could fetch increment from chain
+		Assets:   assetInfo,
+		Auctions: auctions,
 	}, nil
 }
 

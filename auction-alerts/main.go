@@ -100,6 +100,8 @@ func main() {
 
 			usdValue := calculateUSDValue(lot, assetInfo)
 			totalValue = totalValue.Add(usdValue)
+
+			fmt.Println(lot, assetInfo, usdValue)
 		}
 
 		logger.Info(fmt.Sprintf("Total auction value %s", totalValue))
@@ -108,7 +110,7 @@ func main() {
 		// +1 if x > y
 		if totalValue.Cmp(config.UsdThreshold.Int) == 1 {
 			warningMsg := fmt.Sprintf(
-				"Auctions exceeded total USD value!\nTotal: %s Threshold: %s",
+				"Auctions exceeded total USD value!\nTotal: %s USD\nThreshold: %s USD",
 				totalValue.String(),
 				config.UsdThreshold.String(),
 			)
