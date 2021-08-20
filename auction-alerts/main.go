@@ -1,15 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	aws_config "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -44,27 +38,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	awsCfg, err := aws_config.LoadDefaultConfig(context.TODO(), aws_config.WithRegion("us-east-1"))
-	if err != nil {
-		logger.Error("Unable to load AWS SDK config, %v", err)
-		os.Exit(1)
-	}
-
-	svc := dynamodb.NewFromConfig(awsCfg)
-
-	output, err := svc.GetItem(context.TODO(), &dynamodb.GetItemInput{
-		TableName: aws.String(config.DynamoDbTableName),
-		Key: map[string]types.AttributeValue{
-			"Id": &types.AttributeValueMemberS{Value: "lastupdate"},
-		},
-	})
-
+	db, err := NewDb()
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
-
-	fmt.Println(output)
 
 	//
 	// bootstrap kava chain config
@@ -84,6 +62,7 @@ func main() {
 	logger.With(
 		"rpcUrl", config.KavaRpcUrl,
 		"Interval", config.Interval.String(),
+		"AlertFrequency", config.AlertFrequency.String(),
 	).Info("config loaded")
 
 	//
@@ -139,21 +118,40 @@ func main() {
 		// If total value exceeds the set threshold
 		// +1 if x > y
 		if totalValue.Cmp(config.UsdThreshold.Int) == 1 {
+			lastAlert, found, err := db.GetLatestAlert(config.DynamoDbTableName, config.KavaRpcUrl)
+			if err != nil {
+				logger.Error("Failed to fetch latest alert time", err.Error())
+				continue
+			}
+
+			fmt.Println(lastAlert)
+
 			warningMsg := fmt.Sprintf(
 				"Auctions exceeded total USD value!\nTotal: %s USD\nThreshold: %s USD",
 				totalValue.String(),
 				config.UsdThreshold.String(),
 			)
-
 			logger.Info(warningMsg)
-			logger.Info("Sending alert to Slack")
-			err := slackClient.Warn(
-				config.SlackChannelId,
-				warningMsg,
-			)
 
-			if err != nil {
-				logger.Error("Failed to send Slack alert", err.Error())
+			// If current time in UTC is before (previous timestamp + alert frequency), skip alert
+			if found && time.Now().UTC().Before(lastAlert.Timestamp.Add(config.AlertFrequency)) {
+				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v)",
+					config.AlertFrequency,
+					lastAlert.Timestamp.Format(time.RFC3339),
+				))
+			} else {
+				logger.Info("Sending alert to Slack")
+
+				if err := slackClient.Warn(
+					config.SlackChannelId,
+					warningMsg,
+				); err != nil {
+					logger.Error("Failed to send Slack alert", err.Error())
+				}
+
+				if _, err := db.SaveAlert(config.DynamoDbTableName, config.KavaRpcUrl, time.Now().UTC()); err != nil {
+					logger.Error("Failed to save alert time to DynamoDb", err.Error())
+				}
 			}
 		}
 
