@@ -110,8 +110,6 @@ func main() {
 
 			usdValue := calculateUSDValue(lot, assetInfo)
 			totalValue = totalValue.Add(usdValue)
-
-			fmt.Println(lot, assetInfo, usdValue)
 		}
 
 		logger.Info(fmt.Sprintf("Total auction value $%s", totalValue))
@@ -125,8 +123,6 @@ func main() {
 				continue
 			}
 
-			fmt.Println(lastAlert)
-
 			warningMsg := fmt.Sprintf(
 				"Elevated auction activity:\nTotal collateral value: $%s",
 				strings.Split(totalValue.String(), ".")[0],
@@ -135,9 +131,10 @@ func main() {
 
 			// If current time in UTC is before (previous timestamp + alert frequency), skip alert
 			if found && time.Now().UTC().Before(lastAlert.Timestamp.Add(config.AlertFrequency)) {
-				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v)",
+				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
 					config.AlertFrequency,
 					lastAlert.Timestamp.Format(time.RFC3339),
+					lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
 				))
 			} else {
 				logger.Info("Sending alert to Slack")
