@@ -8,7 +8,10 @@ Bot for sending auction related alerts to Slack.
 2. Add the `chat:write` bot token scope
 3. Add the bot to the desired Slack channel
 
-## DynamoDB
+## DynamoDB Setup
+
+1. Create a new DynamoDB table with the primary parition key set to
+   `RpcEndpoint`.
 
 The latest alert time is persisted in DynamoDB which is used by
 `ALERT_FREQUENCY` below. This will only alert at most once in the given alert
