@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -113,7 +114,7 @@ func main() {
 			fmt.Println(lot, assetInfo, usdValue)
 		}
 
-		logger.Info(fmt.Sprintf("Total auction value %s", totalValue))
+		logger.Info(fmt.Sprintf("Total auction value $%s", totalValue))
 
 		// If total value exceeds the set threshold
 		// +1 if x > y
@@ -127,9 +128,8 @@ func main() {
 			fmt.Println(lastAlert)
 
 			warningMsg := fmt.Sprintf(
-				"Auctions exceeded total USD value!\nTotal: %s USD\nThreshold: %s USD",
-				totalValue.String(),
-				config.UsdThreshold.String(),
+				"Elevated auction activity:\nTotal collateral value: $%s",
+				strings.Split(totalValue.String(), ".")[0],
 			)
 			logger.Info(warningMsg)
 
