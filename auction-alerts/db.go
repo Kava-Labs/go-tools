@@ -11,7 +11,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+var SERVICE_NAME = "AuctionAlerts"
+
 type AlertTime struct {
+	ServiceName string    `json:"ServiceName"`
 	RpcEndpoint string    `json:"RpcEndpoint"`
 	Timestamp   time.Time `json:"Timestamp"`
 }
@@ -35,6 +38,7 @@ func (db *Db) GetLatestAlert(tableName string, rpcUrl string) (AlertTime, bool, 
 	lastAlert, err := db.svc.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
 		Key: map[string]types.AttributeValue{
+			"ServiceName": &types.AttributeValueMemberS{Value: SERVICE_NAME},
 			"RpcEndpoint": &types.AttributeValueMemberS{Value: rpcUrl},
 		},
 	})
@@ -60,6 +64,7 @@ func (db *Db) SaveAlert(tableName string, rpcUrl string, d time.Time) (*dynamodb
 	return db.svc.PutItem(context.TODO(), &dynamodb.PutItemInput{
 		TableName: aws.String(tableName),
 		Item: map[string]types.AttributeValue{
+			"ServiceName": &types.AttributeValueMemberS{Value: SERVICE_NAME},
 			"RpcEndpoint": &types.AttributeValueMemberS{Value: rpcUrl},
 			"Timestamp":   &types.AttributeValueMemberS{Value: d.Format(time.RFC3339)},
 		},
