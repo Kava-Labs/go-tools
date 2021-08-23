@@ -89,11 +89,22 @@ func main() {
 	logger.Info("creating rpc client")
 	auctionClient := NewRpcAuctionClient(http, cdc)
 
+	firstIteration := true
+
 	for {
+		// Wait for next interval after the first loop. This is done at the
+		// beginning so that any following `continue` statements will not
+		// continue the loop immediately.
+		if !firstIteration {
+			time.Sleep(config.Interval)
+		} else {
+			firstIteration = false
+		}
+
 		data, err := GetAuctionData(auctionClient)
 		if err != nil {
 			logger.Error(err.Error())
-			os.Exit(1)
+			continue
 		}
 
 		logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
@@ -105,7 +116,7 @@ func main() {
 			assetInfo, ok := data.Assets[lot.Denom]
 			if !ok {
 				logger.Error("Missing asset info for %s", lot.Denom)
-				os.Exit(1)
+				continue
 			}
 
 			usdValue := calculateUSDValue(lot, assetInfo)
@@ -151,8 +162,5 @@ func main() {
 				}
 			}
 		}
-
-		// wait for next interval
-		time.Sleep(config.Interval)
 	}
 }
