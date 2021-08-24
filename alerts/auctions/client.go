@@ -35,8 +35,8 @@ type AuctionClient interface {
 
 // RpcAuctionClient defines a client for interacting with auctions via rpc
 type RpcAuctionClient struct {
-	rpc       RpcClient    `json:"rpc" yaml:"rpc"`
-	cdc       *codec.Codec `json:"cdc" yaml:"cdc"`
+	rpc       RpcClient
+	cdc       *codec.Codec
 	PageLimit int
 }
 

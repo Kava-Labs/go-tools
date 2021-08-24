@@ -16,7 +16,7 @@ type AuctionInfo struct {
 // AuctionInfos is an array of AuctionInfo
 type AuctionInfos []AuctionInfo
 
-func TotalAuctionsUSDValue(data *AuctionData) (sdk.Dec, error) {
+func CalculateTotalAuctionsUSDValue(data *AuctionData) (sdk.Dec, error) {
 	totalValue := sdk.NewDec(0)
 
 	for _, auction := range data.Auctions {

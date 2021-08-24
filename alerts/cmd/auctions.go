@@ -107,41 +107,44 @@ var runAuctionsCmd = &cobra.Command{
 
 			logger.Info(fmt.Sprintf("Total auction value $%s", totalValue))
 
+			// Total value has not exceeded threshold, continue
+			if totalValue.Cmp(config.UsdThreshold.Int) != 1 {
+				continue
+			}
+
 			// If total value exceeds the set threshold
 			// +1 if x > y
-			if totalValue.Cmp(config.UsdThreshold.Int) == 1 {
-				lastAlert, found, err := db.GetLatestAlert()
-				if err != nil {
-					logger.Error("Failed to fetch latest alert time", err.Error())
-					continue
+			lastAlert, found, err := db.GetLatestAlert()
+			if err != nil {
+				logger.Error("Failed to fetch latest alert time", err.Error())
+				continue
+			}
+
+			warningMsg := fmt.Sprintf(
+				"Elevated auction activity:\nTotal collateral value: $%s",
+				strings.Split(totalValue.String(), ".")[0],
+			)
+			logger.Info(warningMsg)
+
+			// If current time in UTC is before (previous timestamp + alert frequency), skip alert
+			if found && time.Now().UTC().Before(lastAlert.Timestamp.Add(config.AlertFrequency)) {
+				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
+					config.AlertFrequency,
+					lastAlert.Timestamp.Format(time.RFC3339),
+					lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
+				))
+			} else {
+				logger.Info("Sending alert to Slack")
+
+				if err := slackAlerter.Warn(
+					config.SlackChannelId,
+					warningMsg,
+				); err != nil {
+					logger.Error("Failed to send Slack alert", err.Error())
 				}
 
-				warningMsg := fmt.Sprintf(
-					"Elevated auction activity:\nTotal collateral value: $%s",
-					strings.Split(totalValue.String(), ".")[0],
-				)
-				logger.Info(warningMsg)
-
-				// If current time in UTC is before (previous timestamp + alert frequency), skip alert
-				if found && time.Now().UTC().Before(lastAlert.Timestamp.Add(config.AlertFrequency)) {
-					logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
-						config.AlertFrequency,
-						lastAlert.Timestamp.Format(time.RFC3339),
-						lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
-					))
-				} else {
-					logger.Info("Sending alert to Slack")
-
-					if err := slackAlerter.Warn(
-						config.SlackChannelId,
-						warningMsg,
-					); err != nil {
-						logger.Error("Failed to send Slack alert", err.Error())
-					}
-
-					if err := db.SaveAlert(time.Now().UTC()); err != nil {
-						logger.Error("Failed to save alert time to DynamoDb", err.Error())
-					}
+				if err := db.SaveAlert(time.Now().UTC()); err != nil {
+					logger.Error("Failed to save alert time to DynamoDb", err.Error())
 				}
 			}
 		}
