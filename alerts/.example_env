@@ -1,0 +1,8 @@
+KAVA_RPC_URL="https://rpc.data-testnet.kava.io:443"
+DYNAMODB_TABLE_NAME="service_alerts"
+# Slack bot token
+SLACK_TOKEN=""
+SLACK_CHANNEL_ID=""
+INTERVAL="10m"
+ALERT_FREQUENCY="8h"
+USD_THRESHOLD="100000"
