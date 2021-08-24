@@ -28,21 +28,19 @@ var runAuctionsCmd = &cobra.Command{
 	Use:     "run",
 	Short:   "runs the alerter for auctions on the Kava blockchain",
 	Example: "run",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create base logger
 		logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
 		// Load config. If config is not valid, exit with fatal error
 		config, err := config.LoadConfig(&config.EnvLoader{})
 		if err != nil {
-			logger.Error(err.Error())
-			os.Exit(1)
+			return err
 		}
 
 		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _serviceName, config.KavaRpcUrl)
 		if err != nil {
-			logger.Error(err.Error())
-			os.Exit(1)
+			return err
 		}
 
 		// Get last alert to test if we can successfully fetch from DynamoDB
@@ -70,9 +68,7 @@ var runAuctionsCmd = &cobra.Command{
 		// Bootstrap rpc http clent
 		http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
 		if err != nil {
-			logger.Error("failed to connect")
-			logger.Error(err.Error())
-			os.Exit(1)
+			return err
 		}
 		http.Logger = logger
 
