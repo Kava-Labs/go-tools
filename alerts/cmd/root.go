@@ -7,10 +7,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "alerts",
-	Short: "alerter for the Kava blockchain",
-}
+var (
+	cfgFile string
+
+	rootCmd = &cobra.Command{
+		Use:   "alerts",
+		Short: "alerter for the Kava blockchain",
+	}
+)
 
 // Execute runs the root command
 func Execute() {

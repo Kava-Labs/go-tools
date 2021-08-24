@@ -14,6 +14,7 @@ require (
 	github.com/kava-labs/kava v0.14.3
 	github.com/slack-go/slack v0.9.4
 	github.com/spf13/cobra v1.2.1
+	github.com/spf13/viper v1.8.1 // indirect
 	github.com/tendermint/tendermint v0.33.9
 
 )

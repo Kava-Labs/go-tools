@@ -33,7 +33,7 @@ var runAuctionsCmd = &cobra.Command{
 		logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
 		// Load config. If config is not valid, exit with fatal error
-		config, err := config.LoadConfig(&config.EnvLoader{})
+		config, err := config.LoadAuctionsConfig(&config.EnvLoader{})
 		if err != nil {
 			return err
 		}
@@ -61,6 +61,7 @@ var runAuctionsCmd = &cobra.Command{
 
 		logger.With(
 			"rpcUrl", config.KavaRpcUrl,
+			"UsdThreshold", strings.Split(config.UsdThreshold.String(), ".")[0],
 			"Interval", config.Interval.String(),
 			"AlertFrequency", config.AlertFrequency.String(),
 		).Info("config loaded")

@@ -11,12 +11,12 @@ import (
 
 const (
 	kavaRpcUrlEnvKey        = "KAVA_RPC_URL"
+	dynamoDbTableNameEnvKey = "DYNAMODB_TABLE_NAME"
 	slackTokenEnvKey        = "SLACK_TOKEN"
 	slackChannelIdEnvKey    = "SLACK_CHANNEL_ID"
 	intervalEnvKey          = "INTERVAL"
 	alertFrequencyEnvKey    = "ALERT_FREQUENCY"
 	usdThresholdEnvKey      = "USD_THRESHOLD"
-	dynamoDbTableNameEnvKey = "DYNAMODB_TABLE_NAME"
 )
 
 // ConfigLoader provides an interface for loading config values from a provided
@@ -26,39 +26,57 @@ type ConfigLoader interface {
 }
 
 // Config provides application configuration
-type Config struct {
-	KavaRpcUrl string
-	// Interval at which the process runs to check ongoing auctions
-	Interval       time.Duration
-	AlertFrequency time.Duration
-	SlackToken     string
-	SlackChannelId string
-	// US dollar value of auctions that triggers alert
-	UsdThreshold      sdk.Dec
+type BaseConfig struct {
+	KavaRpcUrl        string
 	DynamoDbTableName string
+	SlackToken        string
+	SlackChannelId    string
+	Interval          time.Duration
+	AlertFrequency    time.Duration
 }
 
-// LoadConfig loads key values from a ConfigLoader and returns a new Config
-func LoadConfig(loader ConfigLoader) (Config, error) {
+type AuctionsConfig struct {
+	BaseConfig
+	// US dollar value of auctions that triggers alert
+	UsdThreshold sdk.Dec
+}
+
+// LoadAuctionsConfig loads key values from a ConfigLoader and returns a new AuctionsConfig
+func LoadAuctionsConfig(loader ConfigLoader) (AuctionsConfig, error) {
+	baseConfig, err := LoadBaseConfig(loader)
+	if err != nil {
+		return AuctionsConfig{}, err
+	}
+
+	usdThreshold := loader.Get(usdThresholdEnvKey)
+
+	usdThresholdDec, err := sdk.NewDecFromStr(usdThreshold)
+	if err != nil {
+		return AuctionsConfig{}, err
+	}
+
+	return AuctionsConfig{
+		BaseConfig:   baseConfig,
+		UsdThreshold: usdThresholdDec,
+	}, nil
+}
+
+// LoadBaseConfig loads key values from a ConfigLoader and returns a new
+// BaseConfig used for multiple different commands
+func LoadBaseConfig(loader ConfigLoader) (BaseConfig, error) {
 	err := godotenv.Load()
 	if err != nil {
-		return Config{}, err
+		return BaseConfig{}, err
 	}
 	rpcURL := loader.Get(kavaRpcUrlEnvKey)
 	if rpcURL == "" {
-		return Config{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
+		return BaseConfig{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
 	}
 
 	dynamoDbTableName := loader.Get(dynamoDbTableNameEnvKey)
 
 	slackToken := loader.Get(slackTokenEnvKey)
 	slackChannelId := loader.Get(slackChannelIdEnvKey)
-	usdThreshold := loader.Get(usdThresholdEnvKey)
-
-	usdThresholdDec, err := sdk.NewDecFromStr(usdThreshold)
-	if err != nil {
-		return Config{}, err
-	}
 
 	updateInterval, err := time.ParseDuration(loader.Get(intervalEnvKey))
 	if err != nil {
@@ -70,13 +88,12 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 		updateInterval = time.Duration(10 * time.Minute)
 	}
 
-	return Config{
+	return BaseConfig{
 		KavaRpcUrl:        rpcURL,
 		Interval:          updateInterval,
 		AlertFrequency:    alertFrequency,
 		SlackToken:        slackToken,
 		SlackChannelId:    slackChannelId,
-		UsdThreshold:      usdThresholdDec,
 		DynamoDbTableName: dynamoDbTableName,
 	}, nil
 }
