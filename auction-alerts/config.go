@@ -10,8 +10,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// ConfigLoader provides an interface for
-// loading config values from a provided key
+// ConfigLoader provides an interface for loading config values from a provided
+// key
 type ConfigLoader interface {
 	Get(key string) string
 }
@@ -29,8 +29,7 @@ type Config struct {
 	DynamoDbTableName string
 }
 
-// LoadConfig loads key values from a ConfigLoader
-// and returns a new Config
+// LoadConfig loads key values from a ConfigLoader and returns a new Config
 func LoadConfig(loader ConfigLoader) (Config, error) {
 	err := godotenv.Load()
 	if err != nil {

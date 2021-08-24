@@ -10,16 +10,19 @@ import (
 	hardtypes "github.com/kava-labs/kava/x/hard/types"
 )
 
+// AssetInfo defines the price and conversion factor of a specific asset
 type AssetInfo struct {
 	Price            sdk.Dec
 	ConversionFactor sdk.Int
 }
 
+// AuctionData defines a map of AssetInfo and array of current auctions
 type AuctionData struct {
 	Assets   map[string]AssetInfo
 	Auctions auctiontypes.Auctions
 }
 
+// GetAuctionData returns AuctionData for current auctions
 func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 	// fetch chain info to get height
 	info, err := client.GetInfo()

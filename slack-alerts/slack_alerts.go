@@ -6,7 +6,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// Send a one off message to a given slack channel
+// SendMessage sends a one off message to a given slack channel
 func SendMessage(token string, channel_id string, options ...slack.MsgOption) error {
 	api := slack.New(token)
 

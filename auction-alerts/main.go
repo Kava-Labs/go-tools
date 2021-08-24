@@ -25,14 +25,10 @@ const (
 )
 
 func main() {
-	// create base logger
+	// Create base logger
 	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
-	//
-	// Load config
-	//
-	// if config is not valid, exit with fatal error
-	//
+	// Load config. If config is not valid, exit with fatal error
 	config, err := LoadConfig(&EnvLoader{})
 	if err != nil {
 		logger.Error(err.Error())
@@ -45,13 +41,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	//
 	// bootstrap kava chain config
-	//
 	// sets a global cosmos sdk for bech32 prefix
-	//
 	// required before loading config
-	//
 	kavaConfig := sdk.GetConfig()
 	kava.SetBech32AddressPrefixes(kavaConfig)
 	kava.SetBip44CoinType(kavaConfig)
@@ -66,9 +58,7 @@ func main() {
 		"AlertFrequency", config.AlertFrequency.String(),
 	).Info("config loaded")
 
-	//
-	// bootstrap rpc http clent
-	//
+	// Bootstrap rpc http clent
 	http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
 	if err != nil {
 		logger.Error("failed to connect")
@@ -77,15 +67,10 @@ func main() {
 	}
 	http.Logger = logger
 
-	//
-	// create codec for messages
-	//
+	// Create codec for messages
 	cdc := kava.MakeCodec()
 
-	//
-	// create rpc client for fetching data
-	// required for bidding
-	//
+	// Create rpc client for fetching data
 	logger.Info("creating rpc client")
 	auctionClient := NewRpcAuctionClient(http, cdc)
 

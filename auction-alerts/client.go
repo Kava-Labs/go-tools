@@ -18,11 +18,13 @@ const (
 	DefaultPageLimit = 1000
 )
 
+// InfoResponse defines the ID and latest height for a specific chain
 type InfoResponse struct {
 	ChainId      string `json:"chain_id" yaml:"chain_id"`
 	LatestHeight int64  `json:"latest_height" yaml:"latest_height"`
 }
 
+// AuctionClient defines the expected client interface for interacting with auctions
 type AuctionClient interface {
 	GetInfo() (*InfoResponse, error)
 	GetPrices(height int64) (pricefeedtypes.CurrentPrices, error)
@@ -31,6 +33,7 @@ type AuctionClient interface {
 	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
+// RpcAuctionClient defines a client for interacting with auctions via rpc
 type RpcAuctionClient struct {
 	rpc       RpcClient    `json:"rpc" yaml:"rpc"`
 	cdc       *codec.Codec `json:"cdc" yaml:"cdc"`
@@ -39,6 +42,7 @@ type RpcAuctionClient struct {
 
 var _ AuctionClient = (*RpcAuctionClient)(nil)
 
+// NewRpcAuctionClient returns a new RpcAuctionClient
 func NewRpcAuctionClient(rpc RpcClient, cdc *codec.Codec) *RpcAuctionClient {
 	return &RpcAuctionClient{
 		rpc:       rpc,
@@ -47,6 +51,7 @@ func NewRpcAuctionClient(rpc RpcClient, cdc *codec.Codec) *RpcAuctionClient {
 	}
 }
 
+// GetInfo returns the current chain info
 func (c *RpcAuctionClient) GetInfo() (*InfoResponse, error) {
 	result, err := c.rpc.Status()
 	if err != nil {
@@ -59,6 +64,7 @@ func (c *RpcAuctionClient) GetInfo() (*InfoResponse, error) {
 	}, nil
 }
 
+// GetPrices gets the current prices for markets
 func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices, error) {
 	path := fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrices)
 
@@ -76,6 +82,7 @@ func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices
 	return currentPrices, nil
 }
 
+// GetMarkets gets an array of collateral params for each collateral type
 func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, error) {
 	path := fmt.Sprintf("custom/%s/%s", cdptypes.QuerierRoute, cdptypes.QueryGetParams)
 
@@ -93,6 +100,7 @@ func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, 
 	return params.CollateralParams, nil
 }
 
+// GetMoneyMarkets gets an array of money markets for each asset
 func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
 	path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
 	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
@@ -108,6 +116,7 @@ func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets
 	return params.MoneyMarkets, nil
 }
 
+// GetAuctions gets all the currently running auctions
 func (c *RpcAuctionClient) GetAuctions(height int64) (auctiontypes.Auctions, error) {
 	path := fmt.Sprintf("custom/%s/%s", auctiontypes.QuerierRoute, auctiontypes.QueryGetAuctions)
 

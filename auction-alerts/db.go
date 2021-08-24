@@ -13,16 +13,19 @@ import (
 
 var SERVICE_NAME = "AuctionAlerts"
 
+// AlertTime defines a previous alert time for a specific service and network
 type AlertTime struct {
 	ServiceName string    `json:"ServiceName"`
 	RpcEndpoint string    `json:"RpcEndpoint"`
 	Timestamp   time.Time `json:"Timestamp"`
 }
 
+// Db wraps a DynamoDB client to provide simple functions to get and save alerts
 type Db struct {
 	svc *dynamodb.Client
 }
 
+// NewDb returns a db with the AWS configuration initialized
 func NewDb() (Db, error) {
 	awsCfg, err := aws_config.LoadDefaultConfig(context.TODO())
 	if err != nil {
@@ -32,8 +35,7 @@ func NewDb() (Db, error) {
 	return Db{dynamodb.NewFromConfig(awsCfg)}, nil
 }
 
-/// Gets the latest alert time
-/// Returns AlertTime, false if item not found, error
+// GetLatestAlert returns the latest alert time and if the item was found
 func (db *Db) GetLatestAlert(tableName string, rpcUrl string) (AlertTime, bool, error) {
 	lastAlert, err := db.svc.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
@@ -60,6 +62,7 @@ func (db *Db) GetLatestAlert(tableName string, rpcUrl string) (AlertTime, bool, 
 	return AlertTime{}, false, nil
 }
 
+// SaveAlert saves an alert for a given RpcEndpoint
 func (db *Db) SaveAlert(tableName string, rpcUrl string, d time.Time) (*dynamodb.PutItemOutput, error) {
 	return db.svc.PutItem(context.TODO(), &dynamodb.PutItemInput{
 		TableName: aws.String(tableName),
