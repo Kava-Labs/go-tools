@@ -17,7 +17,7 @@ import (
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 )
 
-var serviceName = "AuctionAlerts"
+var _serviceName = "AuctionAlerts"
 
 var auctionsCmd = &cobra.Command{
 	Use:   "auctions",
@@ -39,10 +39,15 @@ var runAuctionsCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		db, err := persistence.NewDb()
+		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _serviceName, config.KavaRpcUrl)
 		if err != nil {
 			logger.Error(err.Error())
 			os.Exit(1)
+		}
+
+		// Get last alert to test if we can successfully fetch from DynamoDB
+		if _, _, err := db.GetLatestAlert(); err != nil {
+			return fmt.Errorf("Failed to fetch alert times from DynamoDB: %v", err)
 		}
 
 		// bootstrap kava chain config
@@ -117,7 +122,7 @@ var runAuctionsCmd = &cobra.Command{
 			// If total value exceeds the set threshold
 			// +1 if x > y
 			if totalValue.Cmp(config.UsdThreshold.Int) == 1 {
-				lastAlert, found, err := db.GetLatestAlert(config.DynamoDbTableName, serviceName, config.KavaRpcUrl)
+				lastAlert, found, err := db.GetLatestAlert()
 				if err != nil {
 					logger.Error("Failed to fetch latest alert time", err.Error())
 					continue
@@ -146,7 +151,7 @@ var runAuctionsCmd = &cobra.Command{
 						logger.Error("Failed to send Slack alert", err.Error())
 					}
 
-					if err := db.SaveAlert(config.DynamoDbTableName, serviceName, config.KavaRpcUrl, time.Now().UTC()); err != nil {
+					if err := db.SaveAlert(time.Now().UTC()); err != nil {
 						logger.Error("Failed to save alert time to DynamoDb", err.Error())
 					}
 				}

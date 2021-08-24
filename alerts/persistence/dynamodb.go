@@ -19,30 +19,38 @@ type AlertTime struct {
 }
 
 // Db wraps a DynamoDB client to provide simple functions to get and save alerts
-type Db struct {
-	svc *dynamodb.Client
+type DynamoDbPersister struct {
+	tableName   string
+	serviceName string
+	rpcEndpoint string
+	svc         *dynamodb.Client
 }
 
 // Verify interface compliance at compile time
-var _ AlertPersister = (*Db)(nil)
+var _ AlertPersister = (*DynamoDbPersister)(nil)
 
-// NewDb returns a db with the AWS configuration initialized
-func NewDb() (Db, error) {
+// NewDynamoDbPersister returns a db with the AWS configuration initialized
+func NewDynamoDbPersister(tableName string, serviceName string, rpcEndpoint string) (DynamoDbPersister, error) {
 	awsCfg, err := aws_config.LoadDefaultConfig(context.TODO())
 	if err != nil {
-		return Db{}, err
+		return DynamoDbPersister{}, err
 	}
 
-	return Db{dynamodb.NewFromConfig(awsCfg)}, nil
+	return DynamoDbPersister{
+		tableName:   tableName,
+		serviceName: serviceName,
+		rpcEndpoint: rpcEndpoint,
+		svc:         dynamodb.NewFromConfig(awsCfg),
+	}, nil
 }
 
 // GetLatestAlert returns the latest alert time and if the item was found
-func (db *Db) GetLatestAlert(tableName string, serviceName string, rpcUrl string) (AlertTime, bool, error) {
+func (db *DynamoDbPersister) GetLatestAlert() (AlertTime, bool, error) {
 	lastAlert, err := db.svc.GetItem(context.TODO(), &dynamodb.GetItemInput{
-		TableName: aws.String(tableName),
+		TableName: aws.String(db.tableName),
 		Key: map[string]types.AttributeValue{
-			"ServiceName": &types.AttributeValueMemberS{Value: serviceName},
-			"RpcEndpoint": &types.AttributeValueMemberS{Value: rpcUrl},
+			"ServiceName": &types.AttributeValueMemberS{Value: db.serviceName},
+			"RpcEndpoint": &types.AttributeValueMemberS{Value: db.rpcEndpoint},
 		},
 	})
 	if err != nil {
@@ -64,12 +72,12 @@ func (db *Db) GetLatestAlert(tableName string, serviceName string, rpcUrl string
 }
 
 // SaveAlert saves an alert for a given RpcEndpoint
-func (db *Db) SaveAlert(tableName string, serviceName string, rpcUrl string, d time.Time) error {
+func (db *DynamoDbPersister) SaveAlert(d time.Time) error {
 	_, err := db.svc.PutItem(context.TODO(), &dynamodb.PutItemInput{
-		TableName: aws.String(tableName),
+		TableName: aws.String(db.tableName),
 		Item: map[string]types.AttributeValue{
-			"ServiceName": &types.AttributeValueMemberS{Value: serviceName},
-			"RpcEndpoint": &types.AttributeValueMemberS{Value: rpcUrl},
+			"ServiceName": &types.AttributeValueMemberS{Value: db.serviceName},
+			"RpcEndpoint": &types.AttributeValueMemberS{Value: db.rpcEndpoint},
 			"Timestamp":   &types.AttributeValueMemberS{Value: d.Format(time.RFC3339)},
 		},
 	})
