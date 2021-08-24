@@ -57,7 +57,7 @@ var runAuctionsCmd = &cobra.Command{
 		kavaConfig.Seal()
 
 		// Create slack alerts client
-		slackClient := alerter.NewSlackAlerter(config.SlackToken)
+		slackAlerter := alerter.NewSlackAlerter(config.SlackToken)
 
 		logger.With(
 			"rpcUrl", config.KavaRpcUrl,
@@ -99,18 +99,10 @@ var runAuctionsCmd = &cobra.Command{
 
 			logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
 
-			totalValue := sdk.NewDec(0)
-
-			for _, auction := range data.Auctions {
-				lot := auction.GetLot()
-				assetInfo, ok := data.Assets[lot.Denom]
-				if !ok {
-					logger.Error("Missing asset info for %s", lot.Denom)
-					continue
-				}
-
-				usdValue := auctions.CalculateUSDValue(lot, assetInfo)
-				totalValue = totalValue.Add(usdValue)
+			totalValue, err := auctions.CalculateTotalAuctionsUSDValue(data)
+			if err != nil {
+				logger.Error(err.Error())
+				continue
 			}
 
 			logger.Info(fmt.Sprintf("Total auction value $%s", totalValue))
@@ -140,7 +132,7 @@ var runAuctionsCmd = &cobra.Command{
 				} else {
 					logger.Info("Sending alert to Slack")
 
-					if err := slackClient.Warn(
+					if err := slackAlerter.Warn(
 						config.SlackChannelId,
 						warningMsg,
 					); err != nil {
