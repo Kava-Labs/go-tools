@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -80,13 +79,4 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 		UsdThreshold:      usdThresholdDec,
 		DynamoDbTableName: dynamoDbTableName,
 	}, nil
-}
-
-// EnvLoader loads keys from os environment
-type EnvLoader struct {
-}
-
-// Get retrieves key from environment
-func (l *EnvLoader) Get(key string) string {
-	return os.Getenv(key)
 }
