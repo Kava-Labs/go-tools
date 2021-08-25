@@ -32,12 +32,14 @@ var runAuctionsCmd = &cobra.Command{
 		// Create base logger
 		logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
-		// Load config. If config is not valid, exit with fatal error
+		// Load config. If config is not valid, exit with error
 		config, err := config.LoadAuctionsConfig(&config.EnvLoader{})
 		if err != nil {
 			return err
 		}
 
+		// Create a new alert persister backed with DynamoDB. If AWS config is
+		// invalid, exits with error
 		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaRpcUrl)
 		if err != nil {
 			return err
