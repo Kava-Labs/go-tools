@@ -7,7 +7,6 @@ const (
 	slackChannelIdEnvKey    = "SLACK_CHANNEL_ID"
 	intervalEnvKey          = "INTERVAL"
 	alertFrequencyEnvKey    = "ALERT_FREQUENCY"
-	usdThresholdEnvKey      = "USD_THRESHOLD"
 )
 
 // ConfigLoader provides an interface for loading config values from a provided

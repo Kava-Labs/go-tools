@@ -382,6 +382,8 @@ github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfV
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/kava-labs/kava v0.14.3 h1:feDGlm0+jMOClcI2V12BP7ohsLTXnENH9S7xlwd7HC0=
 github.com/kava-labs/kava v0.14.3/go.mod h1:eWBRWvt7ReAi16TsDK7n2ADz1wqeKWOehJXrEVUiRdg=
+github.com/kava-labs/kava v0.15.0-rc1.0.20210825221911-ae70dce2b15e h1:cjfEWIyr4Xv2sLqzEADfYhZ5zx+yvCI9yrGPZFouRgg=
+github.com/kava-labs/kava v0.15.0-rc1.0.20210825221911-ae70dce2b15e/go.mod h1:mG0tn4xXeUDwP4lHCRluPcFKbEQCFHwROA1vuFLu448=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d h1:Z+RDyXzjKE0i2sTjZ/b1uxiGtPhFy34Ou/Tk0qwN0kM=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d/go.mod h1:JJNrCn9otv/2QP4D7SMJBgaleKpOf66PnW6F5WGNRIc=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=

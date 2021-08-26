@@ -3,42 +3,46 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-tools/alerts/alerter"
-	"github.com/kava-labs/go-tools/alerts/auctions"
 	"github.com/kava-labs/go-tools/alerts/config"
 	"github.com/kava-labs/go-tools/alerts/persistence"
+	"github.com/kava-labs/go-tools/alerts/swap"
 	kava "github.com/kava-labs/kava/app"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/tendermint/libs/log"
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 )
 
-var _auctionsServiceName = "AuctionAlerts"
+var _swapArbitrageServiceName = "SwapArbitrageAlerts"
 
-var auctionsCmd = &cobra.Command{
-	Use:   "auctions",
-	Short: "alerter for auctions on the Kava blockchain",
+var swapCmd = &cobra.Command{
+	Use:   "swap",
+	Short: "alerter for swap on the Kava blockchain",
 }
 
-var runAuctionsCmd = &cobra.Command{
+var swapArbitrageCmd = &cobra.Command{
+	Use:   "arbitrage",
+	Short: "alerter for swap arbitrage on the Kava blockchain",
+}
+
+var runArbitrageSwapCmd = &cobra.Command{
 	Use:     "run",
-	Short:   "runs the alerter for auctions on the Kava blockchain",
+	Short:   "runs the alerter for swap arbitrage on the Kava blockchain",
 	Example: "run",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Create base logger
 		logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
 		// Load config. If config is not valid, exit with fatal error
-		config, err := config.LoadAuctionsConfig(&config.EnvLoader{})
+		config, err := config.LoadArbitrageConfig(&config.EnvLoader{})
 		if err != nil {
 			return err
 		}
 
-		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaRpcUrl)
+		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _swapArbitrageServiceName, config.KavaRpcUrl)
 		if err != nil {
 			return err
 		}
@@ -61,7 +65,7 @@ var runAuctionsCmd = &cobra.Command{
 
 		logger.With(
 			"rpcUrl", config.KavaRpcUrl,
-			"UsdThreshold", strings.Split(config.UsdThreshold.String(), ".")[0],
+			"SpreadPercentThreshold", config.SpreadPercentThreshold,
 			"Interval", config.Interval.String(),
 			"AlertFrequency", config.AlertFrequency.String(),
 		).Info("config loaded")
@@ -78,7 +82,10 @@ var runAuctionsCmd = &cobra.Command{
 
 		// Create rpc client for fetching data
 		logger.Info("creating rpc client")
-		auctionClient := auctions.NewRpcAuctionClient(http, cdc)
+
+		swapClient := swap.NewRpcSwapClient(http, cdc)
+
+		frequencyLimiter := alerter.NewFrequencyLimiter(&db, config.AlertFrequency)
 
 		firstIteration := true
 
@@ -92,67 +99,54 @@ var runAuctionsCmd = &cobra.Command{
 				firstIteration = false
 			}
 
-			data, err := auctions.GetAuctionData(auctionClient)
+			// data, err := auctions.GetAuctionData(auctionClient)
+			pools, err := swap.GetPoolsData(swapClient)
 			if err != nil {
 				logger.Error(err.Error())
 				continue
 			}
 
-			logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
+			logger.Info(fmt.Sprintf("Pools: %v", pools))
+			return nil
 
-			totalValue, err := auctions.CalculateTotalAuctionsUSDValue(data)
-			if err != nil {
-				logger.Error(err.Error())
-				continue
-			}
+			logger.Info(fmt.Sprintf("checking %d pools", len(pools)))
 
-			logger.Info(fmt.Sprintf("Total auction value $%s", totalValue))
+			// Spreads have not exceeded threshold, continue
+			// if totalValue.Cmp(config.UsdThreshold.Int) != 1 {
+			// 	continue
+			// }
 
-			// Total value has not exceeded threshold, continue
-			if totalValue.Cmp(config.UsdThreshold.Int) != 1 {
-				continue
-			}
+			msg := fmt.Sprintf("Swap spread diverged")
+			logger.Info(msg)
 
-			// If total value exceeds the set threshold
-			// +1 if x > y
-			lastAlert, found, err := db.GetLatestAlert()
-			if err != nil {
-				logger.Error("Failed to fetch latest alert time", err.Error())
-				continue
-			}
+			frequencyLimiter.Exec(func() error {
+				// If last alert has past alert frequency
+				logger.Info("Sending alert to Slack")
 
-			warningMsg := fmt.Sprintf(
-				"Elevated auction activity:\nTotal collateral value: $%s",
-				strings.Split(totalValue.String(), ".")[0],
-			)
-			logger.Info(warningMsg)
+				if err := slackAlerter.Info(
+					config.SlackChannelId,
+					msg,
+				); err != nil {
+					logger.Error("Failed to send Slack alert", err.Error())
+				}
 
-			// If current time in UTC is before (previous timestamp + alert frequency), skip alert
-			if found && time.Now().UTC().Before(lastAlert.Timestamp.Add(config.AlertFrequency)) {
+				return nil
+			}, func(lastAlert persistence.AlertTime) error {
+				// Last alert is within alert frequency, only log locally
 				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
 					config.AlertFrequency,
 					lastAlert.Timestamp.Format(time.RFC3339),
 					lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
 				))
-			} else {
-				logger.Info("Sending alert to Slack")
 
-				if err := slackAlerter.Warn(
-					config.SlackChannelId,
-					warningMsg,
-				); err != nil {
-					logger.Error("Failed to send Slack alert", err.Error())
-				}
-
-				if err := db.SaveAlert(time.Now().UTC()); err != nil {
-					logger.Error("Failed to save alert time to DynamoDb", err.Error())
-				}
-			}
+				return nil
+			})
 		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(auctionsCmd)
-	auctionsCmd.AddCommand(runAuctionsCmd)
+	rootCmd.AddCommand(swapCmd)
+	swapCmd.AddCommand(swapArbitrageCmd)
+	swapArbitrageCmd.AddCommand(runArbitrageSwapCmd)
 }

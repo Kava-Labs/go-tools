@@ -1,22 +1,17 @@
-package auctions
+package swap
 
 import (
 	"errors"
 	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/codec"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-tools/alerts/rpc"
-	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
+	swaptypes "github.com/kava-labs/kava/x/swap/types"
 	"github.com/tendermint/tendermint/libs/bytes"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
-)
-
-const (
-	DefaultPageLimit = 1000
 )
 
 // InfoResponse defines the ID and latest height for a specific chain
@@ -25,35 +20,33 @@ type InfoResponse struct {
 	LatestHeight int64  `json:"latest_height" yaml:"latest_height"`
 }
 
-// AuctionClient defines the expected client interface for interacting with auctions
-type AuctionClient interface {
+// SwapClient defines the expected client interface for interacting with swap
+type SwapClient interface {
 	GetInfo() (*InfoResponse, error)
 	GetPrices(height int64) (pricefeedtypes.CurrentPrices, error)
-	GetAuctions(height int64) (auctiontypes.Auctions, error)
+	GetPools(height int64) (swaptypes.PoolStatsQueryResults, error)
 	GetMarkets(height int64) (cdptypes.CollateralParams, error)
 	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
-// RpcAuctionClient defines a client for interacting with auctions via rpc
-type RpcAuctionClient struct {
-	rpc       rpc.RpcClient
-	cdc       *codec.Codec
-	PageLimit int
+// RpcSwapClient defines a client for interacting with auctions via rpc
+type RpcSwapClient struct {
+	rpc rpc.RpcClient
+	cdc *codec.Codec
 }
 
-var _ AuctionClient = (*RpcAuctionClient)(nil)
+var _ SwapClient = (*RpcSwapClient)(nil)
 
-// NewRpcAuctionClient returns a new RpcAuctionClient
-func NewRpcAuctionClient(rpc rpc.RpcClient, cdc *codec.Codec) *RpcAuctionClient {
-	return &RpcAuctionClient{
-		rpc:       rpc,
-		cdc:       cdc,
-		PageLimit: DefaultPageLimit,
+// NewRpcSwapClient returns a new RpcSwapClient
+func NewRpcSwapClient(rpc rpc.RpcClient, cdc *codec.Codec) *RpcSwapClient {
+	return &RpcSwapClient{
+		rpc: rpc,
+		cdc: cdc,
 	}
 }
 
 // GetInfo returns the current chain info
-func (c *RpcAuctionClient) GetInfo() (*InfoResponse, error) {
+func (c *RpcSwapClient) GetInfo() (*InfoResponse, error) {
 	result, err := c.rpc.Status()
 	if err != nil {
 		return nil, err
@@ -66,7 +59,7 @@ func (c *RpcAuctionClient) GetInfo() (*InfoResponse, error) {
 }
 
 // GetPrices gets the current prices for markets
-func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices, error) {
+func (c *RpcSwapClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices, error) {
 	path := fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrices)
 
 	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
@@ -84,7 +77,7 @@ func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices
 }
 
 // GetMarkets gets an array of collateral params for each collateral type
-func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, error) {
+func (c *RpcSwapClient) GetMarkets(height int64) (cdptypes.CollateralParams, error) {
 	path := fmt.Sprintf("custom/%s/%s", cdptypes.QuerierRoute, cdptypes.QueryGetParams)
 
 	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
@@ -102,7 +95,7 @@ func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, 
 }
 
 // GetMoneyMarkets gets an array of money markets for each asset
-func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
+func (c *RpcSwapClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
 	path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
 	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
 	if err != nil {
@@ -118,44 +111,23 @@ func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets
 }
 
 // GetAuctions gets all the currently running auctions
-func (c *RpcAuctionClient) GetAuctions(height int64) (auctiontypes.Auctions, error) {
-	path := fmt.Sprintf("custom/%s/%s", auctiontypes.QuerierRoute, auctiontypes.QueryGetAuctions)
+func (c *RpcSwapClient) GetPools(height int64) (swaptypes.PoolStatsQueryResults, error) {
+	path := fmt.Sprintf("custom/%s/%s", swaptypes.QuerierRoute, swaptypes.QueryGetPools)
 
-	page := 1
-	var auctions auctiontypes.Auctions
-
-	for {
-		params := auctiontypes.NewQueryAllAuctionParams(page, c.PageLimit, "", "", "", sdk.AccAddress{})
-		bz, err := c.cdc.MarshalJSON(&params)
-
-		if err != nil {
-			return nil, err
-		}
-
-		data, err := c.abciQuery(path, bz, height)
-		if err != nil {
-			return nil, err
-		}
-
-		var pagedAuctions auctiontypes.Auctions
-		err = c.cdc.UnmarshalJSON(data, &pagedAuctions)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(pagedAuctions) > 0 {
-			auctions = append(auctions, pagedAuctions...)
-		}
-
-		if len(pagedAuctions) < c.PageLimit {
-			return auctions, nil
-		}
-
-		page++
+	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
+	if err != nil {
+		return nil, err
 	}
+
+	var pools swaptypes.PoolStatsQueryResults
+	if err := c.cdc.UnmarshalJSON(data, &pools); err != nil {
+		return nil, err
+	}
+
+	return pools, nil
 }
 
-func (c *RpcAuctionClient) abciQuery(
+func (c *RpcSwapClient) abciQuery(
 	path string,
 	data bytes.HexBytes,
 	height int64) ([]byte, error) {

@@ -4,6 +4,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+const usdThresholdEnvKey = "USD_THRESHOLD"
+
 type AuctionsConfig struct {
 	BaseConfig
 	// US dollar value of auctions that triggers alert
