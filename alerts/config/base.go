@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/tendermint/tendermint/libs/log"
 )
 
 // Config provides application configuration
@@ -18,10 +19,12 @@ type BaseConfig struct {
 
 // LoadBaseConfig loads key values from a ConfigLoader and returns a new
 // BaseConfig used for multiple different commands
-func LoadBaseConfig(loader ConfigLoader) (BaseConfig, error) {
+func LoadBaseConfig(loader ConfigLoader, logger log.Logger) (BaseConfig, error) {
 	// Ignore error from godotenv, continue if there isn't an .env file and
 	// check if required env vars already exist
-	godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		logger.Info(".env not found, attempting to proceed with available env variables")
+	}
 
 	rpcURL := loader.Get(kavaRpcUrlEnvKey)
 	if rpcURL == "" {

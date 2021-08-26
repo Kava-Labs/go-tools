@@ -33,7 +33,7 @@ var runAuctionsCmd = &cobra.Command{
 		logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
 		// Load config. If config is not valid, exit with error
-		config, err := config.LoadAuctionsConfig(&config.EnvLoader{})
+		config, err := config.LoadAuctionsConfig(&config.EnvLoader{}, logger)
 		if err != nil {
 			return err
 		}

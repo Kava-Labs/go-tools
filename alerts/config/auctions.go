@@ -2,6 +2,7 @@ package config
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/tendermint/tendermint/libs/log"
 )
 
 type AuctionsConfig struct {
@@ -12,8 +13,8 @@ type AuctionsConfig struct {
 }
 
 // LoadAuctionsConfig loads key values from a ConfigLoader and returns a new AuctionsConfig
-func LoadAuctionsConfig(loader ConfigLoader) (AuctionsConfig, error) {
-	baseConfig, err := LoadBaseConfig(loader)
+func LoadAuctionsConfig(loader ConfigLoader, logger log.Logger) (AuctionsConfig, error) {
+	baseConfig, err := LoadBaseConfig(loader, logger)
 	if err != nil {
 		return AuctionsConfig{}, err
 	}
