@@ -85,8 +85,6 @@ var runArbitrageSwapCmd = &cobra.Command{
 
 		swapClient := swap.NewRpcSwapClient(http, cdc)
 
-		frequencyLimiter := alerter.NewFrequencyLimiter(&db, config.AlertFrequency)
-
 		firstIteration := true
 
 		for {
@@ -106,10 +104,33 @@ var runArbitrageSwapCmd = &cobra.Command{
 				continue
 			}
 
-			logger.Info(fmt.Sprintf("Pools: %v", pools))
-			return nil
+			// logger.Info(fmt.Sprintf("Pools: %v", pools))
+			logger.Info(fmt.Sprintf("checking %d pools", len(pools.Pools)))
 
-			logger.Info(fmt.Sprintf("checking %d pools", len(pools)))
+			spreads, err := swap.GetPoolSpreads(pools)
+			if err != nil {
+				logger.Error(err.Error())
+				continue
+			}
+
+			for _, spread := range spreads {
+				fmt.Println(fmt.Sprintf("Pool: %v", spread.PoolName))
+				fmt.Println(fmt.Sprintf("\t%v: $%v vs $%v (%v %%)",
+					spread.ASpreadPercent.Name,
+					spread.ASpreadPercent.ExternalUsdValue,
+					spread.ASpreadPercent.PoolUsdValue,
+					spread.ASpreadPercent.SpreadPercent,
+				))
+				fmt.Println(fmt.Sprintf("\t%v: $%v vs $%v (%v %%)",
+					spread.BSpreadPercent.Name,
+					spread.BSpreadPercent.ExternalUsdValue,
+					spread.BSpreadPercent.PoolUsdValue,
+					spread.BSpreadPercent.SpreadPercent,
+				))
+				fmt.Println("")
+			}
+
+			return nil
 
 			// Spreads have not exceeded threshold, continue
 			// if totalValue.Cmp(config.UsdThreshold.Int) != 1 {
@@ -119,19 +140,13 @@ var runArbitrageSwapCmd = &cobra.Command{
 			msg := fmt.Sprintf("Swap spread diverged")
 			logger.Info(msg)
 
-			frequencyLimiter.Exec(func() error {
-				// If last alert has past alert frequency
-				logger.Info("Sending alert to Slack")
+			canAlert, lastAlert, err := alerter.IsPastInterval(&db, config.AlertFrequency)
+			if err != nil {
+				logger.Error("Failed to check alert interval: %v", err.Error())
+				continue
+			}
 
-				if err := slackAlerter.Info(
-					config.SlackChannelId,
-					msg,
-				); err != nil {
-					logger.Error("Failed to send Slack alert", err.Error())
-				}
-
-				return nil
-			}, func(lastAlert persistence.AlertTime) error {
+			if !canAlert {
 				// Last alert is within alert frequency, only log locally
 				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
 					config.AlertFrequency,
@@ -139,8 +154,19 @@ var runArbitrageSwapCmd = &cobra.Command{
 					lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
 				))
 
-				return nil
-			})
+				continue
+			}
+
+			// If last alert has past alert frequency
+			logger.Info("Sending alert to Slack")
+
+			if err := slackAlerter.Info(
+				config.SlackChannelId,
+				msg,
+			); err != nil {
+				logger.Error("Failed to send Slack alert", err.Error())
+			}
+
 		}
 	},
 }

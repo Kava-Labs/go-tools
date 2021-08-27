@@ -11,20 +11,24 @@ import (
 const (
 	UsdxUsdMarketId = "usdx:usd"
 	BusdUsdMarketId = "busd:usd"
+	UsdDenom        = "usd"
 )
 
-// Assets is a map of market_id to price corresponding to the Kava pricefeed module
-type Assets map[string]sdk.Dec
+// PricefeedPrices is a map of market_id to price corresponding to the Kava pricefeed module
+type PricefeedPrices map[string]sdk.Dec
 
 // UsdValue returns the USD value of a given denom via the pricefeed module
-func (assets Assets) UsdValue(denom string) (sdk.Dec, error) {
-	price, ok := assets[strings.ToLower(denom)+BusdDenom]
+func (assets PricefeedPrices) UsdValue(denom string) (sdk.Dec, error) {
+	price, ok := assets[strings.ToLower(denom+":"+UsdDenom)]
+	if ok {
+		// Found in pricefeed
+		return price, nil
+	}
+
+	// Try reversed symbol
+	price, ok = assets[strings.ToLower(UsdDenom+":"+denom)]
 	if !ok {
-		// Try reversed symbol
-		price, ok = assets[BusdDenom+strings.ToLower(denom)]
-		if !ok {
-			return sdk.Dec{}, fmt.Errorf("Failed to find price for %v", denom)
-		}
+		return sdk.Dec{}, fmt.Errorf("Failed to find price for %v", denom)
 	}
 
 	return price, nil
@@ -38,10 +42,10 @@ type UsdValues struct {
 
 // SwapPoolsData defines a map of AssetInfo and array of pools
 type SwapPoolsData struct {
-	Assets
-	UsdValues     UsdValues
-	Pools         swaptypes.PoolStatsQueryResults
-	BinancePrices BinancePrices
+	PricefeedPrices PricefeedPrices
+	UsdValues       UsdValues
+	Pools           swaptypes.PoolStatsQueryResults
+	BinancePrices   BinancePrices
 }
 
 // GetPoolsData returns current swap pools
@@ -87,7 +91,7 @@ func GetPoolsData(client SwapClient) (SwapPoolsData, error) {
 	}
 
 	return SwapPoolsData{
-		Assets: priceData,
+		PricefeedPrices: priceData,
 		UsdValues: UsdValues{
 			Usdx: usdXValue,
 			Busd: busdValue,

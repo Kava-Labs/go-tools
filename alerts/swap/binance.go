@@ -48,12 +48,14 @@ func GetBinancePrices() (BinancePrices, error) {
 // BusdValue returns the BUSD value of a given denom
 func (prices BinancePrices) BusdValue(denom string) (sdk.Dec, error) {
 	price, ok := prices[strings.ToUpper(denom)+BusdDenom]
+	if ok {
+		return price, nil
+	}
+
+	// Try reversed symbol
+	price, ok = prices[BusdDenom+strings.ToUpper(denom)]
 	if !ok {
-		// Try reversed symbol
-		price, ok = prices[BusdDenom+strings.ToUpper(denom)]
-		if !ok {
-			return sdk.Dec{}, fmt.Errorf("Failed to find price for %v", denom)
-		}
+		return sdk.Dec{}, fmt.Errorf("Failed to find price for %v", denom)
 	}
 
 	return price, nil
