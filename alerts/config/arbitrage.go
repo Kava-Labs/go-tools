@@ -2,7 +2,8 @@ package config
 
 import (
 	"fmt"
-	"strconv"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 const spreadPercentThresholdEnvKey = "SPREAD_PERCENT_THRESHOLD"
@@ -10,7 +11,7 @@ const spreadPercentThresholdEnvKey = "SPREAD_PERCENT_THRESHOLD"
 type ArbitrageConfig struct {
 	BaseConfig
 	// US dollar value of auctions that triggers alert
-	SpreadPercentThreshold float64
+	SpreadPercentThreshold sdk.Dec
 }
 
 // LoadAuctionsConfig loads key values from a ConfigLoader and returns a new AuctionsConfig
@@ -25,7 +26,7 @@ func LoadArbitrageConfig(loader ConfigLoader) (ArbitrageConfig, error) {
 		return ArbitrageConfig{}, fmt.Errorf("%s not set", spreadPercentThresholdEnvKey)
 	}
 
-	spreadThreshold, err := strconv.ParseFloat(spreadThresholdPercent, 64)
+	spreadThreshold, err := sdk.NewDecFromStr(spreadThresholdPercent)
 	if err != nil {
 		return ArbitrageConfig{}, err
 	}

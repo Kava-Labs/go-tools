@@ -13,10 +13,41 @@ type AssetSpread struct {
 	PoolUsdValue     sdk.Dec
 }
 
+func (a AssetSpread) String() string {
+	fmtDec := func(d sdk.Dec) string {
+		s := d.String()
+
+		// 18 decimal places in Dec
+		return s[:len(s)-16]
+	}
+
+	return fmt.Sprintf(
+		"\t`%v`: `$%v` (pool) vs `$%v` (Binance) (`%v%%`)",
+		a.Name,
+		fmtDec(a.PoolUsdValue),
+		fmtDec(a.ExternalUsdValue),
+		fmtDec(a.SpreadPercent.MulInt64(100)),
+	)
+}
+
 type PoolSpread struct {
 	PoolName       string
 	ASpreadPercent AssetSpread
 	BSpreadPercent AssetSpread
+}
+
+func (ps PoolSpread) String() string {
+	return fmt.Sprintf(
+		"Pool `%v` spread:\n\t%v\n\t%v",
+		ps.PoolName,
+		ps.ASpreadPercent,
+		ps.BSpreadPercent,
+	)
+}
+
+func (ps PoolSpread) ExceededThreshold(threshold sdk.Dec) bool {
+	return ps.ASpreadPercent.SpreadPercent.Abs().GTE(threshold) ||
+		ps.BSpreadPercent.SpreadPercent.Abs().GTE(threshold)
 }
 
 type PoolSpreads []PoolSpread

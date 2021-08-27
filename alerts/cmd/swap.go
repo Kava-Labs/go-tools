@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -113,31 +114,25 @@ var runArbitrageSwapCmd = &cobra.Command{
 				continue
 			}
 
+			messages := make([]string, 0)
+
 			for _, spread := range spreads {
-				fmt.Println(fmt.Sprintf("Pool: %v", spread.PoolName))
-				fmt.Println(fmt.Sprintf("\t%v: $%v vs $%v (%v %%)",
-					spread.ASpreadPercent.Name,
-					spread.ASpreadPercent.ExternalUsdValue,
-					spread.ASpreadPercent.PoolUsdValue,
-					spread.ASpreadPercent.SpreadPercent,
-				))
-				fmt.Println(fmt.Sprintf("\t%v: $%v vs $%v (%v %%)",
-					spread.BSpreadPercent.Name,
-					spread.BSpreadPercent.ExternalUsdValue,
-					spread.BSpreadPercent.PoolUsdValue,
-					spread.BSpreadPercent.SpreadPercent,
-				))
-				fmt.Println("")
+				// For either values in pool
+				if spread.ExceededThreshold(config.SpreadPercentThreshold) {
+					messages = append(messages, spread.String())
+				}
 			}
 
-			return nil
+			// No spreads have not exceeded threshold, continue
+			if len(messages) == 0 {
+				continue
+			}
 
-			// Spreads have not exceeded threshold, continue
-			// if totalValue.Cmp(config.UsdThreshold.Int) != 1 {
-			// 	continue
-			// }
-
-			msg := fmt.Sprintf("Swap spread diverged")
+			msg := fmt.Sprintf(
+				"%v pool spread(s) have diverged from Binance:\n%v",
+				len(messages),
+				strings.Join(messages, "\n"),
+			)
 			logger.Info(msg)
 
 			canAlert, lastAlert, err := alerter.IsPastInterval(&db, config.AlertFrequency)

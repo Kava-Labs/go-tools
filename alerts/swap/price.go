@@ -4,7 +4,11 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-var denomRewrites = map[string]string{"btcb": "btc", "xrpb": "xrp", "ukava": "kava"}
+var denomRewrites = map[string]string{
+	"btcb":  "btc",
+	"xrpb":  "xrp",
+	"ukava": "kava",
+}
 
 // GetDenomRewrite returns rewritten denoms for certain assets that may be
 // difficult to find the actual USD value of, such as BTCV
