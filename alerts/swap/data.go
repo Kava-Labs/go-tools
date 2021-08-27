@@ -2,32 +2,97 @@ package swap
 
 import (
 	"fmt"
+	"strings"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	swaptypes "github.com/kava-labs/kava/x/swap/types"
 )
 
+const (
+	UsdxUsdMarketId = "usdx:usd"
+	BusdUsdMarketId = "busd:usd"
+)
+
+// Assets is a map of market_id to price corresponding to the Kava pricefeed module
+type Assets map[string]sdk.Dec
+
+// UsdValue returns the USD value of a given denom via the pricefeed module
+func (assets Assets) UsdValue(denom string) (sdk.Dec, error) {
+	price, ok := assets[strings.ToLower(denom)+BusdDenom]
+	if !ok {
+		// Try reversed symbol
+		price, ok = assets[BusdDenom+strings.ToLower(denom)]
+		if !ok {
+			return sdk.Dec{}, fmt.Errorf("Failed to find price for %v", denom)
+		}
+	}
+
+	return price, nil
+}
+
+// UsdValues contains the market USD value of USDX and BUSD
+type UsdValues struct {
+	Usdx sdk.Dec
+	Busd sdk.Dec
+}
+
+// SwapPoolsData defines a map of AssetInfo and array of pools
+type SwapPoolsData struct {
+	Assets
+	UsdValues     UsdValues
+	Pools         swaptypes.PoolStatsQueryResults
+	BinancePrices BinancePrices
+}
+
 // GetPoolsData returns current swap pools
-func GetPoolsData(client SwapClient) (swaptypes.PoolStatsQueryResults, error) {
+func GetPoolsData(client SwapClient) (SwapPoolsData, error) {
 	// fetch chain info to get height
 	info, err := client.GetInfo()
 	if err != nil {
-		return nil, err
+		return SwapPoolsData{}, err
 	}
 
 	// use height to get consistent state from rpc client
 	height := info.LatestHeight
 
-	prices, err := client.GetPrices(height)
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println(prices)
-
 	pools, err := client.GetPools(height)
 	if err != nil {
-		return nil, err
+		return SwapPoolsData{}, err
 	}
 
-	return pools, nil
+	prices, err := client.GetPrices(height)
+	if err != nil {
+		return SwapPoolsData{}, err
+	}
+
+	// map price data
+	priceData := make(map[string]sdk.Dec)
+	for _, price := range prices {
+		priceData[price.MarketID] = price.Price
+	}
+
+	usdXValue, ok := priceData[UsdxUsdMarketId]
+	if !ok {
+		return SwapPoolsData{}, fmt.Errorf("Failed to price of %v", UsdxUsdMarketId)
+	}
+
+	busdValue, ok := priceData[BusdUsdMarketId]
+	if !ok {
+		return SwapPoolsData{}, fmt.Errorf("Failed to price of %v", BusdUsdMarketId)
+	}
+
+	binancePrices, err := GetBinancePrices()
+	if err != nil {
+		return SwapPoolsData{}, fmt.Errorf("Failed to fetch prices from Binance API %v", err.Error())
+	}
+
+	return SwapPoolsData{
+		Assets: priceData,
+		UsdValues: UsdValues{
+			Usdx: usdXValue,
+			Busd: busdValue,
+		},
+		Pools:         pools,
+		BinancePrices: binancePrices,
+	}, nil
 }
