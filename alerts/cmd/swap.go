@@ -135,7 +135,7 @@ var runArbitrageSwapCmd = &cobra.Command{
 			)
 			logger.Info(msg)
 
-			canAlert, lastAlert, err := alerter.IsPastInterval(&db, config.AlertFrequency)
+			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&db, config.AlertFrequency)
 			if err != nil {
 				logger.Error("Failed to check alert interval: %v", err.Error())
 				continue

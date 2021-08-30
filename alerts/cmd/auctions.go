@@ -113,40 +113,36 @@ var runAuctionsCmd = &cobra.Command{
 				continue
 			}
 
-			// If total value exceeds the set threshold
-			// +1 if x > y
-			lastAlert, found, err := db.GetLatestAlert()
-			if err != nil {
-				logger.Error("Failed to fetch latest alert time", err.Error())
-				continue
-			}
-
 			warningMsg := fmt.Sprintf(
 				"Elevated auction activity:\nTotal collateral value: $%s",
 				strings.Split(totalValue.String(), ".")[0],
 			)
 			logger.Info(warningMsg)
 
+			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&db, config.AlertFrequency)
+			if err != nil {
+				logger.Error("Failed to check alert interval: %v", err.Error())
+				continue
+			}
+
 			// If current time in UTC is before (previous timestamp + alert frequency), skip alert
-			if found && time.Now().UTC().Before(lastAlert.Timestamp.Add(config.AlertFrequency)) {
+			if !canAlert {
 				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
 					config.AlertFrequency,
 					lastAlert.Timestamp.Format(time.RFC3339),
 					lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
 				))
-			} else {
-				logger.Info("Sending alert to Slack")
 
-				if err := slackAlerter.Warn(
-					config.SlackChannelId,
-					warningMsg,
-				); err != nil {
-					logger.Error("Failed to send Slack alert", err.Error())
-				}
+				continue
+			}
 
-				if err := db.SaveAlert(time.Now().UTC()); err != nil {
-					logger.Error("Failed to save alert time to DynamoDb", err.Error())
-				}
+			logger.Info("Sending alert to Slack")
+
+			if err := slackAlerter.Warn(
+				config.SlackChannelId,
+				warningMsg,
+			); err != nil {
+				logger.Error("Failed to send Slack alert", err.Error())
 			}
 		}
 	},
