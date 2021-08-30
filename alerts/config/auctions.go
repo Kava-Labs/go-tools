@@ -7,7 +7,7 @@ import (
 const usdThresholdEnvKey = "USD_THRESHOLD"
 
 type AuctionsConfig struct {
-	BaseConfig
+	Base BaseConfig
 	// US dollar value of auctions that triggers alert
 	UsdThreshold sdk.Dec
 }
@@ -27,7 +27,7 @@ func LoadAuctionsConfig(loader ConfigLoader) (AuctionsConfig, error) {
 	}
 
 	return AuctionsConfig{
-		BaseConfig:   baseConfig,
+		Base:         baseConfig,
 		UsdThreshold: usdThresholdDec,
 	}, nil
 }

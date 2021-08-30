@@ -76,7 +76,7 @@ func PercentChange(a sdk.Dec, b sdk.Dec) (sdk.Dec, error) {
 
 // GetCoinConversionDivisor returns an Int to divide by the chain value to get the quantity
 func GetCoinConversionDivisor(pools SwapPoolsData, coin sdk.Coin) sdk.Int {
-	marketEntry, ok := pools.CdpMarkets[coin.Denom]
+	marketEntry, ok := pools.ConversionFactors[coin.Denom]
 	if ok {
 		i := big.NewInt(10)
 		return sdk.NewIntFromBigInt(i.Exp(i, marketEntry.BigInt(), nil))
@@ -101,7 +101,7 @@ func GetPoolAssetUsdPrice(pools SwapPoolsData, a sdk.Coin, b sdk.Coin, bUsdValue
 
 // GetPoolSpreads returns an array of spreads for all of the provided pools
 func GetPoolSpreads(logger log.Logger, pools SwapPoolsData) (PoolSpreads, error) {
-	spreads := make(PoolSpreads, 0)
+	var spreads PoolSpreads
 
 	for _, pool := range pools.Pools {
 		if len(pool.Coins) < 2 {

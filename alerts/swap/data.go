@@ -40,16 +40,16 @@ type UsdValues struct {
 	Busd sdk.Dec
 }
 
-// cdpMarketMap is a map of denom to CollateralParam
-type cdpMarketMap map[string]sdk.Int
+// ConversionFactorMap is a map of denom to Int conversion factor
+type ConversionFactorMap map[string]sdk.Int
 
 // SwapPoolsData defines a map of AssetInfo and array of pools
 type SwapPoolsData struct {
-	PricefeedPrices PricefeedPrices
-	UsdValues       UsdValues
-	Pools           swaptypes.PoolStatsQueryResults
-	BinancePrices   BinancePrices
-	CdpMarkets      cdpMarketMap
+	PricefeedPrices   PricefeedPrices
+	UsdValues         UsdValues
+	Pools             swaptypes.PoolStatsQueryResults
+	BinancePrices     BinancePrices
+	ConversionFactors ConversionFactorMap
 }
 
 // GetPoolsData returns current swap pools
@@ -73,9 +73,9 @@ func GetPoolsData(client SwapClient) (SwapPoolsData, error) {
 		return SwapPoolsData{}, err
 	}
 	// Add conversion factor for each of the collateral params
-	cdpMarketData := make(map[string]sdk.Int)
+	conversionFactors := make(map[string]sdk.Int)
 	for _, market := range cdpMarkets {
-		cdpMarketData[market.Denom] = market.ConversionFactor
+		conversionFactors[market.Denom] = market.ConversionFactor
 	}
 
 	debtParam, err := client.GetDebtParam(height)
@@ -83,7 +83,7 @@ func GetPoolsData(client SwapClient) (SwapPoolsData, error) {
 		return SwapPoolsData{}, err
 	}
 	// Add USDX conversion factor
-	cdpMarketData[debtParam.Denom] = debtParam.ConversionFactor
+	conversionFactors[debtParam.Denom] = debtParam.ConversionFactor
 
 	prices, err := client.GetPrices(height)
 	if err != nil {
@@ -117,8 +117,8 @@ func GetPoolsData(client SwapClient) (SwapPoolsData, error) {
 			Usdx: usdXValue,
 			Busd: busdValue,
 		},
-		Pools:         pools,
-		BinancePrices: binancePrices,
-		CdpMarkets:    cdpMarketData,
+		Pools:             pools,
+		BinancePrices:     binancePrices,
+		ConversionFactors: conversionFactors,
 	}, nil
 }

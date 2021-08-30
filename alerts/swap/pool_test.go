@@ -66,7 +66,7 @@ func TestGetPoolAssetPrice(t *testing.T) {
 	}
 
 	poolData := SwapPoolsData{
-		CdpMarkets: map[string]sdk.Int{
+		ConversionFactors: map[string]sdk.Int{
 			"bnb":  sdk.NewInt(8),
 			"usdx": sdk.NewInt(6),
 			"btcb": sdk.NewInt(8),

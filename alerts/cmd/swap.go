@@ -43,7 +43,7 @@ var runArbitrageSwapCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _swapArbitrageServiceName, config.KavaRpcUrl)
+		db, err := persistence.NewDynamoDbPersister(config.Base.DynamoDbTableName, _swapArbitrageServiceName, config.Base.KavaRpcUrl)
 		if err != nil {
 			return err
 		}
@@ -62,17 +62,17 @@ var runArbitrageSwapCmd = &cobra.Command{
 		kavaConfig.Seal()
 
 		// Create slack alerts client
-		slackAlerter := alerter.NewSlackAlerter(config.SlackToken)
+		slackAlerter := alerter.NewSlackAlerter(config.Base.SlackToken)
 
 		logger.With(
-			"rpcUrl", config.KavaRpcUrl,
+			"rpcUrl", config.Base.KavaRpcUrl,
 			"SpreadPercentThreshold", config.SpreadPercentThreshold,
-			"Interval", config.Interval.String(),
-			"AlertFrequency", config.AlertFrequency.String(),
+			"Interval", config.Base.Interval.String(),
+			"AlertFrequency", config.Base.AlertFrequency.String(),
 		).Info("config loaded")
 
 		// Bootstrap rpc http clent
-		http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
+		http, err := rpchttpclient.New(config.Base.KavaRpcUrl, "/websocket")
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ var runArbitrageSwapCmd = &cobra.Command{
 			// beginning so that any following `continue` statements will not
 			// continue the loop immediately.
 			if !firstIteration {
-				time.Sleep(config.Interval)
+				time.Sleep(config.Base.Interval)
 			} else {
 				firstIteration = false
 			}
@@ -135,7 +135,7 @@ var runArbitrageSwapCmd = &cobra.Command{
 			)
 			logger.Info(msg)
 
-			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&db, config.AlertFrequency)
+			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&db, config.Base.AlertFrequency)
 			if err != nil {
 				logger.Error("Failed to check alert interval: %v", err.Error())
 				continue
@@ -144,9 +144,9 @@ var runArbitrageSwapCmd = &cobra.Command{
 			if !canAlert {
 				// Last alert is within alert frequency, only log locally
 				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
-					config.AlertFrequency,
+					config.Base.AlertFrequency,
 					lastAlert.Timestamp.Format(time.RFC3339),
-					lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
+					lastAlert.Timestamp.Add(config.Base.AlertFrequency).Format(time.RFC3339),
 				))
 
 				continue
@@ -156,7 +156,7 @@ var runArbitrageSwapCmd = &cobra.Command{
 			logger.Info("Sending alert to Slack")
 
 			if err := slackAlerter.Info(
-				config.SlackChannelId,
+				config.Base.SlackChannelId,
 				msg,
 			); err != nil {
 				logger.Error("Failed to send Slack alert", err.Error())

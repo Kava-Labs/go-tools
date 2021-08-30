@@ -32,13 +32,13 @@ var runAuctionsCmd = &cobra.Command{
 		// Create base logger
 		logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
-		// Load config. If config is not valid, exit with fatal error
+		// Load config.Base. If config is not valid, exit with fatal error
 		config, err := config.LoadAuctionsConfig(&config.EnvLoader{})
 		if err != nil {
 			return err
 		}
 
-		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaRpcUrl)
+		db, err := persistence.NewDynamoDbPersister(config.Base.DynamoDbTableName, _auctionsServiceName, config.Base.KavaRpcUrl)
 		if err != nil {
 			return err
 		}
@@ -57,17 +57,17 @@ var runAuctionsCmd = &cobra.Command{
 		kavaConfig.Seal()
 
 		// Create slack alerts client
-		slackAlerter := alerter.NewSlackAlerter(config.SlackToken)
+		slackAlerter := alerter.NewSlackAlerter(config.Base.SlackToken)
 
 		logger.With(
-			"rpcUrl", config.KavaRpcUrl,
+			"rpcUrl", config.Base.KavaRpcUrl,
 			"UsdThreshold", strings.Split(config.UsdThreshold.String(), ".")[0],
-			"Interval", config.Interval.String(),
-			"AlertFrequency", config.AlertFrequency.String(),
+			"Interval", config.Base.Interval.String(),
+			"AlertFrequency", config.Base.AlertFrequency.String(),
 		).Info("config loaded")
 
 		// Bootstrap rpc http clent
-		http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
+		http, err := rpchttpclient.New(config.Base.KavaRpcUrl, "/websocket")
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ var runAuctionsCmd = &cobra.Command{
 			// beginning so that any following `continue` statements will not
 			// continue the loop immediately.
 			if !firstIteration {
-				time.Sleep(config.Interval)
+				time.Sleep(config.Base.Interval)
 			} else {
 				firstIteration = false
 			}
@@ -119,7 +119,7 @@ var runAuctionsCmd = &cobra.Command{
 			)
 			logger.Info(warningMsg)
 
-			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&db, config.AlertFrequency)
+			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&db, config.Base.AlertFrequency)
 			if err != nil {
 				logger.Error("Failed to check alert interval: %v", err.Error())
 				continue
@@ -128,9 +128,9 @@ var runAuctionsCmd = &cobra.Command{
 			// If current time in UTC is before (previous timestamp + alert frequency), skip alert
 			if !canAlert {
 				logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
-					config.AlertFrequency,
+					config.Base.AlertFrequency,
 					lastAlert.Timestamp.Format(time.RFC3339),
-					lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
+					lastAlert.Timestamp.Add(config.Base.AlertFrequency).Format(time.RFC3339),
 				))
 
 				continue
@@ -139,7 +139,7 @@ var runAuctionsCmd = &cobra.Command{
 			logger.Info("Sending alert to Slack")
 
 			if err := slackAlerter.Warn(
-				config.SlackChannelId,
+				config.Base.SlackChannelId,
 				warningMsg,
 			); err != nil {
 				logger.Error("Failed to send Slack alert", err.Error())
