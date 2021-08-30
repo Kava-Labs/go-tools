@@ -7,7 +7,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/kava-labs/go-tools/alerts/rpc"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
-	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	swaptypes "github.com/kava-labs/kava/x/swap/types"
 	"github.com/tendermint/tendermint/libs/bytes"
@@ -27,7 +26,6 @@ type SwapClient interface {
 	GetPools(height int64) (swaptypes.PoolStatsQueryResults, error)
 	GetMarkets(height int64) (cdptypes.CollateralParams, error)
 	GetDebtParam(height int64) (cdptypes.DebtParam, error)
-	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
 // RpcSwapClient defines a client for interacting with auctions via rpc
@@ -111,22 +109,6 @@ func (c *RpcSwapClient) GetDebtParam(height int64) (cdptypes.DebtParam, error) {
 	}
 
 	return params.DebtParam, nil
-}
-
-// GetMoneyMarkets gets an array of money markets for each asset
-func (c *RpcSwapClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
-	path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
-	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
-	if err != nil {
-		return nil, err
-	}
-
-	var params hardtypes.Params
-	err = c.cdc.UnmarshalJSON(data, &params)
-	if err != nil {
-		return nil, err
-	}
-	return params.MoneyMarkets, nil
 }
 
 // GetAuctions gets all the currently running auctions
