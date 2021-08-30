@@ -35,5 +35,8 @@ Install and start the alerts service with the desired AWS profile.
 ```bash
 make install
 
-AWS_PROFILE=development $GOPATH/bin/alerts auctions run
+# Run currently available alerts
+AWS_PROFILE=development alerts auctions run
+
+AWS_PROFILE=development alerts swap arbitrage run
 ```
