@@ -74,7 +74,8 @@ func PercentChange(a sdk.Dec, b sdk.Dec) (sdk.Dec, error) {
 	return b.Sub(a).Quo(a.Abs()), nil
 }
 
-func GetCoinConversionFactor(pools SwapPoolsData, coin sdk.Coin) sdk.Int {
+// GetCoinConversionDivisor returns an Int to divide by the chain value to get the quantity
+func GetCoinConversionDivisor(pools SwapPoolsData, coin sdk.Coin) sdk.Int {
 	marketEntry, ok := pools.CdpMarkets[coin.Denom]
 	if ok {
 		i := big.NewInt(10)
@@ -90,8 +91,8 @@ func GetPoolAssetUsdPrice(pools SwapPoolsData, a sdk.Coin, b sdk.Coin, bUsdValue
 		return sdk.Dec{}, fmt.Errorf("Cannot get price with second value 0")
 	}
 
-	aTrueAmount := a.Amount.ToDec().Quo(GetCoinConversionFactor(pools, a).ToDec())
-	bTrueAmount := b.Amount.ToDec().Quo(GetCoinConversionFactor(pools, b).ToDec())
+	aTrueAmount := a.Amount.ToDec().Quo(GetCoinConversionDivisor(pools, a).ToDec())
+	bTrueAmount := b.Amount.ToDec().Quo(GetCoinConversionDivisor(pools, b).ToDec())
 
 	// B / A == Output of B equivalent to 1 A
 	// Output of B * USD price of B == USD price of 1 A
