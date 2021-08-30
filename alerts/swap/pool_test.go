@@ -47,30 +47,34 @@ type poolAssetValue struct {
 func TestGetPoolAssetPrice(t *testing.T) {
 	values := []poolAssetValue{
 		{
-			sdk.Coin{Denom: "USD", Amount: sdk.NewInt(10)}, sdk.Coin{Denom: "USD", Amount: sdk.NewInt(10)},
+			sdk.Coin{Denom: "usd", Amount: sdk.NewInt(10)}, sdk.Coin{Denom: "usd", Amount: sdk.NewInt(10)},
 			sdk.NewDec(1), 1,
 		},
 		{
-			sdk.Coin{Denom: "BNB", Amount: sdk.NewInt(1)}, sdk.Coin{Denom: "USDX", Amount: sdk.NewInt(492)},
+			sdk.Coin{Denom: "bnb", Amount: sdk.NewInt(100000000)}, sdk.Coin{Denom: "usdx", Amount: sdk.NewInt(492000000)},
 			sdk.NewDec(1), 492,
 		},
+		// Some actual pool values
 		{
-			sdk.Coin{Denom: "BNB", Amount: sdk.NewInt(1000)}, sdk.Coin{Denom: "USDX", Amount: sdk.NewInt(492000)},
-			sdk.NewDec(1), 492,
-		},
-		// Some actual testnet value that doesn't actually reflect true values
-		{
-			sdk.Coin{Denom: "BNB", Amount: sdk.NewInt(2483177290869)}, sdk.Coin{Denom: "USDX", Amount: sdk.NewInt(10008950281659)},
-			sdk.NewDec(1), 4,
+			sdk.Coin{Denom: "bnb", Amount: sdk.NewInt(19247262658)}, sdk.Coin{Denom: "usdx", Amount: sdk.NewInt(91486075424)},
+			sdk.NewDec(1), 475,
 		},
 		{
-			sdk.Coin{Denom: "BTCB", Amount: sdk.NewInt(55427402988)}, sdk.Coin{Denom: "USDX", Amount: sdk.NewInt(14314542737753)},
-			sdk.NewDec(1), 258,
+			sdk.Coin{Denom: "btcb", Amount: sdk.NewInt(495726043)}, sdk.Coin{Denom: "usdx", Amount: sdk.NewInt(239260237273)},
+			sdk.NewDec(1), 48265,
+		},
+	}
+
+	poolData := SwapPoolsData{
+		CdpMarkets: map[string]sdk.Int{
+			"bnb":  sdk.NewInt(8),
+			"usdx": sdk.NewInt(6),
+			"btcb": sdk.NewInt(8),
 		},
 	}
 
 	for _, val := range values {
-		usdValue, err := GetPoolAssetUsdPrice(SwapPoolsData{}, val.a, val.b, val.bUsd)
+		usdValue, err := GetPoolAssetUsdPrice(poolData, val.a, val.b, val.bUsd)
 		if err != nil {
 			// Should only error if the first value is 0
 			assert.Equal(t, int64(0), val.a)
