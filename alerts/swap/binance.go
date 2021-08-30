@@ -17,11 +17,13 @@ const (
 // BinancePrices maps the symbol to price
 type BinancePrices map[string]sdk.Dec
 
+// BinancePrice defines an asset symbol and price
 type BinancePrice struct {
 	Symbol string  `json:"symbol"`
 	Price  sdk.Dec `json:"price"`
 }
 
+// GetBinancePrices returns an array of BinancePrice fetched from the Binance API
 func GetBinancePrices() (BinancePrices, error) {
 	resp, err := http.Get(BinancePriceApiEndpoint)
 	if err != nil {

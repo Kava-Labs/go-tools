@@ -2,10 +2,15 @@ package swap
 
 import (
 	"fmt"
+	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/tendermint/tendermint/libs/log"
 )
 
+// AssetSpread defines the percent spread between a Kava Swap pool and an
+// external (Binance) value, the external (Binance) USD value, and the
+// calculated pool USD value.
 type AssetSpread struct {
 	Name             string
 	SpreadPercent    sdk.Dec
@@ -13,6 +18,7 @@ type AssetSpread struct {
 	PoolUsdValue     sdk.Dec
 }
 
+// String returns a formatted string of AssetSpread
 func (a AssetSpread) String() string {
 	fmtDec := func(d sdk.Dec) string {
 		s := d.String()
@@ -30,12 +36,14 @@ func (a AssetSpread) String() string {
 	)
 }
 
+// PoolSpread defines the spread of a Kava Swap pool with the spread of both assets
 type PoolSpread struct {
 	PoolName       string
 	ASpreadPercent AssetSpread
 	BSpreadPercent AssetSpread
 }
 
+// String returns a formatted string of a pool and both of it's spreads
 func (ps PoolSpread) String() string {
 	return fmt.Sprintf(
 		"Pool `%v` spread:\n\t%v\n\t%v",
@@ -45,11 +53,13 @@ func (ps PoolSpread) String() string {
 	)
 }
 
+// ExceededThreshold returns true if a pool has exceeded a given spread threshold
 func (ps PoolSpread) ExceededThreshold(threshold sdk.Dec) bool {
 	return ps.ASpreadPercent.SpreadPercent.Abs().GTE(threshold) ||
 		ps.BSpreadPercent.SpreadPercent.Abs().GTE(threshold)
 }
 
+// PoolSpreads defines an array of PoolSpread
 type PoolSpreads []PoolSpread
 
 // PercentChange returns the percent change from a to b.
@@ -64,23 +74,38 @@ func PercentChange(a sdk.Dec, b sdk.Dec) (sdk.Dec, error) {
 	return b.Sub(a).Quo(a.Abs()), nil
 }
 
+func GetCoinConversionFactor(pools SwapPoolsData, coin sdk.Coin) sdk.Int {
+	marketEntry, ok := pools.CdpMarkets[coin.Denom]
+	if ok {
+		i := big.NewInt(10)
+		return sdk.NewIntFromBigInt(i.Exp(i, marketEntry.BigInt(), nil))
+	}
+
+	return sdk.NewIntFromBigInt(big.NewInt(1))
+}
+
 // GetPoolAssetUsdPrice returns the USD value of the first coin parameter
-func GetPoolAssetUsdPrice(a sdk.Coin, b sdk.Coin, bUsdValue sdk.Dec) (sdk.Dec, error) {
+func GetPoolAssetUsdPrice(pools SwapPoolsData, a sdk.Coin, b sdk.Coin, bUsdValue sdk.Dec) (sdk.Dec, error) {
 	if b.Amount.IsZero() {
 		return sdk.Dec{}, fmt.Errorf("Cannot get price with second value 0")
 	}
 
+	aTrueAmount := a.Amount.ToDec().Quo(GetCoinConversionFactor(pools, a).ToDec())
+	bTrueAmount := b.Amount.ToDec().Quo(GetCoinConversionFactor(pools, b).ToDec())
+
 	// B / A == Output of B equivalent to 1 A
 	// Output of B * USD price of B == USD price of 1 A
-	return b.Amount.ToDec().Quo(a.Amount.ToDec()).Mul(bUsdValue), nil
+	return bTrueAmount.Quo(aTrueAmount).Mul(bUsdValue), nil
 }
 
-func GetPoolSpreads(pools SwapPoolsData) (PoolSpreads, error) {
+// GetPoolSpreads returns an array of spreads for all of the provided pools
+func GetPoolSpreads(logger log.Logger, pools SwapPoolsData) (PoolSpreads, error) {
 	spreads := make(PoolSpreads, 0)
 
 	for _, pool := range pools.Pools {
 		if len(pool.Coins) < 2 {
-			return nil, fmt.Errorf("Pool %v does not contain 2 coins", pool.Name)
+			logger.Error(fmt.Sprintf("Pool %v does not contain 2 coins", pool.Name))
+			continue
 		}
 
 		first := pool.Coins[0]
@@ -89,31 +114,29 @@ func GetPoolSpreads(pools SwapPoolsData) (PoolSpreads, error) {
 		// Get USD prices of coins from external sources via pricefeed or Binance
 		firstUsdExternalPrice, err := GetUsdPrice(first.Denom, pools)
 		if err != nil {
-			return nil, err
+			// Skip the pools that have assets we cannot find USD price for
+			logger.Error(err.Error())
+			continue
 		}
 
 		secondUsdExternalPrice, err := GetUsdPrice(second.Denom, pools)
 		if err != nil {
-			return nil, err
+			logger.Error(err.Error())
+			continue
 		}
 
 		// Calculate USD value of pool assets
-		firstPoolPrice, err := GetPoolAssetUsdPrice(first, second, secondUsdExternalPrice)
+		// Skip pools if a value is zero
+		firstPoolPrice, err := GetPoolAssetUsdPrice(pools, first, second, secondUsdExternalPrice)
 		if err != nil {
-			return nil, err
+			logger.Error(err.Error())
+			continue
 		}
-		secondPoolPrice, err := GetPoolAssetUsdPrice(second, first, firstUsdExternalPrice)
+		secondPoolPrice, err := GetPoolAssetUsdPrice(pools, second, first, firstUsdExternalPrice)
 		if err != nil {
-			return nil, err
+			logger.Error(err.Error())
+			continue
 		}
-
-		fmt.Println(fmt.Sprintf("%v: secondPoolPrice %v / %v * $%v == %v",
-			second.Denom,
-			second.Amount,
-			first.Amount,
-			firstUsdExternalPrice,
-			secondPoolPrice,
-		))
 
 		// Find change between external price and pool price
 		// Skip this pool if there is a zero for one of the assets

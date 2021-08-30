@@ -70,7 +70,7 @@ func TestGetPoolAssetPrice(t *testing.T) {
 	}
 
 	for _, val := range values {
-		usdValue, err := GetPoolAssetUsdPrice(val.a, val.b, val.bUsd)
+		usdValue, err := GetPoolAssetUsdPrice(SwapPoolsData{}, val.a, val.b, val.bUsd)
 		if err != nil {
 			// Should only error if the first value is 0
 			assert.Equal(t, int64(0), val.a)

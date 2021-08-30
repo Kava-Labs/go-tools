@@ -108,7 +108,7 @@ var runArbitrageSwapCmd = &cobra.Command{
 			// logger.Info(fmt.Sprintf("Pools: %v", pools))
 			logger.Info(fmt.Sprintf("checking %d pools", len(pools.Pools)))
 
-			spreads, err := swap.GetPoolSpreads(pools)
+			spreads, err := swap.GetPoolSpreads(logger, pools)
 			if err != nil {
 				logger.Error(err.Error())
 				continue

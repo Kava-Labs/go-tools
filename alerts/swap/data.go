@@ -40,12 +40,16 @@ type UsdValues struct {
 	Busd sdk.Dec
 }
 
+// cdpMarketMap is a map of denom to CollateralParam
+type cdpMarketMap map[string]sdk.Int
+
 // SwapPoolsData defines a map of AssetInfo and array of pools
 type SwapPoolsData struct {
 	PricefeedPrices PricefeedPrices
 	UsdValues       UsdValues
 	Pools           swaptypes.PoolStatsQueryResults
 	BinancePrices   BinancePrices
+	CdpMarkets      cdpMarketMap
 }
 
 // GetPoolsData returns current swap pools
@@ -63,6 +67,23 @@ func GetPoolsData(client SwapClient) (SwapPoolsData, error) {
 	if err != nil {
 		return SwapPoolsData{}, err
 	}
+
+	cdpMarkets, err := client.GetMarkets(height)
+	if err != nil {
+		return SwapPoolsData{}, err
+	}
+	// Add conversion factor for each of the collateral params
+	cdpMarketData := make(map[string]sdk.Int)
+	for _, market := range cdpMarkets {
+		cdpMarketData[market.Denom] = market.ConversionFactor
+	}
+
+	debtParam, err := client.GetDebtParam(height)
+	if err != nil {
+		return SwapPoolsData{}, err
+	}
+	// Add USDX conversion factor
+	cdpMarketData[debtParam.Denom] = debtParam.ConversionFactor
 
 	prices, err := client.GetPrices(height)
 	if err != nil {
@@ -98,5 +119,6 @@ func GetPoolsData(client SwapClient) (SwapPoolsData, error) {
 		},
 		Pools:         pools,
 		BinancePrices: binancePrices,
+		CdpMarkets:    cdpMarketData,
 	}, nil
 }

@@ -26,6 +26,7 @@ type SwapClient interface {
 	GetPrices(height int64) (pricefeedtypes.CurrentPrices, error)
 	GetPools(height int64) (swaptypes.PoolStatsQueryResults, error)
 	GetMarkets(height int64) (cdptypes.CollateralParams, error)
+	GetDebtParam(height int64) (cdptypes.DebtParam, error)
 	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
@@ -94,6 +95,24 @@ func (c *RpcSwapClient) GetMarkets(height int64) (cdptypes.CollateralParams, err
 	return params.CollateralParams, nil
 }
 
+// GetDebptParam gets the
+func (c *RpcSwapClient) GetDebtParam(height int64) (cdptypes.DebtParam, error) {
+	path := fmt.Sprintf("custom/%s/%s", cdptypes.QuerierRoute, cdptypes.QueryGetParams)
+
+	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
+	if err != nil {
+		return cdptypes.DebtParam{}, err
+	}
+
+	var params cdptypes.Params
+	err = c.cdc.UnmarshalJSON(data, &params)
+	if err != nil {
+		return cdptypes.DebtParam{}, err
+	}
+
+	return params.DebtParam, nil
+}
+
 // GetMoneyMarkets gets an array of money markets for each asset
 func (c *RpcSwapClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
 	path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
@@ -127,6 +146,7 @@ func (c *RpcSwapClient) GetPools(height int64) (swaptypes.PoolStatsQueryResults,
 	return pools, nil
 }
 
+// abciQuery sends a query via ABCI and returns the response
 func (c *RpcSwapClient) abciQuery(
 	path string,
 	data bytes.HexBytes,
