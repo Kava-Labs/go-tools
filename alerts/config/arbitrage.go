@@ -8,13 +8,14 @@ import (
 
 const spreadPercentThresholdEnvKey = "SPREAD_PERCENT_THRESHOLD"
 
+// ArbitrageConfig defines the swap arbitrage specific configuration fields
 type ArbitrageConfig struct {
 	BaseConfig
-	// US dollar value of auctions that triggers alert
+	// Spread percent that triggers alert
 	SpreadPercentThreshold sdk.Dec
 }
 
-// LoadAuctionsConfig loads key values from a ConfigLoader and returns a new AuctionsConfig
+// LoadArbitrageConfig loads key values from a ConfigLoader and returns a new ArbitrageConfig
 func LoadArbitrageConfig(loader ConfigLoader) (ArbitrageConfig, error) {
 	baseConfig, err := LoadBaseConfig(loader)
 	if err != nil {
