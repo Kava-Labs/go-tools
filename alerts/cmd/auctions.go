@@ -17,7 +17,7 @@ import (
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 )
 
-var _serviceName = "AuctionAlerts"
+var _auctionsServiceName = "AuctionAlerts"
 
 var auctionsCmd = &cobra.Command{
 	Use:   "auctions",
@@ -38,7 +38,7 @@ var runAuctionsCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _serviceName, config.KavaRpcUrl)
+		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaRpcUrl)
 		if err != nil {
 			return err
 		}
