@@ -45,7 +45,7 @@ var runAuctionsCmd = &cobra.Command{
 
 		// Get last alert to test if we can successfully fetch from DynamoDB
 		if _, _, err := db.GetLatestAlert(); err != nil {
-			return fmt.Errorf("Failed to fetch alert times from DynamoDB: %v", err)
+			return fmt.Errorf("failed to fetch alert times from DynamoDB: %v", err)
 		}
 
 		// bootstrap kava chain config

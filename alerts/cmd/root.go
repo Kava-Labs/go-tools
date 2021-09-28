@@ -8,8 +8,6 @@ import (
 )
 
 var (
-	cfgFile string
-
 	rootCmd = &cobra.Command{
 		Use:   "alerts",
 		Short: "alerter for the Kava blockchain",
