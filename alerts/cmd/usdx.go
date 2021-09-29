@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -77,7 +78,9 @@ var runUsdxCmd = &cobra.Command{
 				continue
 			}
 
-			logger.Info(fmt.Sprintf("%v last traded price %v", _ascendexUsdxTickerSymbol, summary.Close))
+			logger.Info(fmt.Sprintf("%v last traded price %v",
+				_ascendexUsdxTickerSymbol, strings.TrimRight(summary.Close.String(), "0"),
+			))
 
 			// ! Price has not exceeded base price +- deviation
 			if !exceedsDeviation(summary.Close, config.UsdxBasePrice, config.UsdxDeviation) {
@@ -91,8 +94,8 @@ var runUsdxCmd = &cobra.Command{
 			}
 
 			warningMsg := fmt.Sprintf(
-				"USDX/USDT price deviation:\n: Last traded price T$%v",
-				summary.Close,
+				"USDX/USDT price deviation:\nLast traded price T$%v",
+				strings.TrimRight(summary.Close.String(), "0"),
 			)
 			logger.Info(warningMsg)
 
