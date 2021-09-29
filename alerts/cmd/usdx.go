@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-tools/alerts/alerter"
 	"github.com/kava-labs/go-tools/alerts/ascendex"
 	"github.com/kava-labs/go-tools/alerts/config"
@@ -35,7 +36,9 @@ var runUsdxCmd = &cobra.Command{
 			return err
 		}
 
-		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _usdxServiceName, config.KavaRpcUrl)
+		// "default" for Rpc url, is not used and does not affect USDX alerts
+		// but can't be empty
+		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _usdxServiceName, "default")
 		if err != nil {
 			return err
 		}
@@ -76,8 +79,8 @@ var runUsdxCmd = &cobra.Command{
 
 			logger.Info(fmt.Sprintf("%v last traded price %v", _ascendexUsdxTickerSymbol, summary.Close))
 
-			// ! Price has exceeded base price +- deviation
-			if !summary.Close.Sub(config.UsdxBasePrice).Abs().GTE(config.UsdxDeviation) {
+			// ! Price has not exceeded base price +- deviation
+			if !exceedsDeviation(summary.Close, config.UsdxBasePrice, config.UsdxDeviation) {
 				continue
 			}
 
@@ -116,6 +119,10 @@ var runUsdxCmd = &cobra.Command{
 			}
 		}
 	},
+}
+
+func exceedsDeviation(value, base, deviation sdk.Dec) bool {
+	return value.Sub(base).Abs().GTE(deviation)
 }
 
 func init() {
