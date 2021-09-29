@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -9,7 +8,6 @@ import (
 
 // Config provides application configuration
 type BaseConfig struct {
-	KavaRpcUrl        string
 	DynamoDbTableName string
 	SlackToken        string
 	SlackChannelId    string
@@ -23,10 +21,6 @@ func LoadBaseConfig(loader ConfigLoader) (BaseConfig, error) {
 	err := godotenv.Load()
 	if err != nil {
 		return BaseConfig{}, err
-	}
-	rpcURL := loader.Get(kavaRpcUrlEnvKey)
-	if rpcURL == "" {
-		return BaseConfig{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
 	}
 
 	dynamoDbTableName := loader.Get(dynamoDbTableNameEnvKey)
@@ -45,7 +39,6 @@ func LoadBaseConfig(loader ConfigLoader) (BaseConfig, error) {
 	}
 
 	return BaseConfig{
-		KavaRpcUrl:        rpcURL,
 		Interval:          updateInterval,
 		AlertFrequency:    alertFrequency,
 		SlackToken:        slackToken,
