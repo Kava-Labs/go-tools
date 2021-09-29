@@ -15,8 +15,10 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 )
 
-var _usdxServiceName = "UsdxAlerts"
-var _ascendexUsdxTickerSymbol = "USDX/USDT"
+const (
+	_usdxServiceName          = "UsdxAlerts"
+	_ascendexUsdxTickerSymbol = "USDX/USDT"
+)
 
 var usdxCmd = &cobra.Command{
 	Use:   "usdx",
