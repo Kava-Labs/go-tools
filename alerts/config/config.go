@@ -8,6 +8,8 @@ const (
 	intervalEnvKey          = "INTERVAL"
 	alertFrequencyEnvKey    = "ALERT_FREQUENCY"
 	usdThresholdEnvKey      = "USD_THRESHOLD"
+	usdxDeviationEnvKey     = "USDX_DEVIATION"
+	usdxBasePriceKey        = "USDX_BASE_PRICE"
 )
 
 // ConfigLoader provides an interface for loading config values from a provided
