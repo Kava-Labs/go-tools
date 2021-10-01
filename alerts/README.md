@@ -32,8 +32,18 @@ cp .example_env .env
 
 Install and start the alerts service with the desired AWS profile.
 
+For auction alerts, run:
+
 ```bash
 make install
 
 AWS_PROFILE=development $GOPATH/bin/alerts auctions run
+```
+
+For USDX price deviation alerts, run:
+
+```bash
+make install
+
+AWS_PROFILE=development $GOPATH/bin/alerts usdx run
 ```
