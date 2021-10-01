@@ -29,7 +29,7 @@ type Config struct {
 func LoadConfig(loader ConfigLoader) (Config, error) {
 	err := godotenv.Load()
 	if err != nil {
-		return Config{}, err
+		logger.Info(".env not found, attempting to proceed with available env variables")
 	}
 	rpcURL := loader.Get(kavaRpcUrlEnvKey)
 	if rpcURL == "" {
