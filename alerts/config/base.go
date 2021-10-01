@@ -26,11 +26,6 @@ func LoadBaseConfig(loader ConfigLoader, logger log.Logger) (BaseConfig, error) 
 		logger.Info(".env not found, attempting to proceed with available env variables")
 	}
 
-	rpcURL := loader.Get(kavaRpcUrlEnvKey)
-	if rpcURL == "" {
-		return BaseConfig{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
-	}
-
 	dynamoDbTableName := loader.Get(dynamoDbTableNameEnvKey)
 	if dynamoDbTableName == "" {
 		return BaseConfig{}, fmt.Errorf("%s not set", dynamoDbTableNameEnvKey)
