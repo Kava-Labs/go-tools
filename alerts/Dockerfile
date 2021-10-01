@@ -1,9 +1,9 @@
-FROM golang:1.16.7-buster as build-env
+FROM golang:1.17-bullseye as build-env
 
 ADD . /src
 RUN cd /src && go build -o /alerts
 
-FROM debian:buster
+FROM debian:bullseye
 
 RUN apt-get update \
       && apt-get install -y ca-certificates \
