@@ -2,6 +2,7 @@ package config
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/tendermint/tendermint/libs/log"
 )
 
 type UsdxConfig struct {
@@ -13,8 +14,8 @@ type UsdxConfig struct {
 }
 
 // LoadUsdxConfig loads key values from a ConfigLoader and returns a new UsdxConfig
-func LoadUsdxConfig(loader ConfigLoader) (UsdxConfig, error) {
-	baseConfig, err := LoadBaseConfig(loader)
+func LoadUsdxConfig(loader ConfigLoader, logger log.Logger) (UsdxConfig, error) {
+	baseConfig, err := LoadBaseConfig(loader, logger)
 	if err != nil {
 		return UsdxConfig{}, err
 	}

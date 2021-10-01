@@ -10,8 +10,8 @@ Bot for sending alerts to Slack for various events on the Kava blockchain.
 
 ## DynamoDB Setup
 
-1. Create a new DynamoDB table with the primary parition key set to `Service` and
-   sort key to `RpcEndpoint`.
+1. Create a new DynamoDB table with the primary partition key set to
+   `ServiceName` and sort key to `RpcEndpoint`.
 
 The latest alert time is persisted in DynamoDB which is used by
 `ALERT_FREQUENCY` below. This will only alert at most once in the given alert

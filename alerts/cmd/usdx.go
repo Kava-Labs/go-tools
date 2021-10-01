@@ -34,7 +34,7 @@ var runUsdxCmd = &cobra.Command{
 		logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
 		// Load config. If config is not valid, exit with fatal error
-		config, err := config.LoadUsdxConfig(&config.EnvLoader{})
+		config, err := config.LoadUsdxConfig(&config.EnvLoader{}, logger)
 		if err != nil {
 			return err
 		}
