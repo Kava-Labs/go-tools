@@ -1,7 +1,6 @@
 FROM golang:1.16.6-buster as build-env
 
 ADD . /src
-COPY .env /src/.env
 RUN cd /src && go build -o /main
 
 FROM debian:buster
