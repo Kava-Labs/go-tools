@@ -1,92 +1,109 @@
 package claimer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
+
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/kava-labs/kava/x/bep3"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	"github.com/tendermint/tendermint/libs/log"
 	rpcclient "github.com/tendermint/tendermint/rpc/client/http"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmtypes "github.com/tendermint/tendermint/types"
+
+	app "github.com/kava-labs/kava/app"
+	bep3 "github.com/kava-labs/kava/x/bep3/types"
 )
 
 type KavaClient struct {
 	http *rpcclient.HTTP
-	cdc  *codec.Codec
+	cdc  *codec.LegacyAmino
+	ctx  client.Context
 }
 
-func NewKavaClient(cdc *codec.Codec, rpcAddr string, logger log.Logger) (*KavaClient, error) {
+func NewKavaClient(cdc *codec.LegacyAmino, rpcAddr string, logger log.Logger) (*KavaClient, error) {
 	http, err := rpcclient.New(rpcAddr, "/websocket")
 	if err != nil {
 		return nil, err
 	}
 	http.Logger = logger
 
+	encodingConfig := app.MakeEncodingConfig()
+	clientCtx := client.Context{}.
+		WithCodec(encodingConfig.Marshaler).
+		WithTxConfig(encodingConfig.TxConfig).
+		WithLegacyAmino(encodingConfig.Amino).
+		WithNodeURI(rpcAddr).
+		WithClient(http).
+		WithAccountRetriever(authtypes.AccountRetriever{})
+
 	return &KavaClient{
 		cdc:  cdc,
 		http: http,
+		ctx:  clientCtx,
 	}, nil
 }
 
-func (c *KavaClient) GetChainID() (string, error) {
-	result, err := c.http.Status()
-	if err != nil {
-		return "", err
-	}
-	return result.NodeInfo.Network, nil
-}
-
-func (c *KavaClient) GetAccount(address sdk.AccAddress) (acc authexported.Account, err error) {
-	params := authtypes.NewQueryAccountParams(address)
-	bz, err := c.cdc.MarshalJSON(params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	path := fmt.Sprintf("custom/acc/account/%s", address.String())
-
-	result, err := c.ABCIQuery(path, bz)
-	if err != nil {
-		return nil, err
-	}
-
-	err = c.cdc.UnmarshalJSON(result, &acc)
-	if err != nil {
-		return nil, err
-	}
-
-	return acc, err
-}
-
-func (c *KavaClient) GetAtomicSwap(swapID []byte) (bep3.AtomicSwap, error) {
+// GetSwapByID gets an atomic swap on Kava by ID
+func (kc *KavaClient) GetSwapByID(ctx context.Context, swapID tmbytes.HexBytes) (swap bep3.AtomicSwap, err error) {
 	params := bep3.NewQueryAtomicSwapByID(swapID)
-	bz, err := c.cdc.MarshalJSON(params)
+	bz, err := kc.cdc.MarshalJSON(params)
 	if err != nil {
 		return bep3.AtomicSwap{}, err
 	}
 
-	result, err := c.ABCIQuery("custom/bep3/swap", bz)
+	path := "custom/bep3/swap"
+
+	result, err := kc.ABCIQuery(ctx, path, bz)
 	if err != nil {
 		return bep3.AtomicSwap{}, err
 	}
 
-	var swap bep3.AtomicSwap
-	err = c.cdc.UnmarshalJSON(result, &swap)
+	err = kc.cdc.UnmarshalJSON(result, &swap)
 	if err != nil {
 		return bep3.AtomicSwap{}, err
 	}
 	return swap, nil
 }
 
-func (c *KavaClient) ABCIQuery(path string, data tmbytes.HexBytes) ([]byte, error) {
-	result, err := c.http.ABCIQuery(path, data)
+// GetAccount gets the account associated with an address on Kava
+func (kc *KavaClient) GetAccount(ctx context.Context, addr sdk.AccAddress) (acc authtypes.BaseAccount, err error) {
+	params := authtypes.QueryAccountRequest{Address: addr.String()}
+	bz, err := kc.cdc.MarshalJSON(params)
+	if err != nil {
+		return authtypes.BaseAccount{}, err
+	}
+
+	path := fmt.Sprintf("custom/auth/account/%s", addr.String())
+
+	result, err := kc.ABCIQuery(ctx, path, bz)
+	if err != nil {
+		return authtypes.BaseAccount{}, err
+	}
+
+	err = kc.cdc.UnmarshalJSON(result, &acc)
+	if err != nil {
+		return authtypes.BaseAccount{}, err
+	}
+
+	return acc, err
+}
+
+func (kc *KavaClient) GetChainID(ctx context.Context) (string, error) {
+	result, err := kc.http.Status(ctx)
+	if err != nil {
+		return "", err
+	}
+	return result.NodeInfo.Network, nil
+}
+
+// ABCIQuery sends a query to Kava
+func (kc *KavaClient) ABCIQuery(ctx context.Context, path string, data tmbytes.HexBytes) ([]byte, error) {
+	result, err := kc.http.ABCIQuery(ctx, path, data)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -104,14 +121,6 @@ func (c *KavaClient) ABCIQuery(path string, data tmbytes.HexBytes) ([]byte, erro
 	return value, nil
 }
 
-func (c *KavaClient) BroadcastTxSync(tx tmtypes.Tx) (*ctypes.ResultBroadcastTx, error) {
-	return c.http.BroadcastTxSync(tx)
-}
-
-func (c *KavaClient) BroadcastTxCommit(tx tmtypes.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
-	return c.http.BroadcastTxCommit(tx)
-}
-
-func (c *KavaClient) GetTxConfirmation(txHash []byte) (*ctypes.ResultTx, error) {
-	return c.http.Tx(txHash, false)
+func (c *KavaClient) GetTxConfirmation(ctx context.Context, txHash []byte) (*ctypes.ResultTx, error) {
+	return c.http.Tx(ctx, txHash, false)
 }
