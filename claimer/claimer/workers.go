@@ -1,6 +1,7 @@
 package claimer
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -8,19 +9,19 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/cosmos/cosmos-sdk/x/auth/legacy/legacytx"
+
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	"github.com/kava-labs/go-sdk/keys"
-	bep3 "github.com/kava-labs/kava/x/bep3/types"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
-	tmtypes "github.com/tendermint/tendermint/types"
-
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
+	"github.com/kava-labs/kava/app"
+	bep3 "github.com/kava-labs/kava/x/bep3/types"
 )
 
 const (
@@ -85,37 +86,40 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		return NewErrorFailed(err)
 	}
 
-	swap, err := client.GetAtomicSwap(swapID)
+
+	swap, err := client.GetSwapByID(context.Background(), swapID)
 	if err != nil {
 		return NewErrorRetryable(err)
 	}
-	if swap.Status == bep3.NULL {
+
+	if swap.Status == bep3.SWAP_STATUS_UNSPECIFIED {
 		return NewErrorRetryable(fmt.Errorf("swap %s not found in state", swapID))
-	} else if swap.Status == bep3.Expired || swap.Status == bep3.Completed {
+	} else if swap.Status == bep3.SWAP_STATUS_EXPIRED || swap.Status == bep3.SWAP_STATUS_COMPLETED {
 		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", hex.EncodeToString(swapID), swap.Status))
 	}
 
-	fromAddr := keyManager.GetAddr()
+	fromAddr := keyManager.GetKeyRing().GetAddress()
 
 	randomNumber, err := hex.DecodeString(claim.RandomNumber)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
 
-	msg := bep3.NewMsgClaimAtomicSwap(fromAddr, swapID, randomNumber)
+	msg := bep3.NewMsgClaimAtomicSwap(fromAddr.String(), swapID, randomNumber)
 	if err := msg.ValidateBasic(); err != nil {
 		return NewErrorFailed(fmt.Errorf("msg basic validation failed: \n%v", msg))
 	}
 
-	signMsg := &authtypes.StdSignMsg{
+	// Build partial legacy transaction for signing
+	fee := calculateFee(ClaimTxDefaultGas, DefaultGasPrice)
+	signMsg := legacytx.StdSignMsg{
 		ChainID:       config.ChainID,
 		AccountNumber: 0,
 		Sequence:      0,
-		Fee:           calculateFee(ClaimTxDefaultGas, DefaultGasPrice),
-		Msgs:          []sdk.Msg{msg},
+		Fee:           fee,
+		Msgs:          []sdk.Msg{&msg},
 		Memo:          "",
 	}
-
 	sequence, accountNumber, err := getAccountNumbers(client, fromAddr)
 	if err != nil {
 		return NewErrorFailed(err)
@@ -123,18 +127,55 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 	signMsg.Sequence = sequence
 	signMsg.AccountNumber = accountNumber
 
-	signedMsg, err := keyManager.Sign(*signMsg, client.cdc)
+	// Sign legacy transaction
+	signBz, err := keyManager.Sign(signMsg, client.cdc)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-	tx := tmtypes.Tx(signedMsg)
 
-	maxTxLength := 1024 * 1024
-	if len(tx) > maxTxLength {
-		return NewErrorFailed(fmt.Errorf("the tx data exceeds max length %d ", maxTxLength))
+	// Build full legacy transaction
+	sigs := []legacytx.StdSignature{legacytx.NewStdSignature(keyManager.GetKeyRing().GetPubKey(), signBz)}
+	stdTx := legacytx.NewStdTx([]sdk.Msg{&msg}, fee, sigs, "")
+	stdTx.TimeoutHeight = 100000
+	legacyTx := app.LegacyTxBroadcastRequest{
+		Tx:   stdTx,
+		Mode: "sync",
 	}
 
-	res, err := client.BroadcastTxSync(tx)
+	// Convert legacy transaction to sendable tx using Tx.Builder
+	builder := client.ctx.TxConfig.NewTxBuilder()
+	builder.SetFeeAmount(legacyTx.Tx.GetFee())
+	builder.SetGasLimit(legacyTx.Tx.GetGas())
+	builder.SetMemo(legacyTx.Tx.GetMemo())
+	builder.SetTimeoutHeight(legacyTx.Tx.GetTimeoutHeight())
+
+	signatures, err := legacyTx.Tx.GetSignaturesV2()
+	if err != nil {
+		return NewErrorFailed(err)
+	}
+
+	for i, sig := range signatures {
+		addr := sdk.AccAddress(sig.PubKey.Address())
+		acc, err := client.GetAccount(context.Background(), addr)
+		if err != nil {
+			return NewErrorFailed(err)
+		}
+		signatures[i].Sequence = acc.GetSequence()
+	}
+
+	err = builder.SetSignatures(signatures...)
+	if err != nil {
+		return NewErrorFailed(err)
+	}
+
+	txBytes, err := client.ctx.TxConfig.TxEncoder()(builder.GetTx())
+	if err != nil {
+		return NewErrorFailed(err)
+	}
+
+	// Attempt to broadcast the transaction in 'sync' mode
+	clientCtx := client.ctx.WithBroadcastMode(legacyTx.Mode)
+	res, err := clientCtx.BroadcastTx(txBytes)
 	if err != nil {
 		if broadcastErrorIsRetryable(err) {
 			return NewErrorRetryable(err)
@@ -142,14 +183,14 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		return NewErrorFailed(err)
 	}
 	if res.Code != 0 {
-		if errorCodeIsRetryable(res.Codespace, res.Code) {
-			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.Log))
+		if errorCodeIsRetryable("sdk", res.Code) {
+			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.Logs))
 		}
-		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.Log))
+		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.Logs))
 	}
 	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-		log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Debug("checking for tx confirmation") // TODO use non global logger, with swap ID field already included
-		queryRes, err := client.GetTxConfirmation(res.Hash)
+		log.WithFields(log.Fields{"swapID": claim.SwapID}).Debug("checking for tx confirmation") // TODO use non global logger, with swap ID field already included
+		queryRes, err := client.GetTxConfirmation(context.Background(), res.Tx.GetValue())
 		if err != nil {
 			return false, nil // poll again, it can't find the tx or node is down/slow
 		}
@@ -161,7 +202,7 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-	log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.Hash.String())
+	log.WithFields(log.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.TxHash)
 	return nil
 }
 
@@ -186,7 +227,7 @@ func errorCodeIsRetryable(codespace string, code uint32) bool {
 }
 
 func getAccountNumbers(client *KavaClient, fromAddr sdk.AccAddress) (uint64, uint64, error) {
-	acc, err := client.GetAccount(fromAddr)
+	acc, err := client.GetAccount(context.Background(), fromAddr)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -218,7 +259,7 @@ func pollWithBackoff(timeout, initialInterval time.Duration, pollFunc func() (bo
 }
 
 // calculateFee calculates the total fee to be paid based on a total gas and gas price.
-func calculateFee(gas uint64, gasPrice sdk.DecCoin) authtypes.StdFee {
+func calculateFee(gas uint64, gasPrice sdk.DecCoin) legacytx.StdFee {
 	var coins sdk.Coins
 	if gas > 0 {
 		coins = sdk.NewCoins(sdk.NewCoin(
@@ -226,5 +267,5 @@ func calculateFee(gas uint64, gasPrice sdk.DecCoin) authtypes.StdFee {
 			gasPrice.Amount.MulInt64(int64(gas)).Ceil().TruncateInt(),
 		))
 	}
-	return authtypes.NewStdFee(gas, coins)
+	return legacytx.NewStdFee(gas, coins)
 }
