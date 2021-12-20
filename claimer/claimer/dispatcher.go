@@ -6,17 +6,18 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/cosmos/cosmos-sdk/codec"
+	tmlog "github.com/tendermint/tendermint/libs/log"
+
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bkeys "github.com/kava-labs/binance-chain-go-sdk/keys"
 	"github.com/kava-labs/go-sdk/keys"
-	kava "github.com/kava-labs/kava/app"
-	log "github.com/sirupsen/logrus"
-	tmlog "github.com/tendermint/tendermint/libs/log"
-
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
+	kava "github.com/kava-labs/kava/app"
 )
 
 var JobQueueSize = 1000
@@ -24,12 +25,15 @@ var JobQueueSize = 1000
 type Dispatcher struct {
 	config   config.Config
 	jobQueue chan server.ClaimJob
-	cdc      *codec.Codec
+	cdc      *codec.LegacyAmino
 }
 
 func NewDispatcher(cfg config.Config) Dispatcher {
 	jobQueue := make(chan server.ClaimJob, JobQueueSize)
-	cdc := kava.MakeCodec()
+
+	tApp := kava.NewTestApp()
+	cdc := tApp.LegacyAmino()
+
 	return Dispatcher{
 		config:   cfg,
 		jobQueue: jobQueue,
