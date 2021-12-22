@@ -19,7 +19,6 @@ import (
 	tmcrypto "github.com/tendermint/tendermint/crypto"
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmmempool "github.com/tendermint/tendermint/mempool"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmjsonrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 )
@@ -32,8 +31,8 @@ type MsgRequest struct {
 
 type MsgResponse struct {
 	Request MsgRequest
-	Tx      authtypes.StdTx
-	Result  ctypes.ResultBroadcastTx
+	Tx      txtypes.BroadcastTxRequest
+	Result  sdk.TxResponse
 	Err     error
 }
 
@@ -284,10 +283,10 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 					}
 				} else {
 					// store rpc result in response
-					response.Result = *rpcResult
+					response.Result = *rpcResult.TxResponse
 
 					// determine action to take based on rpc result
-					switch rpcResult.Code {
+					switch rpcResult.TxResponse.Code {
 					// 0: success, in mempool
 					case sdkerrors.SuccessABCICode:
 						txResult = txOK
@@ -301,7 +300,10 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 					case sdkerrors.ErrMempoolIsFull.ABCICode():
 						txResult = txRetry
 					default:
-						response.Err = fmt.Errorf("message failed to broadcast, unrecoverable error code %d", rpcResult.Code)
+						response.Err = fmt.Errorf(
+							"message failed to broadcast, unrecoverable error code %d",
+							rpcResult.TxResponse.Code,
+						)
 						txResult = txFailed
 					}
 				}
@@ -363,6 +365,7 @@ func (s Signer) Sign(
 	txBuilder := s.encodingConfig.TxConfig.NewTxBuilder()
 	txBuilder.SetMsgs(msgs...)
 	txBuilder.SetFeeAmount(fee)
+	txBuilder.SetGasLimit(300000)
 
 	// build signature data, leaving signature blank
 	signatureData := signing.SingleSignatureData{
