@@ -18,7 +18,7 @@ type ConfigLoader interface {
 
 // Config provides application configuration
 type Config struct {
-	KavaRpcUrl         string
+	KavaGrpcUrl        string
 	KavaBidInterval    time.Duration
 	KavaKeeperMnemonic string
 	ProfitMargin       sdk.Dec
@@ -31,9 +31,9 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	if err != nil {
 		fmt.Printf(".env not found, attempting to proceed with available env variables\n")
 	}
-	rpcURL := loader.Get(kavaRpcUrlEnvKey)
-	if rpcURL == "" {
-		return Config{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
+	grpcURL := loader.Get(kavaGrpcUrlEnvKey)
+	if grpcURL == "" {
+		return Config{}, fmt.Errorf("%s not set", kavaGrpcUrlEnvKey)
 	}
 
 	keeperMnemonic := loader.Get(mnemonicEnvKey)
@@ -52,7 +52,7 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	}
 
 	return Config{
-		KavaRpcUrl:         rpcURL,
+		KavaGrpcUrl:        grpcURL,
 		KavaBidInterval:    keeperBidInterval,
 		KavaKeeperMnemonic: keeperMnemonic,
 		ProfitMargin:       marginDec,
