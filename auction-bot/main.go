@@ -8,15 +8,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	kava "github.com/kava-labs/kava/app"
 	"github.com/tendermint/tendermint/libs/log"
-	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 )
 
 const (
-	kavaRpcUrlEnvKey  = "KAVA_RPC_URL"
 	kavaGrpcUrlEnvKey = "KAVA_GRPC_URL"
 	mnemonicEnvKey    = "KEEPER_MNEMONIC"
 	profitMargin      = "BID_MARGIN"
@@ -51,7 +48,7 @@ func main() {
 	}
 
 	logger.With(
-		"rpcUrl", config.KavaRpcUrl,
+		"grpcUrl", config.KavaGrpcUrl,
 		"bidInterval", config.KavaBidInterval.String(),
 	).Info("config loaded")
 
@@ -68,17 +65,6 @@ func main() {
 
 	grpcClient := NewGrpcClient(config.KavaGrpcUrl, encodingConfig.Marshaler)
 	defer grpcClient.GrpcClientConn.Close()
-
-	//
-	// bootstrap rpc http clent
-	//
-	http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
-	if err != nil {
-		logger.Error("failed to connect")
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
-	http.Logger = logger
 
 	//
 	// client for broadcasting txs
@@ -123,7 +109,7 @@ func main() {
 
 			// code and result are from broadcast, not deliver tx
 			// it is up to the caller/requester to check the deliver tx code and deal with failure
-			fmt.Printf("response code: %d, hash %s\n", response.Result.Code, response.Result.Hash)
+			fmt.Printf("response code: %d, hash %s\n", response.Result.Code, response.Result.TxHash)
 		}
 	}()
 
@@ -152,13 +138,9 @@ func main() {
 		txBuilder.SetMsgs()
 
 		for _, msg := range msgs {
-
 			requests <- MsgRequest{
 				Msgs: []sdk.Msg{&msg},
-				Fee: authtypes.StdFee{
-					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(15000)}},
-					Gas:    300000,
-				},
+				Fee:  sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(15000)}},
 				Memo: "",
 			}
 		}
