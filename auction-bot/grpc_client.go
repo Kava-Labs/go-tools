@@ -61,7 +61,7 @@ func (c *GrpcClient) LatestHeight() (int64, error) {
 func (c *GrpcClient) ChainID() (string, error) {
 	latestBlock, err := c.Tm.GetLatestBlock(context.Background(), &tmservice.GetLatestBlockRequest{})
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	return latestBlock.Block.Header.ChainID, nil

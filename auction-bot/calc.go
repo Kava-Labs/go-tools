@@ -51,7 +51,7 @@ func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionIn
 }
 
 func handleForwardCollateralAuction(auction auctiontypes.Auction, keeper sdk.AccAddress, assetInfo map[string]AssetInfo, margin sdk.Dec) (AuctionInfo, bool) {
-	collateralAuction := auction.(auctiontypes.CollateralAuction)
+	collateralAuction := auction.(*auctiontypes.CollateralAuction)
 
 	// check bidder
 	if collateralAuction.Bidder.Equals(keeper) {
@@ -86,7 +86,7 @@ func handleForwardCollateralAuction(auction auctiontypes.Auction, keeper sdk.Acc
 }
 
 func handleReverseCollateralAuction(auction auctiontypes.Auction, keeper sdk.AccAddress, assetInfo map[string]AssetInfo, increment, margin sdk.Dec) (AuctionInfo, bool) {
-	collateralAuction := auction.(auctiontypes.CollateralAuction)
+	collateralAuction := auction.(*auctiontypes.CollateralAuction)
 	// check bidder
 	if collateralAuction.Bidder.Equals(keeper) {
 		return AuctionInfo{}, false
@@ -119,7 +119,7 @@ func handleReverseCollateralAuction(auction auctiontypes.Auction, keeper sdk.Acc
 }
 
 func handleReverseDebtAuction(auction auctiontypes.Auction, keeper sdk.AccAddress, assetInfo map[string]AssetInfo, increment, margin sdk.Dec) (AuctionInfo, bool) {
-	debtAuction := auction.(auctiontypes.DebtAuction)
+	debtAuction := auction.(*auctiontypes.DebtAuction)
 	// check bidder
 	if debtAuction.Bidder.Equals(keeper) {
 		return AuctionInfo{}, false
