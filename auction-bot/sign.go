@@ -1,23 +1,32 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/client/tx"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	params "github.com/kava-labs/kava/app/params"
 	tmcrypto "github.com/tendermint/tendermint/crypto"
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 	tmmempool "github.com/tendermint/tendermint/mempool"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	tmjsonrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
+	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 type MsgRequest struct {
 	Msgs []sdk.Msg
-	Fee  authtypes.StdFee
+	Fee  sdk.Coins
 	Memo string
 }
 
@@ -42,13 +51,20 @@ const (
 
 // Signer broadcasts msgs to a single kava node
 type Signer struct {
-	client          BroadcastClient
-	privKey         tmcrypto.PrivKey
+	encodingConfig  params.EncodingConfig
+	client          GrpcClient
+	privKey         secp256k1.PrivKey
 	inflightTxLimit uint64
 }
 
-func NewSigner(client BroadcastClient, privKey tmcrypto.PrivKey, inflightTxLimit uint64) *Signer {
+func NewSigner(
+	encodingConfig params.EncodingConfig,
+	client GrpcClient,
+	privKey secp256k1.PrivKey,
+	inflightTxLimit uint64,
+) *Signer {
 	return &Signer{
+		encodingConfig:  encodingConfig,
 		client:          client,
 		privKey:         privKey,
 		inflightTxLimit: inflightTxLimit,
@@ -56,7 +72,7 @@ func NewSigner(client BroadcastClient, privKey tmcrypto.PrivKey, inflightTxLimit
 }
 
 func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
-	chainID, err := s.client.GetChainID()
+	chainID, err := s.client.ChainID()
 	if err != nil {
 		return nil, err
 	}
@@ -68,9 +84,10 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 	accountState := make(chan authtypes.BaseAccount)
 	go func() {
 		for {
-			account, err := s.client.GetAccount(GetAccAddress(s.privKey))
+			accAddr := sdk.AccAddress(s.privKey.PubKey().Address())
+			account, err := s.client.BaseAccount(accAddr.String())
 			if err == nil {
-				accountState <- *account
+				accountState <- account
 			}
 			time.Sleep(1 * time.Second)
 		}
@@ -199,16 +216,13 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						continue
 					}
 
-					stdSignMsg := authtypes.StdSignMsg{
-						ChainID:       chainID,
-						AccountNumber: account.GetAccountNumber(),
-						Sequence:      broadcastTxSeq,
-						Fee:           currentRequest.Fee,
-						Msgs:          currentRequest.Msgs,
-						Memo:          currentRequest.Memo,
-					}
-
-					stdTx, err := Sign(s.privKey, stdSignMsg)
+					stdTx, err := s.Sign(
+						chainID,
+						currentRequest.Msgs,
+						currentRequest.Fee,
+						account.GetAccountNumber(),
+						broadcastTxSeq,
+					)
 
 					response = &MsgResponse{
 						Request: *currentRequest,
@@ -238,7 +252,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 				// Retry (tx not in mempool, but retry - do not change inflight status)
 				// Failed (tx not in mempool, not recoverable - clear inflight status, reply to channel)
 				// Unauthorized (tx not in mempool - sequence not valid)
-				rpcResult, err := s.client.BroadcastTxSync(&response.Tx)
+				rpcResult, err := s.client.Tx.BroadcastTx(context.Background(), &response.Tx)
 
 				// set to determine action at the end of loop
 				// default is OK
@@ -339,23 +353,76 @@ func GetAccAddress(privKey tmcrypto.PrivKey) sdk.AccAddress {
 	return privKey.PubKey().Address().Bytes()
 }
 
-func Sign(privKey tmcrypto.PrivKey, signMsg authtypes.StdSignMsg) (authtypes.StdTx, error) {
-	sigBytes, err := privKey.Sign(signMsg.Bytes())
+func (s Signer) Sign(
+	chainID string,
+	msgs []sdk.Msg,
+	fee sdk.Coins,
+	accNum uint64,
+	accSeq uint64,
+) (txtypes.BroadcastTxRequest, error) {
+	txBuilder := s.encodingConfig.TxConfig.NewTxBuilder()
+	txBuilder.SetMsgs(msgs...)
+	txBuilder.SetFeeAmount(fee)
+
+	// build signature data, leaving signature blank
+	signatureData := signing.SingleSignatureData{
+		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
+		Signature: nil,
+	}
+	// add pubkey, data, and account sequence
+	sigV2 := signing.SignatureV2{
+		PubKey:   s.privKey.PubKey(),
+		Data:     &signatureData,
+		Sequence: accSeq,
+	}
+
+	// set signature data with nil signature -- this is required before signing
+	err := txBuilder.SetSignatures(sigV2)
 	if err != nil {
-		return authtypes.StdTx{}, err
+		return txtypes.BroadcastTxRequest{}, err
 	}
 
-	sig := authtypes.StdSignature{
-		PubKey:    privKey.PubKey(),
-		Signature: sigBytes,
+	// data to use to generate sign bytes
+	signerData := authsigning.SignerData{
+		ChainID:       chainID,
+		AccountNumber: accNum,
+		// only required with using amino signing
+		//Sequence: acc.GetSequence()
 	}
 
-	tx := authtypes.NewStdTx(
-		signMsg.Msgs,
-		signMsg.Fee,
-		[]authtypes.StdSignature{sig},
-		signMsg.Memo,
+	sigV2, err = tx.SignWithPrivKey(
+		s.encodingConfig.TxConfig.SignModeHandler().DefaultMode(),
+		signerData,
+		txBuilder,
+		&s.privKey,
+		s.encodingConfig.TxConfig,
+		accSeq,
 	)
+	if err != nil {
+		return txtypes.BroadcastTxRequest{}, err
+	}
 
-	return tx, nil
+	// set signature on transaction
+	err = txBuilder.SetSignatures(sigV2)
+	if err != nil {
+		return txtypes.BroadcastTxRequest{}, err
+	}
+
+	// encode the transaction to raw bytes
+	txBytes, err := s.encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		return txtypes.BroadcastTxRequest{}, err
+	}
+
+	// can use tendermint types to get hash before broadcast
+	tmtx := tmtypes.Tx(txBytes)
+	tmTxHexBytes := tmbytes.HexBytes(tmtx.Hash())
+	fmt.Println(fmt.Sprintf("Hash Before Broadcast: %s\n", tmTxHexBytes.String()))
+
+	request := txtypes.BroadcastTxRequest{
+		Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+		TxBytes: txBytes,
+	}
+
+	return request, nil
 }

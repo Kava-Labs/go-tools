@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	kavaRpcUrlEnvKey = "KAVA_RPC_URL"
-	mnemonicEnvKey   = "KEEPER_MNEMONIC"
-	profitMargin     = "BID_MARGIN"
-	bidInterval      = "BID_INTERVAL"
+	kavaRpcUrlEnvKey  = "KAVA_RPC_URL"
+	kavaGrpcUrlEnvKey = "KAVA_GRPC_URL"
+	mnemonicEnvKey    = "KEEPER_MNEMONIC"
+	profitMargin      = "BID_MARGIN"
+	bidInterval       = "BID_INTERVAL"
 )
 
 func main() {
@@ -55,6 +56,20 @@ func main() {
 	).Info("config loaded")
 
 	//
+	// create codec for messages
+	//
+	encodingConfig := kava.MakeEncodingConfig()
+
+	//
+	// create rpc client for fetching data
+	// required for bidding
+	//
+	logger.Info("creating rpc client")
+
+	grpcClient := NewGrpcClient(config.KavaGrpcUrl, encodingConfig.Marshaler)
+	defer grpcClient.GrpcClientConn.Close()
+
+	//
 	// bootstrap rpc http clent
 	//
 	http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
@@ -66,39 +81,22 @@ func main() {
 	http.Logger = logger
 
 	//
-	// create codec for messages
-	//
-	cdc := kava.MakeCodec()
-
-	//
-	// create rpc client for fetching data
-	// required for bidding
-	//
-	logger.Info("creating rpc client")
-	auctionClient := NewRpcAuctionClient(http, cdc)
-
-	//
 	// client for broadcasting txs
 	//
-	broadcastClient := NewRpcBroadcastClient(http, cdc)
 	params := *hd.NewFundraiserParams(0, 459, 0)
 	hdPath := params.String()
 
-	derivedPriv, err := keys.StdDeriveKey(config.KavaKeeperMnemonic, "", hdPath, keys.Secp256k1)
+	privKeyBytes, err := hd.Secp256k1.Derive()(config.KavaKeeperMnemonic, "", hdPath)
 	if err != nil {
 		logger.Error("failed to derive key")
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	privKey, err := keys.StdPrivKeyGen(derivedPriv, keys.Secp256k1)
-	if err != nil {
-		logger.Error("failed to generate private key")
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
+	// wrap with cosmos secp256k1 private key struct
+	privKey := secp256k1.PrivKey{Key: privKeyBytes}
 	logger.Info(fmt.Sprintf("signing address: %s", sdk.AccAddress(privKey.PubKey().Address()).String()))
 
-	signer := NewSigner(broadcastClient, privKey, 10)
+	signer := NewSigner(encodingConfig, grpcClient, privKey, 10)
 
 	// channels to communicate with signer
 	requests := make(chan MsgRequest)
@@ -130,17 +128,17 @@ func main() {
 	}()
 
 	for {
-		data, err := GetAuctionData(auctionClient)
+		data, err := GetAuctionData(grpcClient, encodingConfig.Marshaler)
 		if err != nil {
 			fmt.Printf("error fetching prices...")
 			continue
 		}
 
-		info, err := auctionClient.GetInfo()
+		latestHeight, err := grpcClient.LatestHeight()
 		if err != nil {
 			continue
 		}
-		logger.Info(fmt.Sprintf("latest height: %d", info.LatestHeight))
+		logger.Info(fmt.Sprintf("latest height: %d", latestHeight))
 
 		logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
 
@@ -150,9 +148,13 @@ func main() {
 
 		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
 
+		txBuilder := encodingConfig.TxConfig.NewTxBuilder()
+		txBuilder.SetMsgs()
+
 		for _, msg := range msgs {
+
 			requests <- MsgRequest{
-				Msgs: []sdk.Msg{msg},
+				Msgs: []sdk.Msg{&msg},
 				Fee: authtypes.StdFee{
 					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(15000)}},
 					Gas:    300000,
