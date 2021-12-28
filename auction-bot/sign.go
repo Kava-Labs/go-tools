@@ -87,7 +87,10 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 			account, err := s.client.BaseAccount(accAddr.String())
 			if err == nil {
 				accountState <- account
+			} else {
+				fmt.Printf("Error getting account %v\n", err)
 			}
+
 			time.Sleep(1 * time.Second)
 		}
 	}()
@@ -190,6 +193,8 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 			if broadcastTxSeq > lastRequestTxSeq {
 				broadcastTxSeq = lastRequestTxSeq
 			}
+
+			fmt.Printf("broadcasting tx %v\n", currentRequest)
 
 			// loop serves three purposes
 			//   - recover from dropped txs (broadcastTxSeq < lastRequestTxSeq)
@@ -420,7 +425,7 @@ func (s Signer) Sign(
 	// can use tendermint types to get hash before broadcast
 	tmtx := tmtypes.Tx(txBytes)
 	tmTxHexBytes := tmbytes.HexBytes(tmtx.Hash())
-	fmt.Println(fmt.Sprintf("Hash Before Broadcast: %s\n", tmTxHexBytes.String()))
+	fmt.Printf("Hash Before Broadcast: %s\n", tmTxHexBytes.String())
 
 	request := txtypes.BroadcastTxRequest{
 		Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
