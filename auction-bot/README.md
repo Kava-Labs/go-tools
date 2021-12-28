@@ -7,8 +7,8 @@ Automated bot for bidding on collateral and debt auctions on the Kava platform. 
 Create a `.env` file:
 
 ```
-# RPC endpoint
-KAVA_RPC_URL="https://rpc.testnet-12000.kava.io:443"
+# GRPC endpoint
+KAVA_GRPC_URL="grpc.testnet.kava.io:443"
 # Mnemonic
 KEEPER_MNEMONIC="secret words here"
 # Profit margin required for bot to bid (1.5% in the example)
