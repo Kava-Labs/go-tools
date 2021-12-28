@@ -16,8 +16,8 @@ import (
 const (
 	kavaGrpcUrlEnvKey = "KAVA_GRPC_URL"
 	mnemonicEnvKey    = "KEEPER_MNEMONIC"
-	profitMargin      = "BID_MARGIN"
-	bidInterval       = "BID_INTERVAL"
+	profitMarginKey   = "BID_MARGIN"
+	bidIntervalKey    = "BID_INTERVAL"
 )
 
 func main() {
@@ -50,6 +50,7 @@ func main() {
 	logger.With(
 		"grpcUrl", config.KavaGrpcUrl,
 		"bidInterval", config.KavaBidInterval.String(),
+		"profitMargin", config.ProfitMargin.String(),
 	).Info("config loaded")
 
 	//
@@ -61,7 +62,7 @@ func main() {
 	// create rpc client for fetching data
 	// required for bidding
 	//
-	logger.Info("creating rpc client")
+	logger.Info("creating grpc client")
 
 	grpcClient := NewGrpcClient(config.KavaGrpcUrl, encodingConfig.Marshaler)
 	defer grpcClient.GrpcClientConn.Close()
@@ -124,8 +125,8 @@ func main() {
 		if err != nil {
 			continue
 		}
-		logger.Info(fmt.Sprintf("latest height: %d", latestHeight))
 
+		logger.Info(fmt.Sprintf("latest height: %d", latestHeight))
 		logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
 
 		auctionBids := GetBids(data, sdk.AccAddress(privKey.PubKey().Address()), config.ProfitMargin)

@@ -38,15 +38,17 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 
 	keeperMnemonic := loader.Get(mnemonicEnvKey)
 
-	marginStr := loader.Get(profitMargin)
-	fmt.Printf("%s\n", marginStr)
+	marginStr := loader.Get(profitMarginKey)
+	if marginStr == "" {
+		return Config{}, fmt.Errorf("%s not set", profitMarginKey)
+	}
 
 	marginDec, err := sdk.NewDecFromStr(marginStr)
 	if err != nil {
 		return Config{}, err
 	}
 
-	keeperBidInterval, err := time.ParseDuration(loader.Get(bidInterval))
+	keeperBidInterval, err := time.ParseDuration(loader.Get(bidIntervalKey))
 	if err != nil {
 		keeperBidInterval = time.Duration(10 * time.Minute)
 	}
