@@ -79,7 +79,7 @@ func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
 	var auctions []auctiontypes.Auction
 	for _, anyAuction := range auctionsRes.Auction {
 		var auction auctiontypes.Auction
-		cdc.UnpackAny(anyAuction, auction)
+		cdc.UnpackAny(anyAuction, &auction)
 
 		auctions = append(auctions, auction)
 	}
