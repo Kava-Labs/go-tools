@@ -9,6 +9,8 @@ Create a `.env` file:
 ```
 # GRPC endpoint
 KAVA_GRPC_URL="grpc.testnet.kava.io:443"
+# Disable TLS if not supported by endpoint
+GRPC_TLS=false
 # Mnemonic
 KEEPER_MNEMONIC="secret words here"
 # Profit margin required for bot to bid (1.5% in the example)
