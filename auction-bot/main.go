@@ -135,9 +135,6 @@ func main() {
 
 		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
 
-		txBuilder := encodingConfig.TxConfig.NewTxBuilder()
-		txBuilder.SetMsgs()
-
 		for _, msg := range msgs {
 			requests <- MsgRequest{
 				Msgs: []sdk.Msg{&msg},
