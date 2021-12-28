@@ -194,8 +194,6 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 				broadcastTxSeq = lastRequestTxSeq
 			}
 
-			fmt.Printf("broadcasting tx %v\n", currentRequest)
-
 			// loop serves three purposes
 			//   - recover from dropped txs (broadcastTxSeq < lastRequestTxSeq)
 			//   - send new requests (currentRequest is set)
