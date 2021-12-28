@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -19,6 +20,7 @@ type ConfigLoader interface {
 // Config provides application configuration
 type Config struct {
 	KavaGrpcUrl        string
+	EnableTls          bool
 	KavaBidInterval    time.Duration
 	KavaKeeperMnemonic string
 	ProfitMargin       sdk.Dec
@@ -34,6 +36,15 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	grpcURL := loader.Get(kavaGrpcUrlEnvKey)
 	if grpcURL == "" {
 		return Config{}, fmt.Errorf("%s not set", kavaGrpcUrlEnvKey)
+	}
+
+	enableTlsStr := loader.Get(enableTlsEnvKey)
+	enableTls := true
+	if enableTlsStr != "" {
+		enableTls, err = strconv.ParseBool(enableTlsStr)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid option %s for %s", enableTlsStr, kavaGrpcUrlEnvKey)
+		}
 	}
 
 	keeperMnemonic := loader.Get(mnemonicEnvKey)
@@ -55,6 +66,7 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 
 	return Config{
 		KavaGrpcUrl:        grpcURL,
+		EnableTls:          enableTls,
 		KavaBidInterval:    keeperBidInterval,
 		KavaKeeperMnemonic: keeperMnemonic,
 		ProfitMargin:       marginDec,

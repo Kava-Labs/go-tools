@@ -15,6 +15,7 @@ import (
 
 const (
 	kavaGrpcUrlEnvKey = "KAVA_GRPC_URL"
+	enableTlsEnvKey   = "GRPC_TLS"
 	mnemonicEnvKey    = "KEEPER_MNEMONIC"
 	profitMarginKey   = "BID_MARGIN"
 	bidIntervalKey    = "BID_INTERVAL"
@@ -64,7 +65,7 @@ func main() {
 	//
 	logger.Info("creating grpc client")
 
-	grpcClient := NewGrpcClient(config.KavaGrpcUrl, encodingConfig.Marshaler)
+	grpcClient := NewGrpcClient(config.KavaGrpcUrl, config.EnableTls, encodingConfig.Marshaler)
 	defer grpcClient.GrpcClientConn.Close()
 
 	//
