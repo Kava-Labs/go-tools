@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/kava-labs/go-tools/signing"
+	"github.com/kava-labs/kava/app"
+
+	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
-	kava "github.com/kava-labs/kava/app"
 	"github.com/tendermint/tendermint/libs/log"
 )
 
@@ -32,10 +35,7 @@ func main() {
 	//
 	// required before loading config
 	//
-	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig)
-	kava.SetBip44CoinType(kavaConfig)
-	kavaConfig.Seal()
+	app.SetSDKConfig()
 
 	//
 	// Load config
@@ -57,7 +57,7 @@ func main() {
 	//
 	// create codec for messages
 	//
-	encodingConfig := kava.MakeEncodingConfig()
+	encodingConfig := app.MakeEncodingConfig()
 
 	//
 	// create rpc client for fetching data
@@ -71,23 +71,34 @@ func main() {
 	//
 	// client for broadcasting txs
 	//
-	params := *hd.NewFundraiserParams(0, 459, 0)
-	hdPath := params.String()
-
-	privKeyBytes, err := hd.Secp256k1.Derive()(config.KavaKeeperMnemonic, "", hdPath)
+	hdPath := hd.CreateHDPath(app.Bip44CoinType, 0, 0)
+	privKeyBytes, err := hd.Secp256k1.Derive()(config.KavaKeeperMnemonic, "", hdPath.String())
 	if err != nil {
 		logger.Error("failed to derive key")
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
 	// wrap with cosmos secp256k1 private key struct
-	privKey := secp256k1.PrivKey{Key: privKeyBytes}
+	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
 	logger.Info(fmt.Sprintf("signing address: %s", sdk.AccAddress(privKey.PubKey().Address()).String()))
 
-	signer := NewSigner(encodingConfig, grpcClient, privKey, 10)
+	nodeInfoResponse, err := grpcClient.Tm.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
+	if err != nil {
+		logger.Error("failed to fetch chain id")
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+	signer := signing.NewSigner(
+		nodeInfoResponse.DefaultNodeInfo.Network,
+		encodingConfig,
+		grpcClient.Auth,
+		grpcClient.Tx,
+		privKey,
+		10,
+	)
 
 	// channels to communicate with signer
-	requests := make(chan MsgRequest)
+	requests := make(chan signing.MsgRequest)
 
 	// signer starts it's own go routines and returns
 	responses, err := signer.Run(requests)
@@ -137,10 +148,11 @@ func main() {
 		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
 
 		for _, msg := range msgs {
-			requests <- MsgRequest{
-				Msgs: []sdk.Msg{&msg},
-				Fee:  sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(15000)}},
-				Memo: "",
+			requests <- signing.MsgRequest{
+				Msgs:      []sdk.Msg{&msg},
+				GasLimit:  300000,
+				FeeAmount: sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(15000))),
+				Memo:      "",
 			}
 		}
 

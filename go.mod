@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/cosmos/cosmos-sdk v0.44.5
+	github.com/joho/godotenv v1.4.0
 	github.com/kava-labs/kava v0.15.2-0.20211214192138-d38371cf2b96
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.14

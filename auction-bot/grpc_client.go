@@ -29,16 +29,16 @@ type GrpcClient struct {
 	Pricefeed      pricefeedtypes.QueryClient
 }
 
-func NewGrpcClient(target string, enableTLS bool, cdc codec.Codec) GrpcClient {
-	var options []grpc.DialOption
-	if enableTLS {
+func NewGrpcClient(target string, enableTls bool, cdc codec.Codec) GrpcClient {
+	var secureOpt grpc.DialOption
+	if enableTls {
 		creds := credentials.NewTLS(&tls.Config{})
-		options = append(options, grpc.WithTransportCredentials(creds))
+		secureOpt = grpc.WithTransportCredentials(creds)
 	} else {
-		options = append(options, grpc.WithInsecure())
+		secureOpt = grpc.WithInsecure()
 	}
 
-	grpcConn, err := grpc.Dial(target, options...)
+	grpcConn, err := grpc.Dial(target, secureOpt)
 	if err != nil {
 		panic(err)
 	}
