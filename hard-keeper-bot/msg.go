@@ -9,10 +9,7 @@ func CreateLiquidationMsgs(keeper sdk.AccAddress, borrowers Borrowers) []hardtyp
 	msgs := make([]hardtypes.MsgLiquidate, len(borrowers))
 
 	for index, borrower := range borrowers {
-		msgs[index] = hardtypes.MsgLiquidate{
-			Keeper:   keeper,
-			Borrower: borrower,
-		}
+		msgs[index] = hardtypes.NewMsgLiquidate(keeper, borrower)
 	}
 
 	return msgs

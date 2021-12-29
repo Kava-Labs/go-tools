@@ -18,39 +18,39 @@ func TestCreateLiquidationMsgs(t *testing.T) {
 
 	tests := []testLiquidationMsgs{
 		{
-			keeper:       sdk.AccAddress(crypto.AddressHash([]byte("keeper"))),
+			keeper:       sdk.AccAddress(crypto.AddressHash([]byte("keeper----------"))),
 			borrowers:    Borrowers{},
 			expectedMsgs: []hardtypes.MsgLiquidate{},
 		},
 		{
-			keeper:    sdk.AccAddress(crypto.AddressHash([]byte("keeper"))),
-			borrowers: Borrowers{sdk.AccAddress(crypto.AddressHash([]byte("borrower")))},
+			keeper:    sdk.AccAddress(crypto.AddressHash([]byte("keeper----------"))),
+			borrowers: Borrowers{sdk.AccAddress(crypto.AddressHash([]byte("borrower----------")))},
 			expectedMsgs: []hardtypes.MsgLiquidate{
 				{
-					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper"))),
-					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower"))),
+					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper----------"))).String(),
+					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower----------"))).String(),
 				},
 			},
 		},
 		{
-			keeper: sdk.AccAddress(crypto.AddressHash([]byte("keeper"))),
+			keeper: sdk.AccAddress(crypto.AddressHash([]byte("keeper----------"))),
 			borrowers: Borrowers{
-				sdk.AccAddress(crypto.AddressHash([]byte("borrower1"))),
-				sdk.AccAddress(crypto.AddressHash([]byte("borrower2"))),
-				sdk.AccAddress(crypto.AddressHash([]byte("borrower3"))),
+				sdk.AccAddress(crypto.AddressHash([]byte("borrower1----------"))),
+				sdk.AccAddress(crypto.AddressHash([]byte("borrower2----------"))),
+				sdk.AccAddress(crypto.AddressHash([]byte("borrower3----------"))),
 			},
 			expectedMsgs: []hardtypes.MsgLiquidate{
 				{
-					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper"))),
-					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower1"))),
+					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper----------"))).String(),
+					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower1----------"))).String(),
 				},
 				{
-					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper"))),
-					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower2"))),
+					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper----------"))).String(),
+					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower2----------"))).String(),
 				},
 				{
-					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper"))),
-					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower3"))),
+					Keeper:   sdk.AccAddress(crypto.AddressHash([]byte("keeper----------"))).String(),
+					Borrower: sdk.AccAddress(crypto.AddressHash([]byte("borrower3----------"))).String(),
 				},
 			},
 		},
