@@ -45,6 +45,16 @@ func (deputyAddresses DeputyAddresses) GetMatchingBnb(kavaAddress sdk.AccAddress
 	return nil, false
 }
 
+// GetMatchingBnbStr finds the bnb chain address for the deputy with the provided kava string address
+func (deputyAddresses DeputyAddresses) GetMatchingBnbStr(kavaAddress string) (types.AccAddress, bool) {
+	for _, da := range deputyAddresses {
+		if da.Kava.String() == kavaAddress {
+			return da.Bnb, true
+		}
+	}
+	return nil, false
+}
+
 // GetMatchingKava finds the kava address for the deputy with the provided bnb chain address
 func (deputyAddresses DeputyAddresses) GetMatchingKava(bnbAddress types.AccAddress) (sdk.AccAddress, bool) {
 	for _, da := range deputyAddresses {

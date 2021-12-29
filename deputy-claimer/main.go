@@ -13,19 +13,19 @@ import (
 )
 
 type Config struct {
-	BnbRPCURL     string
-	KavaRestURL   string
-	KavaRPCURL    string
-	Deputies      claim.DeputyAddresses
-	BnbMnemonics  []string
-	KavaMnemonics []string
+	BnbRPCURL         string
+	kavaGrpcURL       string
+	kavaGrpcEnableTLS bool
+	Deputies          claim.DeputyAddresses
+	BnbMnemonics      []string
+	KavaMnemonics     []string
 }
 
 type ConfigSimple struct {
-	BnbRPCURL   string
-	KavaRestURL string
-	KavaRPCURL  string
-	Deputies    map[string]struct {
+	BnbRPCURL         string
+	kavaGrpcURL       string
+	kavaGrpcEnableTLS bool
+	Deputies          map[string]struct {
 		Kava string
 		Bnb  string
 	}
@@ -54,13 +54,14 @@ func loadConfig() (Config, error) {
 			Bnb:  mustDecodeBnbAddress(v.Bnb),
 		}
 	}
+
 	cfg := Config{
-		BnbRPCURL:     temp.BnbRPCURL,
-		KavaRestURL:   temp.KavaRestURL,
-		KavaRPCURL:    temp.KavaRPCURL,
-		Deputies:      deputies,
-		BnbMnemonics:  temp.BnbMnemonics,
-		KavaMnemonics: temp.KavaMnemonics,
+		BnbRPCURL:         temp.BnbRPCURL,
+		kavaGrpcURL:       temp.kavaGrpcURL,
+		kavaGrpcEnableTLS: temp.kavaGrpcEnableTLS,
+		Deputies:          deputies,
+		BnbMnemonics:      temp.BnbMnemonics,
+		KavaMnemonics:     temp.KavaMnemonics,
 	}
 	return cfg, nil
 }
@@ -77,8 +78,20 @@ func main() {
 		log.Fatal(err)
 	}
 
-	kavaClaimer := claim.NewKavaClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.KavaMnemonics)
-	bnbClaimer := claim.NewBnbClaimer(cfg.KavaRestURL, cfg.KavaRPCURL, cfg.BnbRPCURL, cfg.Deputies, cfg.BnbMnemonics)
+	kavaClaimer := claim.NewKavaClaimer(
+		cfg.kavaGrpcURL,
+		cfg.kavaGrpcEnableTLS,
+		cfg.BnbRPCURL,
+		cfg.Deputies,
+		cfg.KavaMnemonics,
+	)
+	bnbClaimer := claim.NewBnbClaimer(
+		cfg.kavaGrpcURL,
+		cfg.kavaGrpcEnableTLS,
+		cfg.BnbRPCURL,
+		cfg.Deputies,
+		cfg.BnbMnemonics,
+	)
 
 	ctx := context.Background()
 	kavaClaimer.Start(ctx)

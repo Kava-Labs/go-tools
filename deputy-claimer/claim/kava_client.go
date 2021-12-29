@@ -17,14 +17,11 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	kavaRpc "github.com/kava-labs/go-sdk/client"
-	"github.com/kava-labs/kava/app/params"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
-
-// TODO use either rest or rpc, not both
 
 //go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
 
@@ -50,8 +47,6 @@ type grpcKavaClient struct {
 }
 
 func NewGrpcKavaClient(grpcURL string, enableTLS bool, cdc codec.Codec) grpcKavaClient {
-	encodingConfig := params.MakeEncodingConfig()
-
 	var options []grpc.DialOption
 	if enableTLS {
 		creds := credentials.NewTLS(&tls.Config{})
@@ -64,7 +59,7 @@ func NewGrpcKavaClient(grpcURL string, enableTLS bool, cdc codec.Codec) grpcKava
 	}
 
 	return grpcKavaClient{
-		cdc:            encodingConfig.Marshaler,
+		cdc:            cdc,
 		GrpcClientConn: grpcConn,
 		Auth:           authtypes.NewQueryClient(grpcConn),
 		Bep3:           bep3types.NewQueryClient(grpcConn),

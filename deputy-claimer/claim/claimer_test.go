@@ -6,7 +6,6 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/golang/mock/gomock"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
@@ -196,7 +195,7 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 	kc.EXPECT().
 		GetChainID().
 		Return("kava-localnet", nil).AnyTimes()
-	testAcc := authexported.Account(&authtypes.BaseAccount{
+	testAcc := authtypes.AccountI(&authtypes.BaseAccount{
 		Address:       addrs.Kava.Users[0].Address,
 		AccountNumber: 12,
 		Sequence:      34,
