@@ -15,7 +15,6 @@ import (
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type GrpcClient struct {
@@ -30,16 +29,16 @@ type GrpcClient struct {
 	Pricefeed      pricefeedtypes.QueryClient
 }
 
-func NewGrpcClient(target string, enableTls bool, cdc codec.Codec) GrpcClient {
-	var creds credentials.TransportCredentials
-
-	if enableTls {
-		creds = credentials.NewTLS(&tls.Config{})
+func NewGrpcClient(target string, enableTLS bool, cdc codec.Codec) GrpcClient {
+	var options []grpc.DialOption
+	if enableTLS {
+		creds := credentials.NewTLS(&tls.Config{})
+		options = append(options, grpc.WithTransportCredentials(creds))
 	} else {
-		creds = insecure.NewCredentials()
+		options = append(options, grpc.WithInsecure())
 	}
 
-	grpcConn, err := grpc.Dial(target, grpc.WithTransportCredentials(creds))
+	grpcConn, err := grpc.Dial(target, options...)
 	if err != nil {
 		panic(err)
 	}
