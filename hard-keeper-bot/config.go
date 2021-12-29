@@ -10,6 +10,7 @@ import (
 
 const (
 	kavaRpcUrlEnvKey             = "KAVA_RPC_URL"
+	kavaGrpcUrlEnvKey            = "KAVA_GRPC_URL"
 	kavaLiqudationIntervalEnvKey = "KAVA_LIQUIDATION_INTERVAL"
 	kavaKeeperAddressEnvKey      = "KAVA_KEEPER_ADDRESS"
 	kavaSignerMnemonicEnvKey     = "KAVA_SIGNER_MNEMONIC"
@@ -24,6 +25,7 @@ type ConfigLoader interface {
 // Config provides application configuration
 type Config struct {
 	KavaRpcUrl              string
+	KavaGrpcUrl             string
 	KavaLiquidationInterval time.Duration
 	KavaKeeperAddress       sdk.AccAddress
 	KavaSignerMnemonic      string
@@ -35,6 +37,11 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	rpcUrl := loader.Get(kavaRpcUrlEnvKey)
 	if rpcUrl == "" {
 		return Config{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
+	}
+
+	grpcUrl := loader.Get(kavaGrpcUrlEnvKey)
+	if grpcUrl == "" {
+		return Config{}, fmt.Errorf("%s not set", kavaGrpcUrlEnvKey)
 	}
 
 	liquidationInterval, err := time.ParseDuration(loader.Get(kavaLiqudationIntervalEnvKey))
@@ -58,7 +65,8 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	}
 
 	return Config{
-		KavaRpcUrl:              loader.Get(kavaRpcUrlEnvKey),
+		KavaRpcUrl:              rpcUrl,
+		KavaGrpcUrl:             grpcUrl,
 		KavaLiquidationInterval: liquidationInterval,
 		KavaKeeperAddress:       keeperAddress,
 		KavaSignerMnemonic:      signerMnemonic,

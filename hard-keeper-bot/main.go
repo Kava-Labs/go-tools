@@ -1,99 +1,96 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
+	"log"
+	"net/url"
 	"os"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys"
+	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	kava "github.com/kava-labs/kava/app"
-	"github.com/tendermint/tendermint/libs/log"
+	"github.com/kava-labs/go-tools/signing"
+	"github.com/kava-labs/kava/app"
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 func main() {
-	// create base logger
-	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+	app.SetSDKConfig()
+	encodingConfig := app.MakeEncodingConfig()
 
-	//
-	// bootstrap kava chain config
-	//
-	// sets a global cosmos sdk for bech32 prefix
-	//
-	// required before loading config
-	//
-	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig)
-	kava.SetBip44CoinType(kavaConfig)
-	kavaConfig.Seal()
-
-	//
-	// Load config
-	//
-	// if config is not valid, exit with fatal error
-	//
 	config, err := LoadConfig(&EnvLoader{})
 	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	logger.With(
-		"rpcUrl", config.KavaRpcUrl,
-		"liquidationInterval", config.KavaLiquidationInterval.String(),
-	).Info("config loaded")
+	grpcUrl, err := url.Parse(config.KavaGrpcUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	//
-	// bootstrap rpc http clent
-	//
+	var secureOpt grpc.DialOption
+	switch grpcUrl.Scheme {
+	case "http":
+		secureOpt = grpc.WithInsecure()
+	case "https":
+		creds := credentials.NewTLS(&tls.Config{})
+		secureOpt = grpc.WithTransportCredentials(creds)
+	default:
+		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
+	}
+
 	http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
 	if err != nil {
-		logger.Error("failed to connect")
-		logger.Error(err.Error())
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	http.Logger = logger
+	liquidationClient := NewRpcLiquidationClient(http, encodingConfig.Amino)
 
-	//
-	// create codec for messages
-	//
-	cdc := kava.MakeCodec()
-
-	// client for fetching borrower info
-	liquidationClient := NewRpcLiquidationClient(http, cdc)
-
-	//
-	// client for broadcasting txs
-	//
-	broadcastClient := NewRpcBroadcastClient(http, cdc)
-	hdPath := keys.CreateHDPath(0, 0)
-
-	derivedPriv, err := keys.StdDeriveKey(config.KavaSignerMnemonic, "", hdPath.String(), keys.Secp256k1)
+	conn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {
-		logger.Error("failed to derive key")
-		logger.Error(err.Error())
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	privKey, err := keys.StdPrivKeyGen(derivedPriv, keys.Secp256k1)
+	defer conn.Close()
+
+	tmClient := tmservice.NewServiceClient(conn)
+	nodeInfoResponse, err := tmClient.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
 	if err != nil {
-		logger.Error("failed to generate private key")
-		logger.Error(err.Error())
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
-	// create signer, needs client, privkey, and inflight limit (max limit for txs in mempool)
-	signer := NewSigner(broadcastClient, privKey, 10)
+	txClient := txtypes.NewServiceClient(conn)
+	authClient := authtypes.NewQueryClient(conn)
+
+	hdPath := hd.CreateHDPath(app.Bip44CoinType, 0, 0)
+	privKeyBytes, err := hd.Secp256k1.Derive()(config.KavaSignerMnemonic, "", hdPath.String())
+	if err != nil {
+		panic(err)
+	}
+	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
+
+	signer := signing.NewSigner(
+		nodeInfoResponse.DefaultNodeInfo.Network,
+		encodingConfig,
+		authClient,
+		txClient,
+		privKey,
+		10,
+	)
 
 	// channels to communicate with signer
-	requests := make(chan MsgRequest)
+	requests := make(chan signing.MsgRequest)
 
 	// signer starts it's own go routines and returns
 	responses, err := signer.Run(requests)
 	if err != nil {
-		logger.Error("failed to start signer")
-		logger.Error(err.Error())
+		log.Fatal(err)
 		os.Exit(1)
 	}
 
@@ -111,7 +108,7 @@ func main() {
 
 			// code and result are from broadcast, not deliver tx
 			// it is up to the caller/requester to check the deliver tx code and deal with failure
-			fmt.Printf("response code: %d, hash %s\n", response.Result.Code, response.Result.Hash)
+			fmt.Printf("response code: %d, hash %s\n", response.Result.Code, response.Result.TxHash)
 		}
 	}()
 
@@ -119,7 +116,7 @@ func main() {
 		// fetch asset and position data using client
 		data, err := GetPositionData(liquidationClient)
 		if err != nil {
-			logger.Error(err.Error())
+			log.Println(err)
 			continue
 		}
 
@@ -132,15 +129,13 @@ func main() {
 
 		// create liquidation transactions
 		for _, msg := range msgs {
-			fmt.Printf("sending liquidation for %s\n", msg.Borrower.String())
+			fmt.Printf("sending liquidation for %s\n", msg.Borrower)
 
-			requests <- MsgRequest{
-				Msgs: []sdk.Msg{msg},
-				Fee: authtypes.StdFee{
-					Amount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(50000)}},
-					Gas:    1000000,
-				},
-				Memo: "",
+			requests <- signing.MsgRequest{
+				Msgs:      []sdk.Msg{&msg},
+				GasLimit:  1000000,
+				FeeAmount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(50000)}},
+				Memo:      "",
 			}
 		}
 
