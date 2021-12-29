@@ -51,6 +51,8 @@ func NewGrpcKavaClient(grpcURL string, enableTLS bool, cdc codec.Codec) grpcKava
 	if enableTLS {
 		creds := credentials.NewTLS(&tls.Config{})
 		options = append(options, grpc.WithTransportCredentials(creds))
+	} else {
+		options = append(options, grpc.WithInsecure())
 	}
 
 	grpcConn, err := grpc.Dial(grpcURL, options...)
