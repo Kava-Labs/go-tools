@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -30,13 +31,13 @@ type LiquidationClient interface {
 
 type RpcLiquidationClient struct {
 	rpc       RpcClient
-	cdc       *codec.Codec
+	cdc       *codec.LegacyAmino
 	PageLimit int
 }
 
 var _ LiquidationClient = (*RpcLiquidationClient)(nil)
 
-func NewRpcLiquidationClient(rpc RpcClient, cdc *codec.Codec) *RpcLiquidationClient {
+func NewRpcLiquidationClient(rpc RpcClient, cdc *codec.LegacyAmino) *RpcLiquidationClient {
 	return &RpcLiquidationClient{
 		rpc:       rpc,
 		cdc:       cdc,
@@ -45,7 +46,7 @@ func NewRpcLiquidationClient(rpc RpcClient, cdc *codec.Codec) *RpcLiquidationCli
 }
 
 func (c *RpcLiquidationClient) GetInfo() (*InfoResponse, error) {
-	result, err := c.rpc.Status()
+	result, err := c.rpc.Status(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +171,6 @@ func (c *RpcLiquidationClient) abciQuery(
 	height int64) ([]byte, error) {
 	opts := rpcclient.ABCIQueryOptions{Height: height, Prove: false}
 
-	result, err := c.rpc.ABCIQueryWithOptions(path, data, opts)
+	result, err := c.rpc.ABCIQueryWithOptions(context.Background(), path, data, opts)
 	return ParseABCIResult(result, err)
 }

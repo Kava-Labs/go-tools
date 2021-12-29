@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	kava "github.com/kava-labs/kava/app"
+	"github.com/kava-labs/kava/app"
 	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"github.com/stretchr/testify/assert"
@@ -20,9 +21,7 @@ import (
 )
 
 func init() {
-	kavaConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(kavaConfig)
-	kavaConfig.Seal()
+	app.SetSDKConfig()
 }
 
 // ABCIQueryDataFunc is used to mock value in query response
@@ -30,6 +29,7 @@ type ABCIQueryDataFunc func(data bytes.HexBytes) []byte
 
 // ABCICheckFunc is used to verify path, params, and opts in tests
 type ABCICheckFunc func(
+	ctx context.Context,
 	path string,
 	params bytes.HexBytes,
 	opts rpcclient.ABCIQueryOptions,
@@ -45,16 +45,17 @@ type MockRpcClient struct {
 	ABCIResponseErr       error
 }
 
-func (m *MockRpcClient) Status() (*ctypes.ResultStatus, error) {
+func (m *MockRpcClient) Status(ctx context.Context) (*ctypes.ResultStatus, error) {
 	return &m.StatusResponse, m.StatusResponseErr
 }
 
 func (m *MockRpcClient) ABCIQuery(
+	ctx context.Context,
 	path string,
 	data bytes.HexBytes,
 ) (*ctypes.ResultABCIQuery, error) {
 	// allow test code to check path, data, opts globally
-	m.ABCICheckFunc(path, data, rpcclient.DefaultABCIQueryOptions)
+	m.ABCICheckFunc(context.Background(), path, data, rpcclient.DefaultABCIQueryOptions)
 
 	// build response and allow injection of return value
 	return &ctypes.ResultABCIQuery{
@@ -67,12 +68,13 @@ func (m *MockRpcClient) ABCIQuery(
 }
 
 func (m *MockRpcClient) ABCIQueryWithOptions(
+	ctx context.Context,
 	path string,
 	data bytes.HexBytes,
 	opts rpcclient.ABCIQueryOptions,
 ) (*ctypes.ResultABCIQuery, error) {
 	// allow test code to check path, data, opts globally
-	m.ABCICheckFunc(path, data, opts)
+	m.ABCICheckFunc(context.Background(), path, data, opts)
 
 	// build response and allow injection of return value
 	return &ctypes.ResultABCIQuery{
@@ -90,7 +92,7 @@ func (m *MockRpcClient) BroadcastTxSync(tx tmtypes.Tx) (*ctypes.ResultBroadcastT
 
 func TestGetInfo(t *testing.T) {
 	rpc := &MockRpcClient{}
-	cdc := kava.MakeCodec()
+	cdc := app.MakeEncodingConfig().Amino
 	client := NewRpcLiquidationClient(rpc, cdc)
 
 	rpc.StatusResponse = ctypes.ResultStatus{
@@ -120,7 +122,7 @@ func TestGetInfo(t *testing.T) {
 
 func TestGetPrices(t *testing.T) {
 	rpc := &MockRpcClient{}
-	cdc := kava.MakeCodec()
+	cdc := app.MakeEncodingConfig().Amino
 	client := NewRpcLiquidationClient(rpc, cdc)
 
 	height := int64(1001)
@@ -141,6 +143,7 @@ func TestGetPrices(t *testing.T) {
 
 	// check correct parameters are called
 	rpc.ABCICheckFunc = func(
+		ctx context.Context,
 		path string,
 		data bytes.HexBytes,
 		opts rpcclient.ABCIQueryOptions,
@@ -189,7 +192,7 @@ func TestGetPrices(t *testing.T) {
 
 func TestGetMarkets(t *testing.T) {
 	rpc := &MockRpcClient{}
-	cdc := kava.MakeCodec()
+	cdc := app.MakeEncodingConfig().Amino
 	client := NewRpcLiquidationClient(rpc, cdc)
 
 	height := int64(1001)
@@ -241,6 +244,7 @@ func TestGetMarkets(t *testing.T) {
 
 	// check correct parameters are called
 	rpc.ABCICheckFunc = func(
+		ctx context.Context,
 		path string,
 		data bytes.HexBytes,
 		opts rpcclient.ABCIQueryOptions,
@@ -289,7 +293,7 @@ func TestGetMarkets(t *testing.T) {
 
 func TestGetBorrows(t *testing.T) {
 	rpc := &MockRpcClient{}
-	cdc := kava.MakeCodec()
+	cdc := app.MakeEncodingConfig().Amino
 	client := NewRpcLiquidationClient(rpc, cdc)
 
 	height := int64(1001)
@@ -327,6 +331,7 @@ func TestGetBorrows(t *testing.T) {
 
 	// check correct parameters are called
 	rpc.ABCICheckFunc = func(
+		ctx context.Context,
 		path string,
 		data bytes.HexBytes,
 		opts rpcclient.ABCIQueryOptions,
@@ -406,7 +411,7 @@ func TestGetBorrows(t *testing.T) {
 
 func TestGetDeposits(t *testing.T) {
 	rpc := &MockRpcClient{}
-	cdc := kava.MakeCodec()
+	cdc := app.MakeEncodingConfig().Amino
 	client := NewRpcLiquidationClient(rpc, cdc)
 
 	height := int64(1001)
@@ -444,6 +449,7 @@ func TestGetDeposits(t *testing.T) {
 
 	// check correct parameters are called
 	rpc.ABCICheckFunc = func(
+		ctx context.Context,
 		path string,
 		data bytes.HexBytes,
 		opts rpcclient.ABCIQueryOptions,

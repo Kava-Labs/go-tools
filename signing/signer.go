@@ -1,34 +1,37 @@
-package main
+package signing
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"regexp"
 	"time"
 
+	"github.com/kava-labs/kava/app/params"
+
+	sdkclient "github.com/cosmos/cosmos-sdk/client"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	tmcrypto "github.com/tendermint/tendermint/crypto"
 	tmmempool "github.com/tendermint/tendermint/mempool"
-	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmjsonrpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
 
 type MsgRequest struct {
-	Msgs []sdk.Msg
-	Fee  authtypes.StdFee
-	Memo string
+	Msgs      []sdk.Msg
+	GasLimit  uint64
+	FeeAmount sdk.Coins
+	Memo      string
 }
 
 type MsgResponse struct {
 	Request MsgRequest
-	Tx      authtypes.StdTx
-	Result  ctypes.ResultBroadcastTx
+	Tx      authsigning.Tx
+	TxBytes []byte
+	Result  sdk.TxResponse
 	Err     error
 }
-
-var tmMempoolFull = regexp.MustCompile("mempool is full")
 
 // internal result for inner loop logic
 type broadcastTxResult int
@@ -37,44 +40,70 @@ const (
 	txOK broadcastTxResult = iota
 	txFailed
 	txRetry
-	txUnauthorized
+	txResetSequence
 )
 
 // Signer broadcasts msgs to a single kava node
 type Signer struct {
-	client          BroadcastClient
-	privKey         tmcrypto.PrivKey
+	chainID         string
+	encodingConfig  params.EncodingConfig
+	authClient      authtypes.QueryClient
+	txClient        txtypes.ServiceClient
+	privKey         cryptotypes.PrivKey
 	inflightTxLimit uint64
 }
 
-func NewSigner(client BroadcastClient, privKey tmcrypto.PrivKey, inflightTxLimit uint64) *Signer {
+func NewSigner(
+	chainID string,
+	encodingConfig params.EncodingConfig,
+	authClient authtypes.QueryClient,
+	txClient txtypes.ServiceClient,
+	privKey cryptotypes.PrivKey,
+	inflightTxLimit uint64) *Signer {
+
 	return &Signer{
-		client:          client,
+		chainID:         chainID,
+		encodingConfig:  encodingConfig,
+		authClient:      authClient,
+		txClient:        txClient,
 		privKey:         privKey,
 		inflightTxLimit: inflightTxLimit,
 	}
 }
 
+func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
+	accountState := make(chan authtypes.AccountI)
+
+	go func() {
+		for {
+			request := authtypes.QueryAccountRequest{
+				Address: getAccAddress(s.privKey).String(),
+			}
+			response, err := s.authClient.Account(context.Background(), &request)
+
+			if err == nil {
+				var account authtypes.AccountI
+
+				err = s.encodingConfig.InterfaceRegistry.UnpackAny(response.Account, &account)
+				if err == nil {
+					accountState <- account
+				}
+			}
+
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
+	return accountState
+}
+
 func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
-	chainID, err := s.client.GetChainID()
-	if err != nil {
-		return nil, err
-	}
 	// poll account state in it's own goroutine
 	// and send status updates to the signing goroutine
 	//
 	// TODO: instead of polling, we can wait for block
 	// websocket events with a fallback to polling
-	accountState := make(chan authtypes.BaseAccount)
-	go func() {
-		for {
-			account, err := s.client.GetAccount(GetAccAddress(s.privKey))
-			if err == nil {
-				accountState <- *account
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}()
+	accountState := s.pollAccountState()
 
 	responses := make(chan MsgResponse)
 	go func() {
@@ -198,24 +227,27 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						continue
 					}
 
-					stdSignMsg := authtypes.StdSignMsg{
-						ChainID:       chainID,
+					txBuilder := s.encodingConfig.TxConfig.NewTxBuilder()
+					txBuilder.SetMsgs(currentRequest.Msgs...)
+					txBuilder.SetGasLimit(currentRequest.GasLimit)
+					txBuilder.SetFeeAmount(currentRequest.FeeAmount)
+
+					signerData := authsigning.SignerData{
+						ChainID:       s.chainID,
 						AccountNumber: account.GetAccountNumber(),
 						Sequence:      broadcastTxSeq,
-						Fee:           currentRequest.Fee,
-						Msgs:          currentRequest.Msgs,
-						Memo:          currentRequest.Memo,
 					}
 
-					stdTx, err := Sign(s.privKey, stdSignMsg)
+					tx, txBytes, err := s.sign(txBuilder, signerData)
 
 					response = &MsgResponse{
 						Request: *currentRequest,
-						Tx:      stdTx,
+						Tx:      tx,
+						TxBytes: txBytes,
 						Err:     err,
 					}
 
-					// could not sign the currentRequest
+					// could not sign and encode the currentRequest
 					if response.Err != nil {
 						// clear invalid request, since this is non-recoverable
 						currentRequest = nil
@@ -237,28 +269,22 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 				// Retry (tx not in mempool, but retry - do not change inflight status)
 				// Failed (tx not in mempool, not recoverable - clear inflight status, reply to channel)
 				// Unauthorized (tx not in mempool - sequence not valid)
-				rpcResult, err := s.client.BroadcastTxSync(&response.Tx)
+				broadcastRequest := txtypes.BroadcastTxRequest{
+					TxBytes: response.TxBytes,
+					Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+				}
+				broadcastResponse, err := s.txClient.BroadcastTx(context.Background(), &broadcastRequest)
 
 				// set to determine action at the end of loop
 				// default is OK
 				txResult := txOK
 
-				// determine action to take when err (and no rpcResult)
+				// determine action to take when err (and no response)
 				if err != nil {
-					var rpcError *tmjsonrpctypes.RPCError
-
-					// tendermint rpc error
-					if errors.As(err, &rpcError) {
-						if rpcError.Data == tmmempool.ErrTxInCache.Error() {
-							txResult = txOK
-						} else if tmMempoolFull.MatchString(rpcError.Data) {
-							txResult = txRetry
-						} else {
-							// ErrTxTooLarge or ErrPreCheck - not recoverable
-							// other RPC Errors like parsing, etc
-							response.Err = rpcError
-							txResult = txFailed
-						}
+					if tmmempool.IsPreCheckError(err) {
+						// ErrPreCheck - not recoverable
+						response.Err = err
+						txResult = txFailed
 					} else {
 						// could not contact node (POST failed, dns errors, etc)
 						// exit loop, wait for another account state update
@@ -269,24 +295,27 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 					}
 				} else {
 					// store rpc result in response
-					response.Result = *rpcResult
+					response.Result = *broadcastResponse.TxResponse
 
 					// determine action to take based on rpc result
-					switch rpcResult.Code {
+					switch response.Result.Code {
 					// 0: success, in mempool
 					case sdkerrors.SuccessABCICode:
 						txResult = txOK
 					// 4: unauthorized
 					case sdkerrors.ErrUnauthorized.ABCICode():
-						txResult = txUnauthorized
+						txResult = txResetSequence
 					// 19: success, tx already in mempool
 					case sdkerrors.ErrTxInMempoolCache.ABCICode():
 						txResult = txOK
 					// 20: mempool full
 					case sdkerrors.ErrMempoolIsFull.ABCICode():
 						txResult = txRetry
+					// 32: wrong sequence
+					case sdkerrors.ErrWrongSequence.ABCICode():
+						txResult = txResetSequence
 					default:
-						response.Err = fmt.Errorf("message failed to broadcast, unrecoverable error code %d", rpcResult.Code)
+						response.Err = fmt.Errorf("message failed to broadcast, unrecoverable error code %d", response.Result.Code)
 						txResult = txFailed
 					}
 				}
@@ -323,7 +352,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 					broadcastTxSeq++
 				case txRetry:
 					break BROADCAST_LOOP
-				case txUnauthorized:
+				case txResetSequence:
 					broadcastTxSeq = account.GetSequence()
 					break BROADCAST_LOOP
 				}
@@ -334,27 +363,45 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 	return responses, nil
 }
 
-func GetAccAddress(privKey tmcrypto.PrivKey) sdk.AccAddress {
-	return privKey.PubKey().Address().Bytes()
+func (s *Signer) sign(txBuilder sdkclient.TxBuilder, signerData authsigning.SignerData) (authsigning.Tx, []byte, error) {
+	signatureData := signing.SingleSignatureData{
+		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
+		Signature: nil,
+	}
+	sigV2 := signing.SignatureV2{
+		PubKey:   s.privKey.PubKey(),
+		Data:     &signatureData,
+		Sequence: signerData.Sequence,
+	}
+	if err := txBuilder.SetSignatures(sigV2); err != nil {
+		return txBuilder.GetTx(), nil, err
+	}
+
+	signBytes, err := s.encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
+	if err != nil {
+		return txBuilder.GetTx(), nil, err
+	}
+	signature, err := s.privKey.Sign(signBytes)
+	if err != nil {
+		return txBuilder.GetTx(), nil, err
+	}
+
+	sigV2.Data = &signing.SingleSignatureData{
+		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
+		Signature: signature,
+	}
+	if err := txBuilder.SetSignatures(sigV2); err != nil {
+		return txBuilder.GetTx(), nil, err
+	}
+
+	txBytes, err := s.encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		return txBuilder.GetTx(), nil, err
+	}
+
+	return txBuilder.GetTx(), txBytes, nil
 }
 
-func Sign(privKey tmcrypto.PrivKey, signMsg authtypes.StdSignMsg) (authtypes.StdTx, error) {
-	sigBytes, err := privKey.Sign(signMsg.Bytes())
-	if err != nil {
-		return authtypes.StdTx{}, err
-	}
-
-	sig := authtypes.StdSignature{
-		PubKey:    privKey.PubKey(),
-		Signature: sigBytes,
-	}
-
-	tx := authtypes.NewStdTx(
-		signMsg.Msgs,
-		signMsg.Fee,
-		[]authtypes.StdSignature{sig},
-		signMsg.Memo,
-	)
-
-	return tx, nil
+func getAccAddress(privKey cryptotypes.PrivKey) sdk.AccAddress {
+	return privKey.PubKey().Address().Bytes()
 }
