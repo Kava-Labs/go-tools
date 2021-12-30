@@ -1,6 +1,7 @@
 package claim
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"testing"
 	"time"
@@ -38,7 +39,6 @@ var (
 )
 
 func init() {
-
 	cfg := sdk.GetConfig()
 	app.SetBech32AddressPrefixes(cfg)
 	cfg.Seal()
@@ -121,6 +121,7 @@ func init() {
 		},
 	}
 }
+
 func TestGetClaimableKavaSwaps(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
@@ -131,7 +132,7 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 
 	kc.EXPECT().
 		GetOpenOutgoingSwaps().
-		Return(testKavaSwaps[:1], nil) // only return outgoing swaps
+		Return(mapAtomicSwapsToResponses(testKavaSwaps[:1]), nil) // only return outgoing swaps
 
 	bc.EXPECT().
 		GetRandomNumberFromSwap([]byte(calcBnbSwapID(testBnbSwaps[0], addrs.Kava.Users[0].Address.String()))).
@@ -153,7 +154,6 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 }
 
 func TestGetClaimableBnbSwaps(t *testing.T) {
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -205,8 +205,8 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 		GetAccount(addrs.Kava.Users[0].Address).
 		Return(testAcc, nil).AnyTimes()
 
-	testID := mustDecodeHex("9e3fdda337b885622e8c0c6a7970c95bc312a97bb7ba38c26f0e3d7a44fb93a8")
-	testRndNum := mustDecodeHex("6712ddf02589858704cf70cf39fff8724fe71f1f2d7560878a97bbc5c1367535")
+	testID := mustDecodeBase64("nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=")
+	testRndNum := mustDecodeBase64("ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU=")
 
 	expectedTxJSON := `
 	{
@@ -320,4 +320,40 @@ func mustDecodeHex(hexString string) []byte {
 		panic(err)
 	}
 	return bz
+}
+
+func mustDecodeBase64(hexString string) []byte {
+	bz, err := base64.StdEncoding.DecodeString(hexString)
+	if err != nil {
+		panic(err)
+	}
+	return bz
+}
+
+func mapAtomicSwapsToResponses(atomicSwaps bep3types.AtomicSwaps) []bep3types.AtomicSwapResponse {
+	var swapResponses []bep3types.AtomicSwapResponse
+
+	for _, swap := range atomicSwaps {
+		swapResponses = append(swapResponses, mapAtomicSwapToResponse(swap))
+	}
+
+	return swapResponses
+}
+
+func mapAtomicSwapToResponse(atomicSwap bep3types.AtomicSwap) bep3types.AtomicSwapResponse {
+	return bep3types.AtomicSwapResponse{
+		Id:                  atomicSwap.GetSwapID().String(),
+		Amount:              atomicSwap.Amount,
+		RandomNumberHash:    atomicSwap.RandomNumberHash.String(),
+		ExpireHeight:        atomicSwap.ExpireHeight,
+		Timestamp:           atomicSwap.Timestamp,
+		Sender:              atomicSwap.Sender.String(),
+		Recipient:           atomicSwap.Recipient.String(),
+		SenderOtherChain:    atomicSwap.SenderOtherChain,
+		RecipientOtherChain: atomicSwap.RecipientOtherChain,
+		ClosedBlock:         atomicSwap.ClosedBlock,
+		Status:              atomicSwap.Status,
+		CrossChain:          atomicSwap.CrossChain,
+		Direction:           atomicSwap.Direction,
+	}
 }
