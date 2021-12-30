@@ -7,14 +7,15 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/golang/mock/gomock"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
 	"github.com/kava-labs/kava/app"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
+	tmtypes "github.com/kava-labs/tendermint/types"
 	"github.com/stretchr/testify/require"
-	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim/mock"
 	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
@@ -204,51 +205,71 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 		GetAccount(addrs.Kava.Users[0].Address).
 		Return(testAcc, nil).AnyTimes()
 
-	expectedTxJSON := `{
-		"type": "cosmos-sdk/StdTx",
-		"value": {
-			"msg": [
-				{
-					"type": "bep3/MsgClaimAtomicSwap",
-					"value": {
-						"from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
-						"swap_id": "9E3FDDA337B885622E8C0C6A7970C95BC312A97BB7BA38C26F0E3D7A44FB93A8",
-						"random_number": "6712DDF02589858704CF70CF39FFF8724FE71F1F2D7560878A97BBC5C1367535"
-					}
-				}
-			],
-			"fee": {
-				"amount": [
-					{
-						"denom": "ukava",
-						"amount": "62500"
-					}
-				],
-				"gas": "250000"
-			},
-			"signatures": [
-				{
-					"pub_key": {
-						"type": "tendermint/PubKeySecp256k1",
-						"value": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
-					},
-					"signature": "bQGaRBq9FuYDWpMEfPF6scgnayakdZCp6lB1d/JE+iUfKzw5B16iOhox+vENzxgQOIYb1VFJYyKP9o2gIrE4Sg=="
-				}
-			],
-			"memo": ""
-		}
-	}`
-
-	var expectedTx tx.BroadcastTxRequest
-	encodingConfig.Marshaler.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
-	expectedTxBytes := tmtypes.Tx(cdc.MustMarshalBinaryLengthPrefixed(expectedTx))
-	// set expected tx
-	kc.EXPECT().BroadcastTx(expectedTxBytes)
-
-	// run function under test (mock will verify tx was created correctly)
 	testID := mustDecodeHex("9e3fdda337b885622e8c0c6a7970c95bc312a97bb7ba38c26f0e3d7a44fb93a8")
 	testRndNum := mustDecodeHex("6712ddf02589858704cf70cf39fff8724fe71f1f2d7560878a97bbc5c1367535")
-	_, err := constructAndSendClaim(kc, mnemonicsKavaUsers0, testID, testRndNum)
+
+	expectedTxJSON := `
+	{
+		"body": {
+		  "messages": [
+			{
+			  "@type": "/kava.bep3.v1beta1.MsgClaimAtomicSwap",
+			  "from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
+			  "swap_id": "nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=",
+			  "random_number": "ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU="
+			}
+		  ],
+		  "memo": "",
+		  "timeout_height": "0",
+		  "extension_options": [],
+		  "non_critical_extension_options": []
+		},
+		"auth_info": {
+		  "signer_infos": [
+			{
+			  "public_key": {
+				"@type": "/cosmos.crypto.secp256k1.PubKey",
+				"key": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
+			  },
+			  "mode_info": {
+				"single": {
+				  "mode": "SIGN_MODE_DIRECT"
+				}
+			  },
+			  "sequence": "0"
+			}
+		  ],
+		  "fee": {
+			"amount": [
+			  {
+				"denom": "ukava",
+				"amount": "62500"
+			  }
+			],
+			"gas_limit": "250000",
+			"payer": "",
+			"granter": ""
+		  }
+		},
+		"signatures": [
+		  "jQ0ZYWddEr5nV+bbFvzWO8k61j28en71PmX3FD0oOvcXPya9AFyRRUNKgD/xhbCnRITvk4OX303v4nJm52WBaQ=="
+		]
+	}
+	`
+
+	var expectedTx tx.Tx
+	encodingConfig.Marshaler.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
+	expectedTxBytes := tmtypes.Tx(encodingConfig.Marshaler.MustMarshal(&expectedTx))
+
+	broadcastTxRequest := txtypes.BroadcastTxRequest{
+		TxBytes: expectedTxBytes,
+		Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+	}
+	// set expected tx
+	kc.EXPECT().BroadcastTx(broadcastTxRequest)
+
+	// run function under test (mock will verify tx was created correctly)
+	_, err := constructAndSendClaim(kc, encodingConfig, mnemonicsKavaUsers0, testID, testRndNum)
 	require.NoError(t, err)
 }
 

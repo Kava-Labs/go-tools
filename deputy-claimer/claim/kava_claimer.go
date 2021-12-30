@@ -121,7 +121,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 			log.Printf("sending claim for kava swap id %s", swap.swapID)
 			defer func() { mnemonics <- mnemonic }()
 
-			txHash, err := constructAndSendClaim(kc, mnemonic, swap.swapID, swap.randomNumber)
+			txHash, err := constructAndSendClaim(kc.kavaClient, kc.encodingConfig, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
 				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
@@ -160,7 +160,12 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	return nil
 }
 
-func constructAndSendClaim(kc KavaChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+func constructAndSendClaim(
+	kavaClient KavaChainClient,
+	encodingConfig params.EncodingConfig,
+	mnemonic string,
+	swapID, randNum tmbytes.HexBytes,
+) ([]byte, error) {
 	hdPath := hd.CreateHDPath(app.Bip44CoinType, 0, 0)
 	privKeyBytes, err := hd.Secp256k1.Derive()(mnemonic, "", hdPath.String())
 
@@ -173,17 +178,17 @@ func constructAndSendClaim(kc KavaChainClient, mnemonic string, swapID, randNum 
 
 	// construct and sign tx
 	msg := bep3types.NewMsgClaimAtomicSwap(accAddr.String(), swapID, randNum)
-	chainID, err := kc.kavaClient.GetChainID()
+	chainID, err := kavaClient.GetChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch chain id: %w", err)
 	}
 
-	account, err := kc.kavaClient.GetAccount(accAddr)
+	account, err := kavaClient.GetAccount(accAddr)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch account: %w", err)
 	}
 
-	txBuilder := kc.encodingConfig.TxConfig.NewTxBuilder()
+	txBuilder := encodingConfig.TxConfig.NewTxBuilder()
 	txBuilder.SetMsgs(&msg)
 	txBuilder.SetGasLimit(defaultGas)
 	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin(
@@ -210,7 +215,7 @@ func constructAndSendClaim(kc KavaChainClient, mnemonic string, swapID, randNum 
 		return nil, err
 	}
 
-	signBytes, err := kc.encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
+	signBytes, err := encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +232,7 @@ func constructAndSendClaim(kc KavaChainClient, mnemonic string, swapID, randNum 
 		return nil, err
 	}
 
-	txBytes, err := kc.encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +243,7 @@ func constructAndSendClaim(kc KavaChainClient, mnemonic string, swapID, randNum 
 	}
 
 	// broadcast tx to mempool
-	if err = kc.kavaClient.BroadcastTx(request); err != nil {
+	if err = kavaClient.BroadcastTx(request); err != nil {
 		return nil, fmt.Errorf("could not submit claim: %w", err)
 	}
 
