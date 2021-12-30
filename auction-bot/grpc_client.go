@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"log"
+	"net/url"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -34,13 +36,21 @@ type GrpcClient struct {
 	Pricefeed      pricefeedtypes.QueryClient
 }
 
-func NewGrpcClient(target string, enableTls bool, cdc codec.Codec) GrpcClient {
+func NewGrpcClient(target string, cdc codec.Codec) GrpcClient {
+	grpcUrl, err := url.Parse(target)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var secureOpt grpc.DialOption
-	if enableTls {
+	switch grpcUrl.Scheme {
+	case "http":
+		secureOpt = grpc.WithInsecure()
+	case "https":
 		creds := credentials.NewTLS(&tls.Config{})
 		secureOpt = grpc.WithTransportCredentials(creds)
-	} else {
-		secureOpt = grpc.WithInsecure()
+	default:
+		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
 	}
 
 	grpcConn, err := grpc.Dial(target, secureOpt)

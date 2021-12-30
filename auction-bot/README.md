@@ -7,8 +7,8 @@ Automated bot for bidding on collateral and debt auctions on the Kava platform. 
 Create a `.env` file:
 
 ```
-# GRPC endpoint
-KAVA_GRPC_URL="grpc.testnet.kava.io:443"
+# GRPC endpoint, scheme must be included
+KAVA_GRPC_URL="https://grpc.testnet.kava.io:443"
 # Disable TLS if not supported by endpoint
 GRPC_TLS=false
 # Mnemonic
