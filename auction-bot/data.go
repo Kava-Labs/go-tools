@@ -40,7 +40,7 @@ func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
 		return nil, err
 	}
 
-	auctionsRes, err := client.Auction.Auctions(ctxAtHeight(latestHeight), &auctiontypes.QueryAuctionsRequest{})
+	auctions, err := client.AllAuctions(ctxAtHeight(latestHeight))
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +74,6 @@ func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
 			Price:            price,
 			ConversionFactor: market.ConversionFactor,
 		}
-	}
-
-	var auctions []auctiontypes.Auction
-	for _, anyAuction := range auctionsRes.Auction {
-		var auction auctiontypes.Auction
-		cdc.UnpackAny(anyAuction, &auction)
-
-		auctions = append(auctions, auction)
 	}
 
 	return &AuctionData{

@@ -7,6 +7,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/types/query"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
@@ -15,6 +16,10 @@ import (
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+)
+
+const (
+	PageLimit = 1000
 )
 
 type GrpcClient struct {
@@ -103,4 +108,37 @@ func (c *GrpcClient) BaseAccount(addr string) (authtypes.BaseAccount, error) {
 	}
 
 	return *bAcc, nil
+}
+
+func (c *GrpcClient) AllAuctions(ctx context.Context) ([]auctiontypes.Auction, error) {
+	var key []byte
+	var auctions []auctiontypes.Auction
+
+	for {
+		auctionsRes, err := c.Auction.Auctions(ctx, &auctiontypes.QueryAuctionsRequest{
+			Pagination: &query.PageRequest{
+				// Default limit if Limit is not provided is 100
+				Limit: PageLimit,
+				Key:   key,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, anyAuction := range auctionsRes.Auction {
+			var auction auctiontypes.Auction
+			if err = c.cdc.UnpackAny(anyAuction, &auction); err != nil {
+				return nil, err
+			}
+
+			auctions = append(auctions, auction)
+		}
+
+		key = auctionsRes.Pagination.NextKey
+
+		if len(auctionsRes.Auction) < PageLimit {
+			return auctions, nil
+		}
+	}
 }
