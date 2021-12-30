@@ -15,7 +15,6 @@ import (
 
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 
-	kavaRpc "github.com/kava-labs/go-sdk/client"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 
 	"google.golang.org/grpc"
@@ -38,7 +37,6 @@ var _ KavaChainClient = grpcKavaClient{}
 type grpcKavaClient struct {
 	cdc            codec.Codec
 	GrpcClientConn *grpc.ClientConn
-	kavaSDKClient  *kavaRpc.KavaClient
 	Auth           authtypes.QueryClient
 	Bep3           bep3types.QueryClient
 	Tx             txtypes.ServiceClient
