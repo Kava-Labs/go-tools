@@ -6,6 +6,7 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/golang/mock/gomock"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
@@ -63,9 +64,9 @@ func init() {
 			SenderOtherChain:    addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
 			RecipientOtherChain: addrs.Bnb.Users[0].Address.String(),
 			ClosedBlock:         0, // default for open swaps
-			Status:              bep3types.Open,
+			Status:              bep3types.SWAP_STATUS_OPEN,
 			CrossChain:          true,
-			Direction:           bep3types.Outgoing,
+			Direction:           bep3types.SWAP_DIRECTION_OUTGOING,
 		},
 		{
 			Amount:              sdk.NewCoins(sdk.NewInt64Coin("bnb", 1_00_000_000)),
@@ -77,9 +78,9 @@ func init() {
 			SenderOtherChain:    addrs.Bnb.Users[0].Address.String(),
 			RecipientOtherChain: addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
 			ClosedBlock:         0, // default for open swaps
-			Status:              bep3types.Open,
+			Status:              bep3types.SWAP_STATUS_OPEN,
 			CrossChain:          true,
-			Direction:           bep3types.Incoming,
+			Direction:           bep3types.SWAP_DIRECTION_OUTGOING,
 		},
 	}
 	testBnbSwaps = []bnbtypes.AtomicSwap{
@@ -188,15 +189,14 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 	kc := mock.NewMockKavaChainClient(ctrl)
 
 	// set endpoints to return testing data
-	cdc := app.MakeCodec()
-	kc.EXPECT().
-		GetCodec().
-		Return(cdc).AnyTimes()
+	encodingConfig := app.MakeEncodingConfig()
+
 	kc.EXPECT().
 		GetChainID().
 		Return("kava-localnet", nil).AnyTimes()
+
 	testAcc := authtypes.AccountI(&authtypes.BaseAccount{
-		Address:       addrs.Kava.Users[0].Address,
+		Address:       addrs.Kava.Users[0].Address.String(),
 		AccountNumber: 12,
 		Sequence:      34,
 	})
@@ -238,8 +238,9 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 			"memo": ""
 		}
 	}`
-	var expectedTx authtypes.StdTx
-	cdc.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
+
+	var expectedTx tx.BroadcastTxRequest
+	encodingConfig.Marshaler.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
 	expectedTxBytes := tmtypes.Tx(cdc.MustMarshalBinaryLengthPrefixed(expectedTx))
 	// set expected tx
 	kc.EXPECT().BroadcastTx(expectedTxBytes)

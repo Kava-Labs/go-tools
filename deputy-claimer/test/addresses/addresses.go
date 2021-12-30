@@ -259,5 +259,6 @@ func KavaAddressFromMnemonic(mnemonic string) sdk.AccAddress {
 	if err != nil {
 		panic(err.Error())
 	}
-	return manager.GetAddr()
+
+	return manager.GetKeyRing().GetAddress()
 }

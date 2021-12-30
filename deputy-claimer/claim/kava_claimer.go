@@ -121,7 +121,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 			log.Printf("sending claim for kava swap id %s", swap.swapID)
 			defer func() { mnemonics <- mnemonic }()
 
-			txHash, err := kc.constructAndSendClaim(mnemonic, swap.swapID, swap.randomNumber)
+			txHash, err := constructAndSendClaim(kc, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
 				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
@@ -160,7 +160,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 	return nil
 }
 
-func (kc KavaClaimer) constructAndSendClaim(mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
+func constructAndSendClaim(kc KavaChainClient, mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
 	hdPath := hd.CreateHDPath(app.Bip44CoinType, 0, 0)
 	privKeyBytes, err := hd.Secp256k1.Derive()(mnemonic, "", hdPath.String())
 

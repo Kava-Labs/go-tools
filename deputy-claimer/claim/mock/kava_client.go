@@ -7,13 +7,11 @@ package mock
 import (
 	reflect "reflect"
 
-	codec "github.com/cosmos/cosmos-sdk/codec"
 	types "github.com/cosmos/cosmos-sdk/types"
+	tx "github.com/cosmos/cosmos-sdk/types/tx"
 	types0 "github.com/cosmos/cosmos-sdk/x/auth/types"
 	gomock "github.com/golang/mock/gomock"
 	types1 "github.com/kava-labs/kava/x/bep3/types"
-	types2 "github.com/tendermint/tendermint/rpc/core/types"
-	types3 "github.com/tendermint/tendermint/types"
 )
 
 // MockKavaChainClient is a mock of KavaChainClient interface.
@@ -40,7 +38,7 @@ func (m *MockKavaChainClient) EXPECT() *MockKavaChainClientMockRecorder {
 }
 
 // BroadcastTx mocks base method.
-func (m *MockKavaChainClient) BroadcastTx(tx types3.Tx) error {
+func (m *MockKavaChainClient) BroadcastTx(tx tx.BroadcastTxRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BroadcastTx", tx)
 	ret0, _ := ret[0].(error)
@@ -83,25 +81,11 @@ func (mr *MockKavaChainClientMockRecorder) GetChainID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainID", reflect.TypeOf((*MockKavaChainClient)(nil).GetChainID))
 }
 
-// GetCodec mocks base method.
-func (m *MockKavaChainClient) GetCodec() *codec.Codec {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCodec")
-	ret0, _ := ret[0].(*codec.Codec)
-	return ret0
-}
-
-// GetCodec indicates an expected call of GetCodec.
-func (mr *MockKavaChainClientMockRecorder) GetCodec() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCodec", reflect.TypeOf((*MockKavaChainClient)(nil).GetCodec))
-}
-
 // GetOpenOutgoingSwaps mocks base method.
-func (m *MockKavaChainClient) GetOpenOutgoingSwaps() (types1.AtomicSwaps, error) {
+func (m *MockKavaChainClient) GetOpenOutgoingSwaps() ([]types1.AtomicSwapResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOpenOutgoingSwaps")
-	ret0, _ := ret[0].(types1.AtomicSwaps)
+	ret0, _ := ret[0].([]types1.AtomicSwapResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -128,10 +112,10 @@ func (mr *MockKavaChainClientMockRecorder) GetRandomNumberFromSwap(id interface{
 }
 
 // GetTxConfirmation mocks base method.
-func (m *MockKavaChainClient) GetTxConfirmation(txHash []byte) (*types2.ResultTx, error) {
+func (m *MockKavaChainClient) GetTxConfirmation(txHash []byte) (*types.TxResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTxConfirmation", txHash)
-	ret0, _ := ret[0].(*types2.ResultTx)
+	ret0, _ := ret[0].(*types.TxResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
