@@ -30,7 +30,8 @@ func TestConfigLoading(t *testing.T) {
 	loader := &testEnvLoader{
 		t: t,
 		Env: map[string]string{
-			"KAVA_RPC_URL":         "https://rpc.testnet.kava.io",
+			"KAVA_RPC_URL":         "https://rpc.testnet.kava.io:443",
+			"KAVA_GRPC_URL":        "https://grpc.testnet.kava.io:443",
 			"KAVA_KEEPER_ADDRESS":  sdk.AccAddress(crypto.AddressHash([]byte("keeper"))).String(),
 			"KAVA_SIGNER_MNEMONIC": "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
 		},
@@ -43,6 +44,10 @@ func TestConfigLoading(t *testing.T) {
 
 	if defaultConfig.KavaRpcUrl != loader.Env["KAVA_RPC_URL"] {
 		t.Fatalf("bad value %s for KavaRpcUrl", defaultConfig.KavaRpcUrl)
+	}
+
+	if defaultConfig.KavaGrpcUrl != loader.Env["KAVA_GRPC_URL"] {
+		t.Fatalf("bad value %s for KavaGrpcUrl", defaultConfig.KavaGrpcUrl)
 	}
 
 	if defaultConfig.KavaLiquidationInterval != time.Duration(10*time.Minute) {
@@ -60,7 +65,8 @@ func TestConfigLoading(t *testing.T) {
 	loader = &testEnvLoader{
 		t: t,
 		Env: map[string]string{
-			"KAVA_RPC_URL":              "https://rpc.testnet.kava.io",
+			"KAVA_RPC_URL":              "https://rpc.testnet.kava.io:443",
+			"KAVA_GRPC_URL":             "https://grpc.testnet.kava.io:443",
 			"KAVA_KEEPER_ADDRESS":       sdk.AccAddress(crypto.AddressHash([]byte("keeper"))).String(),
 			"KAVA_LIQUIDATION_INTERVAL": "30m",
 			"KAVA_SIGNER_MNEMONIC":      "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
@@ -81,7 +87,8 @@ func TestInvalidKeeperAddress(t *testing.T) {
 	loader := &testEnvLoader{
 		t: t,
 		Env: map[string]string{
-			"KAVA_RPC_URL":         "https://rpc.testnet.kava.io",
+			"KAVA_RPC_URL":         "https://rpc.testnet.kava.io:443",
+			"KAVA_GRPC_URL":        "https://grpc.testnet.kava.io:443",
 			"KAVA_KEEPER_ADDRESS":  "kava1invalidaddress",
 			"KAVA_SIGNER_MNEMONIC": "arrive guide way exit polar print kitchen hair series custom siege afraid shrug crew fashion mind script divorce pattern trust project regular robust safe",
 		},

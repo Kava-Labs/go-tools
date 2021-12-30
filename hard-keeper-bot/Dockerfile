@@ -1,9 +1,9 @@
-FROM golang:1.15.6-buster as build-env
+FROM golang:1.17.5-bullseye as build-env
 
 ADD . /src
-RUN cd /src && go build -o /main
+RUN cd /src/hard-keeper-bot && go build -o /main
 
-FROM debian:buster
+FROM debian:bullseye
 
 RUN apt-get update \
       && apt-get install -y ca-certificates \
