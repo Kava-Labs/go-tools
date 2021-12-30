@@ -9,14 +9,22 @@ import (
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
-	kavaKeys "github.com/kava-labs/go-sdk/keys"
-	"github.com/kava-labs/kava/app"
-	bep3types "github.com/kava-labs/kava/x/bep3/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
+
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	tmtypes "github.com/tendermint/tendermint/types"
+
+	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	tmtypes "github.com/kava-labs/tendermint/types"
+
+	"github.com/kava-labs/kava/app"
+	"github.com/kava-labs/kava/app/params"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
 )
 
 const (
@@ -46,6 +54,7 @@ func (r KavaClaimError) Error() string {
 }
 
 type KavaClaimer struct {
+	encodingConfig  params.EncodingConfig
 	cdc             codec.Codec
 	kavaClient      KavaChainClient
 	bnbClient       BnbChainClient
@@ -63,6 +72,7 @@ func NewKavaClaimer(
 	encodingConfig := app.MakeEncodingConfig()
 
 	return KavaClaimer{
+		encodingConfig:  encodingConfig,
 		cdc:             encodingConfig.Marshaler,
 		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, kavaGrpcEnableTLS, encodingConfig.Marshaler),
 		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
@@ -111,7 +121,7 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 			log.Printf("sending claim for kava swap id %s", swap.swapID)
 			defer func() { mnemonics <- mnemonic }()
 
-			txHash, err := kc.constructAndSendClaim(kc.kavaClient, mnemonic, swap.swapID, swap.randomNumber)
+			txHash, err := kc.constructAndSendClaim(mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
 				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
@@ -151,47 +161,91 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 }
 
 func (kc KavaClaimer) constructAndSendClaim(mnemonic string, swapID, randNum tmbytes.HexBytes) ([]byte, error) {
-	kavaKeyM, err := kavaKeys.NewMnemonicKeyManager(mnemonic, app.Bip44CoinType)
+	hdPath := hd.CreateHDPath(app.Bip44CoinType, 0, 0)
+	privKeyBytes, err := hd.Secp256k1.Derive()(mnemonic, "", hdPath.String())
+
 	if err != nil {
-		return nil, fmt.Errorf("could not create key manager: %w", err)
+		return nil, fmt.Errorf("could not derive private key bytes: %w", err)
 	}
 
-	fromAddr := kavaKeyM.GetKeyRing().GetAddress()
+	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
+	accAddr := getAccAddress(privKey)
 
 	// construct and sign tx
-	msg := bep3types.NewMsgClaimAtomicSwap(fromAddr.String(), swapID, randNum)
+	msg := bep3types.NewMsgClaimAtomicSwap(accAddr.String(), swapID, randNum)
 	chainID, err := kc.kavaClient.GetChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch chain id: %w", err)
 	}
-	account, err := kc.kavaClient.GetAccount(fromAddr)
+
+	account, err := kc.kavaClient.GetAccount(accAddr)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch account: %w", err)
 	}
-	fee := authtypes.NewStdFee(
-		defaultGas,
-		sdk.NewCoins(sdk.NewCoin(
-			defaultGasPrice.Denom,
-			defaultGasPrice.Amount.MulInt64(int64(defaultGas)).Ceil().TruncateInt(),
-		)),
-	)
-	signMsg := authtypes.StdSignMsg{
+
+	txBuilder := kc.encodingConfig.TxConfig.NewTxBuilder()
+	txBuilder.SetMsgs(&msg)
+	txBuilder.SetGasLimit(defaultGas)
+	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin(
+		defaultGasPrice.Denom,
+		defaultGasPrice.Amount.MulInt64(int64(defaultGas)).Ceil().TruncateInt(),
+	)))
+
+	signerData := authsigning.SignerData{
 		ChainID:       chainID,
 		AccountNumber: account.GetAccountNumber(),
-		Sequence:      account.GetSequence(),
-		Fee:           fee,
-		Msgs:          []sdk.Msg{msg},
-		Memo:          "",
+		// Sequence:      account.GetSequence(),
 	}
-	txBz, err := kavaKeyM.Sign(signMsg, kc.cdc)
+
+	signatureData := signing.SingleSignatureData{
+		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
+		Signature: nil,
+	}
+	sigV2 := signing.SignatureV2{
+		PubKey:   privKey.PubKey(),
+		Data:     &signatureData,
+		Sequence: signerData.Sequence,
+	}
+	if err := txBuilder.SetSignatures(sigV2); err != nil {
+		return nil, err
+	}
+
+	signBytes, err := kc.encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
 	if err != nil {
-		return nil, fmt.Errorf("could not sign: %w", err)
+		return nil, err
 	}
+	signature, err := privKey.Sign(signBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	sigV2.Data = &signing.SingleSignatureData{
+		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
+		Signature: signature,
+	}
+	if err := txBuilder.SetSignatures(sigV2); err != nil {
+		return nil, err
+	}
+
+	txBytes, err := kc.encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
+	if err != nil {
+		return nil, err
+	}
+
+	request := txtypes.BroadcastTxRequest{
+		TxBytes: txBytes,
+		Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+	}
+
 	// broadcast tx to mempool
-	if err = kc.kavaClient.BroadcastTx(txBz); err != nil {
+	if err = kc.kavaClient.BroadcastTx(request); err != nil {
 		return nil, fmt.Errorf("could not submit claim: %w", err)
 	}
-	return tmtypes.Tx(txBz).Hash(), nil
+
+	tmtx := tmtypes.Tx(txBytes)
+	tmTxHexBytes := tmbytes.HexBytes(tmtx.Hash())
+
+	return tmTxHexBytes, nil
 }
 
 type kavaClaimableSwap struct {
@@ -278,4 +332,8 @@ func Wait(timeout time.Duration, shouldStop func() (bool, error)) error {
 		}
 		time.Sleep(1 * time.Millisecond)
 	}
+}
+
+func getAccAddress(privKey cryptotypes.PrivKey) sdk.AccAddress {
+	return privKey.PubKey().Address().Bytes()
 }

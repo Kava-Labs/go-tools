@@ -14,7 +14,6 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	tmtypes "github.com/tendermint/tendermint/types"
 
 	kavaRpc "github.com/kava-labs/go-sdk/client"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
@@ -31,7 +30,7 @@ type KavaChainClient interface {
 	GetTxConfirmation(txHash []byte) (*sdk.TxResponse, error)
 	GetAccount(address sdk.AccAddress) (authtypes.AccountI, error)
 	GetChainID() (string, error)
-	BroadcastTx(tx tmtypes.Tx) error
+	BroadcastTx(tx txtypes.BroadcastTxRequest) error
 }
 
 var _ KavaChainClient = grpcKavaClient{}
@@ -109,10 +108,8 @@ func (kc grpcKavaClient) GetTxConfirmation(txHash []byte) (*sdk.TxResponse, erro
 	return res.TxResponse, err
 }
 
-func (kc grpcKavaClient) BroadcastTx(tx tmtypes.Tx) error {
-	res, err := kc.Tx.BroadcastTx(context.Background(), &txtypes.BroadcastTxRequest{
-		TxBytes: tx,
-	})
+func (kc grpcKavaClient) BroadcastTx(tx txtypes.BroadcastTxRequest) error {
+	res, err := kc.Tx.BroadcastTx(context.Background(), &tx)
 	if err != nil {
 		return err
 	}
