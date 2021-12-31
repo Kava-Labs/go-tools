@@ -6,7 +6,7 @@ require (
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/gorilla/mux v1.8.0
 	github.com/kava-labs/binance-chain-go-sdk v1.2.5-kava
-	github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd // indirect
+	github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd
 	github.com/kava-labs/go-tools/deputy-claimer v0.0.0-20201223131958-31f436616e96
 	github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69
 	github.com/sirupsen/logrus v1.8.1

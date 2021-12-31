@@ -521,7 +521,6 @@ github.com/kava-labs/binance-chain-ledger-cosmos-go v0.9.9-binance.1-kava1 h1:wj
 github.com/kava-labs/binance-chain-ledger-cosmos-go v0.9.9-binance.1-kava1/go.mod h1:1dz1Z0UcH6EROUe0RN301BapaxPOdam2mLSpCYrQSnM=
 github.com/kava-labs/go-amino v0.14.1-kava h1:mXiFIiRjc45RR+vs7cKO5Sk/kpZFapulBX2skJosIFI=
 github.com/kava-labs/go-amino v0.14.1-kava/go.mod h1:CVdr4CKxHrPCYuU60BWOsl21+ldnqXbUhh6wQc6AQIM=
-github.com/kava-labs/go-sdk v0.3.0-rc1 h1:avTi7xnXAPreaSz9RGFeUOgoLvvUSeShYTuKvBVFKjQ=
 github.com/kava-labs/go-sdk v0.3.0-rc1/go.mod h1:EGk8l+SCIC4wsQvGQ9iGcuYhlurKYgLkS6hbrxrvVnY=
 github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd h1:ACVehZL8cm1Goc4X/MCy1E2mu/38Jxoyxky2RR1XqHk=
 github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd/go.mod h1:0N9L8VKQHCOT7zCtrjikI8BlIovT7Z4uV9QWuRnndoY=
