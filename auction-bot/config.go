@@ -18,7 +18,7 @@ type ConfigLoader interface {
 
 // Config provides application configuration
 type Config struct {
-	KavaRpcUrl         string
+	KavaGrpcUrl        string
 	KavaBidInterval    time.Duration
 	KavaKeeperMnemonic string
 	ProfitMargin       sdk.Dec
@@ -31,28 +31,30 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	if err != nil {
 		fmt.Printf(".env not found, attempting to proceed with available env variables\n")
 	}
-	rpcURL := loader.Get(kavaRpcUrlEnvKey)
-	if rpcURL == "" {
-		return Config{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
+	grpcURL := loader.Get(kavaGrpcUrlEnvKey)
+	if grpcURL == "" {
+		return Config{}, fmt.Errorf("%s not set", kavaGrpcUrlEnvKey)
 	}
 
 	keeperMnemonic := loader.Get(mnemonicEnvKey)
 
-	marginStr := loader.Get(profitMargin)
-	fmt.Printf("%s\n", marginStr)
+	marginStr := loader.Get(profitMarginKey)
+	if marginStr == "" {
+		return Config{}, fmt.Errorf("%s not set", profitMarginKey)
+	}
 
 	marginDec, err := sdk.NewDecFromStr(marginStr)
 	if err != nil {
 		return Config{}, err
 	}
 
-	keeperBidInterval, err := time.ParseDuration(loader.Get(bidInterval))
+	keeperBidInterval, err := time.ParseDuration(loader.Get(bidIntervalKey))
 	if err != nil {
 		keeperBidInterval = time.Duration(10 * time.Minute)
 	}
 
 	return Config{
-		KavaRpcUrl:         rpcURL,
+		KavaGrpcUrl:        grpcURL,
 		KavaBidInterval:    keeperBidInterval,
 		KavaKeeperMnemonic: keeperMnemonic,
 		ProfitMargin:       marginDec,
@@ -60,8 +62,7 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 }
 
 // EnvLoader loads keys from os environment
-type EnvLoader struct {
-}
+type EnvLoader struct{}
 
 // Get retrieves key from environment
 func (l *EnvLoader) Get(key string) string {

@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 	hardtypes "github.com/kava-labs/kava/x/hard/types"
+	"github.com/kava-labs/kava/x/pricefeed/types"
+	"google.golang.org/grpc/metadata"
 )
 
 type AssetInfo struct {
@@ -17,46 +23,43 @@ type AssetInfo struct {
 
 type AuctionData struct {
 	Assets       map[string]AssetInfo
-	Auctions     auctiontypes.Auctions
+	Auctions     []auctiontypes.Auction
 	BidIncrement sdk.Dec
 	BidMargin    sdk.Dec
 }
 
-func GetAuctionData(client AuctionClient) (*AuctionData, error) {
-	// fetch chain info to get height
-	info, err := client.GetInfo()
+func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
+	// fetch latest block to get height
+	latestHeight, err := client.LatestHeight()
 	if err != nil {
 		return nil, err
 	}
 
-	// use height to get consistent state from rpc client
-	height := info.LatestHeight
-
-	prices, err := client.GetPrices(height)
+	pricesRes, err := client.Pricefeed.Prices(ctxAtHeight(latestHeight), &types.QueryPricesRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	auctions, err := client.GetAuctions(height)
+	auctions, err := client.AllAuctions(ctxAtHeight(latestHeight))
 	if err != nil {
 		return nil, err
 	}
 
-	cdpMarkets, err := client.GetMarkets(height)
+	cdpParamsRes, err := client.Cdp.Params(ctxAtHeight(latestHeight), &cdptypes.QueryParamsRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	moneyMarkets, err := client.GetMoneyMarkets(height)
+	hardParamsRes, err := client.Hard.Params(ctxAtHeight(latestHeight), &hardtypes.QueryParamsRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	markets := deduplicateMarkets(cdpMarkets, moneyMarkets)
+	markets := deduplicateMarkets(cdpParamsRes.Params.CollateralParams, hardParamsRes.Params.MoneyMarkets)
 
 	// map price data
 	priceData := make(map[string]sdk.Dec)
-	for _, price := range prices {
+	for _, price := range pricesRes.Prices {
 		priceData[price.MarketID] = price.Price
 	}
 
@@ -78,6 +81,11 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 		Auctions:     auctions,
 		BidIncrement: sdk.MustNewDecFromStr("0.01"), // TODO could fetch increment from chain
 	}, nil
+}
+
+func ctxAtHeight(height int64) context.Context {
+	heightStr := strconv.FormatInt(height, 10)
+	return metadata.AppendToOutgoingContext(context.Background(), grpctypes.GRPCBlockHeightHeader, heightStr)
 }
 
 func deduplicateMarkets(cdpMarkets cdptypes.CollateralParams, hardMarkets hardtypes.MoneyMarkets) []auctionMarket {
