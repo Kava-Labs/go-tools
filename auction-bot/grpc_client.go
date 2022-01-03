@@ -53,7 +53,7 @@ func NewGrpcClient(target string, cdc codec.Codec) GrpcClient {
 		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
 	}
 
-	grpcConn, err := grpc.Dial(target, secureOpt)
+	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {
 		panic(err)
 	}
