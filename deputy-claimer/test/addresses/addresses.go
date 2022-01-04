@@ -16,6 +16,7 @@ import (
 
 const (
 	KavaNodeURL                                           = "tcp://localhost:26657"
+	KavaGrpcURL                                           = "http://localhost:9090"
 	KavaRestURL                                           = "http://localhost:1317"
 	BnbNodeURL                                            = "tcp://localhost:26658"
 	BnbHTLTFee, BnbClaimFee, BnbRefundFee, BnbTransferFee = 37500, 37500, 37500, 37500
