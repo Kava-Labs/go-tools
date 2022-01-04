@@ -9,11 +9,11 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 
-	"github.com/kava-labs/go-sdk/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -43,11 +43,11 @@ func TestMultipleClaimBnb(t *testing.T) {
 		if err != nil {
 			return swap, err
 		}
-		_, err = kavaSwapper.Create(swap.KavaSwap, client.Block)
+		_, err = kavaSwapper.Create(swap.KavaSwap, txtypes.BroadcastMode_BROADCAST_MODE_BLOCK)
 		if err != nil {
 			return swap, err
 		}
-		_, err = kavaSwapper.Claim(swap.KavaSwap, swap.RandomNumber, client.Block)
+		_, err = kavaSwapper.Claim(swap.KavaSwap, swap.RandomNumber, txtypes.BroadcastMode_BROADCAST_MODE_BLOCK)
 		if err != nil {
 			return swap, err
 		}
@@ -102,7 +102,7 @@ func TestMultipleClaimKava(t *testing.T) {
 			addrs.Bnb.Users[0].Address,
 			sdk.NewCoins(sdk.NewInt64Coin("bnb", 50_000_000)),
 		)
-		_, err := kavaSwapper.Create(swap.KavaSwap, client.Block)
+		_, err := kavaSwapper.Create(swap.KavaSwap, txtypes.BroadcastMode_BROADCAST_MODE_BLOCK)
 		if err != nil {
 			return swap, err
 		}
