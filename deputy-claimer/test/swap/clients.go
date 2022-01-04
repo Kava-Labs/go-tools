@@ -75,6 +75,7 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 	encodingConfig := app.MakeEncodingConfig()
 	kavaClient := client.NewKavaClient(encodingConfig.Amino, signerMnemonic, app.Bip44CoinType, swapClient.kavaRpcUrl)
 	ctx := sdkclient.Context{}.
+		WithClient(kavaClient.HTTP).
 		WithCodec(encodingConfig.Marshaler).
 		WithInterfaceRegistry(encodingConfig.InterfaceRegistry).
 		WithTxConfig(encodingConfig.TxConfig).
