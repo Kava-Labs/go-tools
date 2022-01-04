@@ -24,7 +24,7 @@ services:
         command:
             - sh
             - -c
-            - /root/.kvd/config/init-data-directory.sh && kvd start --pruning=nothing --rpc.laddr=tcp://0.0.0.0:26657
+            - /root/.kava/config/init-data-directory.sh && kvd start --pruning=nothing --rpc.laddr=tcp://0.0.0.0:26657
         image: kava/kava:upgrade-v44
         ports:
             # rpc
