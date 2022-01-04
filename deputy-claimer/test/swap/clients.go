@@ -2,13 +2,19 @@ package swap
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"log"
+	"net/url"
 
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	sdkclient "github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	bnbKeys "github.com/kava-labs/binance-chain-go-sdk/keys"
 	"github.com/kava-labs/go-sdk/client"
 	"github.com/kava-labs/kava/app"
@@ -18,11 +24,38 @@ import (
 // KavaSwapClient handles sending txs to modify a kava swap on chain.
 // It can create, claim, or refund a swap.
 type KavaSwapClient struct {
-	kavaRpcUrl string
+	GrpcClientConn *grpc.ClientConn
+	Tx             txtypes.ServiceClient
+	Bep3           bep3types.QueryClient
 }
 
-func NewKavaSwapClient(KavaRpcUrl string) KavaSwapClient {
-	return KavaSwapClient{kavaRpcUrl: KavaRpcUrl}
+func NewKavaSwapClient(target string) KavaSwapClient {
+	grpcUrl, err := url.Parse(target)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var secureOpt grpc.DialOption
+	switch grpcUrl.Scheme {
+	case "http":
+		secureOpt = grpc.WithInsecure()
+	case "https":
+		creds := credentials.NewTLS(&tls.Config{})
+		secureOpt = grpc.WithTransportCredentials(creds)
+	default:
+		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
+	}
+
+	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
+	if err != nil {
+		panic(err)
+	}
+
+	return KavaSwapClient{
+		GrpcClientConn: grpcConn,
+		Tx:             txtypes.NewServiceClient(grpcConn),
+		Bep3:           bep3types.NewQueryClient(grpcConn),
+	}
 }
 
 func (swapClient KavaSwapClient) Create(swap KavaSwap, mode client.SyncType) (string, error) {
@@ -86,8 +119,14 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 		return "", err
 	}
 	if res.Code != 0 {
-		return res.TxHash, fmt.Errorf("tx rejected: %s", res.Logs)
+		return res.TxHash, fmt.Errorf("tx rejected: %v", res)
 	}
+
+	client := txtypes.NewServiceClient(nil)
+	client.BroadcastTx(context.Background(), &txtypes.BroadcastTxRequest{
+		Mode: txtypes.BroadcastMode_BROADCAST_MODE_BLOCK,
+	})
+
 	return res.TxHash, nil
 }
 
