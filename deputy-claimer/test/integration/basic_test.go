@@ -50,7 +50,7 @@ func TestClaimBnb(t *testing.T) {
 	)
 	_, err := bnbSwapper.Create(swap1.BnbSwap, bnbRpc.Commit)
 	require.NoError(t, err)
-	_, err = kavaSwapper.Create(swap1.KavaSwap, client.Commit)
+	_, err = kavaSwapper.Create(swap1.KavaSwap, client.Block)
 	require.NoError(t, err)
 
 	// create another swap
@@ -61,11 +61,11 @@ func TestClaimBnb(t *testing.T) {
 	)
 	_, err = bnbSwapper.Create(swap2.BnbSwap, bnbRpc.Commit)
 	require.NoError(t, err)
-	_, err = kavaSwapper.Create(swap2.KavaSwap, client.Commit)
+	_, err = kavaSwapper.Create(swap2.KavaSwap, client.Block)
 	require.NoError(t, err)
 
 	// claim kava side of first swap
-	_, err = kavaSwapper.Claim(swap1.KavaSwap, swap1.RandomNumber, client.Commit)
+	_, err = kavaSwapper.Claim(swap1.KavaSwap, swap1.RandomNumber, client.Block)
 	require.NoError(t, err)
 
 	// run
@@ -102,7 +102,7 @@ func TestClaimKava(t *testing.T) {
 		addrs.Bnb.Users[0].Address,
 		sdk.NewCoins(sdk.NewInt64Coin("bnb", 50_000_000)),
 	)
-	_, err := kavaSwapper.Create(swap1.KavaSwap, client.Commit)
+	_, err := kavaSwapper.Create(swap1.KavaSwap, client.Block)
 	require.NoError(t, err)
 	_, err = bnbSwapper.Create(swap1.BnbSwap, bnbRpc.Commit)
 	require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestClaimKava(t *testing.T) {
 		addrs.Bnb.Users[0].Address,
 		sdk.NewCoins(sdk.NewInt64Coin("bnb", 50_000_000)),
 	)
-	_, err = kavaSwapper.Create(swap2.KavaSwap, client.Commit)
+	_, err = kavaSwapper.Create(swap2.KavaSwap, client.Block)
 	require.NoError(t, err)
 	_, err = bnbSwapper.Create(swap2.BnbSwap, bnbRpc.Commit)
 	require.NoError(t, err)

@@ -43,11 +43,11 @@ func TestMultipleClaimBnb(t *testing.T) {
 		if err != nil {
 			return swap, err
 		}
-		_, err = kavaSwapper.Create(swap.KavaSwap, client.Commit)
+		_, err = kavaSwapper.Create(swap.KavaSwap, client.Block)
 		if err != nil {
 			return swap, err
 		}
-		_, err = kavaSwapper.Claim(swap.KavaSwap, swap.RandomNumber, client.Commit)
+		_, err = kavaSwapper.Claim(swap.KavaSwap, swap.RandomNumber, client.Block)
 		if err != nil {
 			return swap, err
 		}
@@ -102,7 +102,7 @@ func TestMultipleClaimKava(t *testing.T) {
 			addrs.Bnb.Users[0].Address,
 			sdk.NewCoins(sdk.NewInt64Coin("bnb", 50_000_000)),
 		)
-		_, err := kavaSwapper.Create(swap.KavaSwap, client.Commit)
+		_, err := kavaSwapper.Create(swap.KavaSwap, client.Block)
 		if err != nil {
 			return swap, err
 		}
