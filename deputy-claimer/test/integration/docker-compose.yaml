@@ -33,15 +33,4 @@ services:
             - 9090:9090
         volumes:
             - ./kava/initstate/.kava/config:/root/.kava/config
-    kavarest:
-        command:
-            - kvcli
-            - rest-server
-            - --node=tcp://kavanode:26657
-            - --trust-node
-            - --laddr=tcp://0.0.0.0:1317
-            - --unsafe-cors
-        image: kava/kava:v0.12.0
-        ports:
-            - 1317:1317
 version: "3"
