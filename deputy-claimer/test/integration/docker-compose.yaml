@@ -27,7 +27,10 @@ services:
             - /root/.kvd/config/init-data-directory.sh && kvd start --pruning=nothing --rpc.laddr=tcp://0.0.0.0:26657
         image: kava/kava:upgrade-v44
         ports:
+            # rpc
             - 26657:26657
+            # grpc
+            - 9090:9090
         volumes:
             - ./kava/initstate/.kava/config:/root/.kava/config
     kavarest:
