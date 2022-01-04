@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package integration
@@ -70,8 +71,7 @@ func TestClaimBnb(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewBnbClaimer(
-		addresses.KavaRestURL,
-		addresses.KavaNodeURL,
+		addresses.KavaGrpcURL,
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.BnbUserMnemonics()[:2],
@@ -125,8 +125,7 @@ func TestClaimKava(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewKavaClaimer(
-		addresses.KavaRestURL,
-		addresses.KavaNodeURL,
+		addresses.KavaGrpcURL,
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.KavaUserMnemonics()[:2],
@@ -137,7 +136,12 @@ func TestClaimKava(t *testing.T) {
 	// check the first kava swap was claimed
 	status, err := kavaSwapper.FetchStatus(swap1.KavaSwap)
 	require.NoError(t, err)
-	require.Equalf(t, bep3types.Completed, status, "expected swap status '%s', actual '%s'", bep3types.Completed, status)
+	require.Equalf(
+		t,
+		bep3types.SWAP_STATUS_COMPLETED, status,
+		"expected swap status '%s', actual '%s'",
+		bep3types.SWAP_STATUS_COMPLETED, status,
+	)
 }
 
 func getDeputyAddresses(addrs addresses.Addresses) claim.DeputyAddresses {

@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package integration
@@ -64,8 +65,7 @@ func TestMultipleClaimBnb(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewBnbClaimer(
-		addresses.KavaRestURL,
-		addresses.KavaNodeURL,
+		addresses.KavaGrpcURL,
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.BnbUserMnemonics()[:2],
@@ -128,8 +128,7 @@ func TestMultipleClaimKava(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewKavaClaimer(
-		addresses.KavaRestURL,
-		addresses.KavaNodeURL,
+		addresses.KavaGrpcURL,
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.KavaUserMnemonics()[:2],
@@ -144,7 +143,12 @@ func TestMultipleClaimKava(t *testing.T) {
 		status, err := kavaSwapper.FetchStatus(s.KavaSwap)
 		assert.NoError(t, err)
 		t.Logf("status of swap %d: %s", i, status)
-		assert.Equalf(t, bep3types.Completed, status, "expected swap status '%s', actual '%s'", bep3types.Completed, status)
+		assert.Equalf(
+			t,
+			bep3types.SWAP_STATUS_COMPLETED, status,
+			"expected swap status '%s', actual '%s'",
+			bep3types.SWAP_STATUS_COMPLETED, status,
+		)
 	}
 
 }
