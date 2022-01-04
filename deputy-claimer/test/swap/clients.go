@@ -49,7 +49,7 @@ func NewKavaSwapClient(target string) KavaSwapClient {
 		creds := credentials.NewTLS(&tls.Config{})
 		secureOpt = grpc.WithTransportCredentials(creds)
 	default:
-		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
+		log.Fatalf("unknown grpc url scheme %s\n", grpcUrl.Scheme)
 	}
 
 	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
@@ -125,14 +125,16 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 	// wrap with cosmos secp256k1 private key struct
 	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
 
+	// Fetch account to get account number and sequence
 	accRes, err := swapClient.Auth.Account(context.Background(), &authtypes.QueryAccountRequest{
 		Address: signing.GetAccAddress(privKey).String(),
 	})
 	if err != nil {
 		return "", err
 	}
+
 	var account authtypes.AccountI
-	err = swapClient.encodingConfig.InterfaceRegistry.UnpackAny(accRes.Account, &account)
+	err = swapClient.encodingConfig.Marshaler.UnpackAny(accRes.Account, &account)
 	if err != nil {
 		return "", err
 	}

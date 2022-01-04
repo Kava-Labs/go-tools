@@ -155,7 +155,7 @@ func (kc grpcKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3types.AtomicSwapR
 
 func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	strID := strings.ToLower(hex.EncodeToString(id))
-	query := fmt.Sprintf(`create_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
+	query := fmt.Sprintf(`claim_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
 
 	// Event format is "{eventType}.{eventAttribute}={value}"
 	// https://github.com/cosmos/cosmos-sdk/blob/9fd866e3820b3510010ae172b682d71594cd8c14/x/auth/tx/service.go#L43
@@ -174,9 +174,9 @@ func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	}
 
 	var claim bep3types.MsgClaimAtomicSwap
-	err = kc.cdc.UnpackAny(res.TxResponses[0].Tx, &claim)
+	err = kc.cdc.Unmarshal(res.TxResponses[0].Tx.Value, &claim)
 	if err != nil {
-		return nil, fmt.Errorf("could not unpack any: %w", err)
+		return nil, fmt.Errorf("could not unmarshal MsgClaimAtomicSwap: %w", err)
 	}
 
 	return claim.RandomNumber, nil
