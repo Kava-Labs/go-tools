@@ -46,7 +46,6 @@ type BnbClaimer struct {
 
 func NewBnbClaimer(
 	kavaGrpcURL string,
-	kavaGrpcEnableTLS bool,
 	bnbRPCURL string,
 	depAddrs DeputyAddresses,
 	mnemonics []string,
@@ -54,7 +53,7 @@ func NewBnbClaimer(
 	encodingConfig := app.MakeEncodingConfig()
 
 	return BnbClaimer{
-		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, kavaGrpcEnableTLS, encodingConfig.Marshaler),
+		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig.Marshaler),
 		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
 		mnemonics:       mnemonics,
 		deputyAddresses: depAddrs,

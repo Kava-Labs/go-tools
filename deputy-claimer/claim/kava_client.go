@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
+	"log"
+	"net/url"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -43,16 +45,24 @@ type grpcKavaClient struct {
 	Tm             tmservice.ServiceClient
 }
 
-func NewGrpcKavaClient(grpcURL string, enableTLS bool, cdc codec.Codec) grpcKavaClient {
-	var options []grpc.DialOption
-	if enableTLS {
-		creds := credentials.NewTLS(&tls.Config{})
-		options = append(options, grpc.WithTransportCredentials(creds))
-	} else {
-		options = append(options, grpc.WithInsecure())
+func NewGrpcKavaClient(target string, cdc codec.Codec) grpcKavaClient {
+	grpcUrl, err := url.Parse(target)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	grpcConn, err := grpc.Dial(grpcURL, options...)
+	var secureOpt grpc.DialOption
+	switch grpcUrl.Scheme {
+	case "http":
+		secureOpt = grpc.WithInsecure()
+	case "https":
+		creds := credentials.NewTLS(&tls.Config{})
+		secureOpt = grpc.WithTransportCredentials(creds)
+	default:
+		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
+	}
+
+	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {
 		panic(err)
 	}
