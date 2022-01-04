@@ -1,11 +1,13 @@
 package swap
 
 import (
+	"context"
 	"fmt"
 
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 
+	sdkclient "github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	bnbKeys "github.com/kava-labs/binance-chain-go-sdk/keys"
 	"github.com/kava-labs/go-sdk/client"
@@ -22,10 +24,11 @@ type KavaSwapClient struct {
 func NewKavaSwapClient(KavaRpcUrl string) KavaSwapClient {
 	return KavaSwapClient{kavaRpcUrl: KavaRpcUrl}
 }
-func (swapClient KavaSwapClient) Create(swap KavaSwap, mode client.SyncType) ([]byte, error) {
+
+func (swapClient KavaSwapClient) Create(swap KavaSwap, mode client.SyncType) (string, error) {
 	msg := bep3types.NewMsgCreateAtomicSwap(
-		swap.Sender,
-		swap.Recipient,
+		swap.Sender.String(),
+		swap.Recipient.String(),
 		swap.RecipientOtherChain,
 		swap.SenderOtherChain,
 		swap.RandomNumberHash,
@@ -33,45 +36,58 @@ func (swapClient KavaSwapClient) Create(swap KavaSwap, mode client.SyncType) ([]
 		swap.Amount,
 		swap.HeightSpan,
 	)
-	return swapClient.broadcastMsg(msg, swap.SenderMnemonic, mode)
+
+	return swapClient.broadcastMsg(&msg, swap.SenderMnemonic, mode)
 }
-func (swapClient KavaSwapClient) Claim(swap KavaSwap, randomNumber []byte, mode client.SyncType) ([]byte, error) {
+
+func (swapClient KavaSwapClient) Claim(swap KavaSwap, randomNumber []byte, mode client.SyncType) (string, error) {
 	msg := bep3types.NewMsgClaimAtomicSwap(
-		swap.Sender, // doesn't need to be sender
+		swap.Sender.String(), // doesn't need to be sender
 		swap.GetSwapID(),
 		randomNumber,
 	)
-	return swapClient.broadcastMsg(msg, swap.SenderMnemonic, mode)
+
+	return swapClient.broadcastMsg(&msg, swap.SenderMnemonic, mode)
 }
-func (swapClient KavaSwapClient) Refund(swap KavaSwap, mode client.SyncType) ([]byte, error) {
+
+func (swapClient KavaSwapClient) Refund(swap KavaSwap, mode client.SyncType) (string, error) {
 	msg := bep3types.NewMsgRefundAtomicSwap(
-		swap.Sender, // doesn't need to be sender
+		swap.Sender.String(), // doesn't need to be sender
 		swap.GetSwapID(),
 	)
-	return swapClient.broadcastMsg(msg, swap.SenderMnemonic, mode)
+
+	return swapClient.broadcastMsg(&msg, swap.SenderMnemonic, mode)
 }
+
 func (swapClient KavaSwapClient) FetchStatus(swap KavaSwap) (bep3types.SwapStatus, error) {
 	standInMnemonic := "grass luxury welcome dismiss legal nothing glide crisp material broccoli jewel put inflict expose taxi wear second party air hockey crew ride wage nurse"
-	kavaClient := client.NewKavaClient(app.MakeCodec(), standInMnemonic, app.Bip44CoinType, swapClient.kavaRpcUrl)
-	fetchedSwap, err := kavaClient.GetSwapByID(swap.GetSwapID())
+	encodingConfig := app.MakeEncodingConfig()
+
+	kavaClient := client.NewKavaClient(encodingConfig.Amino, standInMnemonic, app.Bip44CoinType, swapClient.kavaRpcUrl)
+	fetchedSwap, err := kavaClient.GetSwapByID(context.Background(), swap.GetSwapID())
 	if err != nil {
 		return 0, fmt.Errorf("could not fetch swap status: %w", err)
 	}
 	return fetchedSwap.Status, nil
 }
 
-func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode client.SyncType) ([]byte, error) {
-	cdc := app.MakeCodec()
-	kavaClient := client.NewKavaClient(cdc, signerMnemonic, app.Bip44CoinType, swapClient.kavaRpcUrl)
+func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode client.SyncType) (string, error) {
+	encodingConfig := app.MakeEncodingConfig()
+	kavaClient := client.NewKavaClient(encodingConfig.Amino, signerMnemonic, app.Bip44CoinType, swapClient.kavaRpcUrl)
+	ctx := sdkclient.Context{}.
+		WithCodec(encodingConfig.Marshaler).
+		WithInterfaceRegistry(encodingConfig.InterfaceRegistry).
+		WithTxConfig(encodingConfig.TxConfig).
+		WithLegacyAmino(encodingConfig.Amino)
 
-	res, err := kavaClient.Broadcast(msg, mode)
+	res, err := kavaClient.Broadcast(ctx, msg, mode)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if res.Code != 0 {
-		return res.Hash, fmt.Errorf("tx rejected: %s", res.Log)
+		return res.TxHash, fmt.Errorf("tx rejected: %s", res.Logs)
 	}
-	return res.Hash, nil
+	return res.TxHash, nil
 }
 
 // BnbSwapClient handles sending txs to modify a bnb swap on chain.
