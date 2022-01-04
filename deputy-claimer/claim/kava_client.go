@@ -12,6 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/query"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
@@ -81,6 +82,9 @@ func (kc grpcKavaClient) GetOpenOutgoingSwaps() ([]bep3types.AtomicSwapResponse,
 	res, err := kc.Bep3.AtomicSwaps(context.Background(), &bep3types.QueryAtomicSwapsRequest{
 		Status:    bep3types.SWAP_STATUS_OPEN,
 		Direction: bep3types.SWAP_DIRECTION_OUTGOING,
+		Pagination: &query.PageRequest{
+			Limit: 1000,
+		},
 	})
 
 	if err != nil {
@@ -151,7 +155,7 @@ func (kc grpcKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3types.AtomicSwapR
 
 func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	strID := strings.ToLower(hex.EncodeToString(id))
-	query := fmt.Sprintf(`claim_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
+	query := fmt.Sprintf(`create_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
 
 	// Event format is "{eventType}.{eventAttribute}={value}"
 	// https://github.com/cosmos/cosmos-sdk/blob/9fd866e3820b3510010ae172b682d71594cd8c14/x/auth/tx/service.go#L43
@@ -165,14 +169,14 @@ func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if len(res.Txs) < 1 {
+	if len(res.Txs) == 0 {
 		return nil, fmt.Errorf("no claim txs found")
 	}
 
 	var claim bep3types.MsgClaimAtomicSwap
 	err = kc.cdc.UnpackAny(res.TxResponses[0].Tx, &claim)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unpack any: %w", err)
 	}
 
 	return claim.RandomNumber, nil
