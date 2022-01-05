@@ -14,12 +14,12 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
-	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 
 	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
+	"github.com/kava-labs/go-tools/signing"
 	tmtypes "github.com/kava-labs/tendermint/types"
 
 	"github.com/kava-labs/kava/app"
@@ -203,37 +203,7 @@ func constructAndSendClaim(
 		Sequence:      account.GetSequence(),
 	}
 
-	signatureData := signing.SingleSignatureData{
-		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
-		Signature: nil,
-	}
-	sigV2 := signing.SignatureV2{
-		PubKey:   privKey.PubKey(),
-		Data:     &signatureData,
-		Sequence: signerData.Sequence,
-	}
-	if err := txBuilder.SetSignatures(sigV2); err != nil {
-		return nil, err
-	}
-
-	signBytes, err := encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
-	if err != nil {
-		return nil, err
-	}
-	signature, err := privKey.Sign(signBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	sigV2.Data = &signing.SingleSignatureData{
-		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
-		Signature: signature,
-	}
-	if err := txBuilder.SetSignatures(sigV2); err != nil {
-		return nil, err
-	}
-
-	txBytes, err := encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
+	_, txBytes, err := signing.Sign(encodingConfig, privKey, txBuilder, signerData)
 	if err != nil {
 		return nil, err
 	}

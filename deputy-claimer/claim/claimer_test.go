@@ -217,7 +217,7 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 					"swap_id": "nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=",
 					"random_number": "ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU="
 				}
-				],
+			],
 			"memo": "",
 			"timeout_height": "0",
 			"extension_options": [],
