@@ -113,7 +113,9 @@ func (swapClient KavaSwapClient) FetchStatus(swap KavaSwap) (bep3types.SwapStatu
 
 func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string, mode txtypes.BroadcastMode) (string, error) {
 	txBuilder := swapClient.encodingConfig.TxConfig.NewTxBuilder()
-	txBuilder.SetMsgs(msg)
+	if err := txBuilder.SetMsgs(msg); err != nil {
+		return "", err
+	}
 	txBuilder.SetGasLimit(250000)
 
 	hdPath := hd.CreateHDPath(app.Bip44CoinType, 0, 0)

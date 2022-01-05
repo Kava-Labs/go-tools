@@ -188,7 +188,9 @@ func constructAndSendClaim(
 	}
 
 	txBuilder := encodingConfig.TxConfig.NewTxBuilder()
-	txBuilder.SetMsgs(&msg)
+	if err := txBuilder.SetMsgs(&msg); err != nil {
+		return nil, err
+	}
 	txBuilder.SetGasLimit(defaultGas)
 	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin(
 		defaultGasPrice.Denom,

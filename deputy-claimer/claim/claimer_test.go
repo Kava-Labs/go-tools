@@ -298,22 +298,6 @@ func getDeputyAddresses(addrs addresses.Addresses) DeputyAddresses {
 	}
 }
 
-func mustDecodeKavaAddress(address string) sdk.AccAddress {
-	aa, err := sdk.AccAddressFromBech32(address)
-	if err != nil {
-		panic(err)
-	}
-	return aa
-}
-
-func mustDecodeBnbAddress(address string) bnbtypes.AccAddress {
-	aa, err := bnbtypes.AccAddressFromBech32(address)
-	if err != nil {
-		panic(err)
-	}
-	return aa
-}
-
 func mustDecodeHex(hexString string) []byte {
 	bz, err := hex.DecodeString(hexString)
 	if err != nil {
