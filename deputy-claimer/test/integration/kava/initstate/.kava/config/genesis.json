@@ -438,9 +438,9 @@
             "denom": "bnb",
             "deputy_address": "kava1agcvt07tcw0tglu0hmwdecsnuxp2yd45f3avgm",
             "fixed_fee": "1000",
-            "max_block_lock": "86400",
+            "max_block_lock": "270",
             "max_swap_amount": "500000000000",
-            "min_block_lock": "24686",
+            "min_block_lock": "220",
             "min_swap_amount": "1001",
             "supply_limit": {
               "limit": "100000000000000",
