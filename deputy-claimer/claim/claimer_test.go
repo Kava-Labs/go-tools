@@ -8,7 +8,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx"
-	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/golang/mock/gomock"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
@@ -261,9 +260,9 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 	encodingConfig.Marshaler.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
 	expectedTxBytes := tmtypes.Tx(encodingConfig.Marshaler.MustMarshal(&expectedTx))
 
-	broadcastTxRequest := txtypes.BroadcastTxRequest{
+	broadcastTxRequest := tx.BroadcastTxRequest{
 		TxBytes: expectedTxBytes,
-		Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+		Mode:    tx.BroadcastMode_BROADCAST_MODE_SYNC,
 	}
 	// set expected tx
 	kc.EXPECT().BroadcastTx(broadcastTxRequest)
