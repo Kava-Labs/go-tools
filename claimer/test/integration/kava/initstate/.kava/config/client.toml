@@ -8,7 +8,7 @@
 # The network chain ID
 chain-id = "kava-localnet"
 # The keyring's backend, where the keys are stored (os|file|kwallet|pass|test|memory)
-keyring-backend = "test"
+keyring-backend = "os"
 # CLI output format (text|json)
 output = "text"
 # <host>:<port> to Tendermint RPC interface for this chain
