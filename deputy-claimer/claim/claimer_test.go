@@ -211,48 +211,48 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 	expectedTxJSON := `
 	{
 		"body": {
-		  "messages": [
-			{
-			  "@type": "/kava.bep3.v1beta1.MsgClaimAtomicSwap",
-			  "from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
-			  "swap_id": "nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=",
-			  "random_number": "ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU="
-			}
-		  ],
-		  "memo": "",
-		  "timeout_height": "0",
-		  "extension_options": [],
-		  "non_critical_extension_options": []
+			"messages": [
+				{
+					"@type": "/kava.bep3.v1beta1.MsgClaimAtomicSwap",
+					"from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
+					"swap_id": "nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=",
+					"random_number": "ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU="
+				}
+				],
+			"memo": "",
+			"timeout_height": "0",
+			"extension_options": [],
+			"non_critical_extension_options": []
 		},
 		"auth_info": {
-		  "signer_infos": [
-			{
-			  "public_key": {
-				"@type": "/cosmos.crypto.secp256k1.PubKey",
-				"key": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
-			  },
-			  "mode_info": {
-				"single": {
-				  "mode": "SIGN_MODE_DIRECT"
+			"signer_infos": [
+				{
+					"public_key": {
+					"@type": "/cosmos.crypto.secp256k1.PubKey",
+					"key": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
+				},
+				"mode_info": {
+					"single": {
+						"mode": "SIGN_MODE_DIRECT"
+					}
+				},
+				"sequence": "34"
 				}
-			  },
-			  "sequence": "0"
-			}
-		  ],
-		  "fee": {
-			"amount": [
-			  {
-				"denom": "ukava",
-				"amount": "62500"
-			  }
 			],
-			"gas_limit": "250000",
-			"payer": "",
-			"granter": ""
-		  }
+			"fee": {
+				"amount": [
+					{
+						"denom": "ukava",
+						"amount": "62500"
+					}
+				],
+				"gas_limit": "250000",
+				"payer": "",
+				"granter": ""
+			}
 		},
 		"signatures": [
-		  "jQ0ZYWddEr5nV+bbFvzWO8k61j28en71PmX3FD0oOvcXPya9AFyRRUNKgD/xhbCnRITvk4OX303v4nJm52WBaQ=="
+			"kzb57JAozylztqS+FHQ27JVLpoO++LNj8meaK5Gs0nBujrJJyhFILq8c0XdDQFTpV7pEeIt4EOIKt+Hezuxf6w=="
 		]
 	}
 	`

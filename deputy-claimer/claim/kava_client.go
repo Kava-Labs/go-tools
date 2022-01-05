@@ -178,7 +178,7 @@ func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 
 	parsedTx, err := kc.encodingConfig.TxConfig.TxDecoder()(res.TxResponses[0].Tx.Value)
 	if err != nil {
-		return nil, fmt.Errorf("decode tx error: %w", err.Error())
+		return nil, fmt.Errorf("decode tx error: %w", err)
 	}
 
 	for _, msg := range parsedTx.GetMsgs() {
