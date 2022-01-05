@@ -116,8 +116,11 @@ func (kc grpcKavaClient) GetTxConfirmation(txHash []byte) (*sdk.TxResponse, erro
 	res, err := kc.Tx.GetTx(context.Background(), &txtypes.GetTxRequest{
 		Hash: txHashStr,
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return res.TxResponse, err
+	return res.TxResponse, nil
 }
 
 func (kc grpcKavaClient) BroadcastTx(tx txtypes.BroadcastTxRequest) error {
@@ -127,7 +130,7 @@ func (kc grpcKavaClient) BroadcastTx(tx txtypes.BroadcastTxRequest) error {
 	}
 
 	if res.TxResponse.Code != 0 { // tx failed to be submitted to the mempool
-		return fmt.Errorf("transaction failed to get into mempool: %s", res.TxResponse.Logs) // TODO should return a named error
+		return fmt.Errorf("transaction failed to get into mempool: %s", res.TxResponse.RawLog) // TODO should return a named error
 	}
 	return nil
 }

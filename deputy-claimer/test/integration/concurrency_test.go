@@ -26,7 +26,7 @@ func TestMultipleClaimBnb(t *testing.T) {
 	addrs := addresses.GetAddresses()
 
 	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
-	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL)
 	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -89,7 +89,7 @@ func TestMultipleClaimKava(t *testing.T) {
 	addrs := addresses.GetAddresses()
 
 	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
-	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL)
 	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,

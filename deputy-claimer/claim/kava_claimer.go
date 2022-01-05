@@ -198,7 +198,7 @@ func constructAndSendClaim(
 	signerData := authsigning.SignerData{
 		ChainID:       chainID,
 		AccountNumber: account.GetAccountNumber(),
-		// Sequence:      account.GetSequence(),
+		Sequence:      account.GetSequence(),
 	}
 
 	signatureData := signing.SingleSignatureData{
