@@ -73,7 +73,7 @@ func NewKavaClaimer(
 	return KavaClaimer{
 		encodingConfig:  encodingConfig,
 		cdc:             encodingConfig.Marshaler,
-		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig.Marshaler),
+		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig),
 		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
 		mnemonics:       mnemonics,
 		deputyAddresses: depAddrs,

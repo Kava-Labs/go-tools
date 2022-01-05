@@ -53,7 +53,7 @@ func NewBnbClaimer(
 	encodingConfig := app.MakeEncodingConfig()
 
 	return BnbClaimer{
-		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig.Marshaler),
+		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig),
 		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
 		mnemonics:       mnemonics,
 		deputyAddresses: depAddrs,

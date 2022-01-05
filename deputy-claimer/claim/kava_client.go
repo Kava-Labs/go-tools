@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
@@ -18,6 +17,7 @@ import (
 
 	tmbytes "github.com/tendermint/tendermint/libs/bytes"
 
+	"github.com/kava-labs/kava/app/params"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 
 	"google.golang.org/grpc"
@@ -38,7 +38,7 @@ type KavaChainClient interface {
 var _ KavaChainClient = grpcKavaClient{}
 
 type grpcKavaClient struct {
-	cdc            codec.Codec
+	encodingConfig params.EncodingConfig
 	GrpcClientConn *grpc.ClientConn
 	Auth           authtypes.QueryClient
 	Bep3           bep3types.QueryClient
@@ -46,7 +46,7 @@ type grpcKavaClient struct {
 	Tm             tmservice.ServiceClient
 }
 
-func NewGrpcKavaClient(target string, cdc codec.Codec) grpcKavaClient {
+func NewGrpcKavaClient(target string, encodingConfig params.EncodingConfig) grpcKavaClient {
 	grpcUrl, err := url.Parse(target)
 	if err != nil {
 		log.Fatal(err)
@@ -69,7 +69,7 @@ func NewGrpcKavaClient(target string, cdc codec.Codec) grpcKavaClient {
 	}
 
 	return grpcKavaClient{
-		cdc:            cdc,
+		encodingConfig: encodingConfig,
 		GrpcClientConn: grpcConn,
 		Auth:           authtypes.NewQueryClient(grpcConn),
 		Bep3:           bep3types.NewQueryClient(grpcConn),
@@ -103,7 +103,7 @@ func (kc grpcKavaClient) GetAccount(address sdk.AccAddress) (authtypes.AccountI,
 	}
 
 	var acc authtypes.AccountI
-	err = kc.cdc.UnpackAny(res.Account, &acc)
+	err = kc.encodingConfig.Marshaler.UnpackAny(res.Account, &acc)
 	if err != nil {
 		return nil, err
 	}
@@ -173,11 +173,17 @@ func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 		return nil, fmt.Errorf("no claim txs found")
 	}
 
-	var claim bep3types.MsgClaimAtomicSwap
-	err = kc.cdc.Unmarshal(res.TxResponses[0].Tx.Value, &claim)
+	parsedTx, err := kc.encodingConfig.TxConfig.TxDecoder()(res.TxResponses[0].Tx.Value)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal MsgClaimAtomicSwap: %w", err)
+		return nil, fmt.Errorf("decode tx error: %w", err.Error())
 	}
 
-	return claim.RandomNumber, nil
+	for _, msg := range parsedTx.GetMsgs() {
+		switch realMsg := msg.(type) {
+		case *bep3types.MsgClaimAtomicSwap:
+			return realMsg.RandomNumber, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no claim tx found")
 }
