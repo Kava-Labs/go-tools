@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package integration
@@ -8,11 +9,11 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 
-	"github.com/kava-labs/go-sdk/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,7 +26,7 @@ func TestMultipleClaimBnb(t *testing.T) {
 	addrs := addresses.GetAddresses()
 
 	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
-	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL)
 	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -42,11 +43,11 @@ func TestMultipleClaimBnb(t *testing.T) {
 		if err != nil {
 			return swap, err
 		}
-		_, err = kavaSwapper.Create(swap.KavaSwap, client.Commit)
+		_, err = kavaSwapper.Create(swap.KavaSwap, txtypes.BroadcastMode_BROADCAST_MODE_BLOCK)
 		if err != nil {
 			return swap, err
 		}
-		_, err = kavaSwapper.Claim(swap.KavaSwap, swap.RandomNumber, client.Commit)
+		_, err = kavaSwapper.Claim(swap.KavaSwap, swap.RandomNumber, txtypes.BroadcastMode_BROADCAST_MODE_BLOCK)
 		if err != nil {
 			return swap, err
 		}
@@ -64,8 +65,7 @@ func TestMultipleClaimBnb(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewBnbClaimer(
-		addresses.KavaRestURL,
-		addresses.KavaNodeURL,
+		addresses.KavaGrpcURL,
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.BnbUserMnemonics()[:2],
@@ -89,7 +89,7 @@ func TestMultipleClaimKava(t *testing.T) {
 	addrs := addresses.GetAddresses()
 
 	bnbSwapper := swap.NewBnbSwapClient(addresses.BnbNodeURL)
-	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL)
 	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -102,7 +102,7 @@ func TestMultipleClaimKava(t *testing.T) {
 			addrs.Bnb.Users[0].Address,
 			sdk.NewCoins(sdk.NewInt64Coin("bnb", 50_000_000)),
 		)
-		_, err := kavaSwapper.Create(swap.KavaSwap, client.Commit)
+		_, err := kavaSwapper.Create(swap.KavaSwap, txtypes.BroadcastMode_BROADCAST_MODE_BLOCK)
 		if err != nil {
 			return swap, err
 		}
@@ -128,8 +128,7 @@ func TestMultipleClaimKava(t *testing.T) {
 	// run
 	ctx, shutdownClaimer := context.WithCancel(context.Background())
 	claim.NewKavaClaimer(
-		addresses.KavaRestURL,
-		addresses.KavaNodeURL,
+		addresses.KavaGrpcURL,
 		addresses.BnbNodeURL,
 		getDeputyAddresses(addrs),
 		addrs.KavaUserMnemonics()[:2],
@@ -144,7 +143,12 @@ func TestMultipleClaimKava(t *testing.T) {
 		status, err := kavaSwapper.FetchStatus(s.KavaSwap)
 		assert.NoError(t, err)
 		t.Logf("status of swap %d: %s", i, status)
-		assert.Equalf(t, bep3types.Completed, status, "expected swap status '%s', actual '%s'", bep3types.Completed, status)
+		assert.Equalf(
+			t,
+			bep3types.SWAP_STATUS_COMPLETED, status,
+			"expected swap status '%s', actual '%s'",
+			bep3types.SWAP_STATUS_COMPLETED, status,
+		)
 	}
 
 }

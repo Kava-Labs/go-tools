@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	KavaNodeURL                                           = "tcp://localhost:26657"
-	KavaRestURL                                           = "http://localhost:1317"
+	KavaGrpcURL                                           = "http://localhost:9090"
 	BnbNodeURL                                            = "tcp://localhost:26658"
 	BnbHTLTFee, BnbClaimFee, BnbRefundFee, BnbTransferFee = 37500, 37500, 37500, 37500
 )
@@ -259,5 +258,6 @@ func KavaAddressFromMnemonic(mnemonic string) sdk.AccAddress {
 	if err != nil {
 		panic(err.Error())
 	}
-	return manager.GetAddr()
+
+	return manager.GetKeyRing().GetAddress()
 }

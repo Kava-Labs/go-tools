@@ -1,20 +1,21 @@
 package claim
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"testing"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
+	"github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/golang/mock/gomock"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bnbmsg "github.com/kava-labs/binance-chain-go-sdk/types/msg"
 	"github.com/kava-labs/kava/app"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
+	tmtypes "github.com/kava-labs/tendermint/types"
 	"github.com/stretchr/testify/require"
-	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim/mock"
 	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
@@ -37,7 +38,6 @@ var (
 )
 
 func init() {
-
 	cfg := sdk.GetConfig()
 	app.SetBech32AddressPrefixes(cfg)
 	cfg.Seal()
@@ -64,9 +64,9 @@ func init() {
 			SenderOtherChain:    addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
 			RecipientOtherChain: addrs.Bnb.Users[0].Address.String(),
 			ClosedBlock:         0, // default for open swaps
-			Status:              bep3types.Open,
+			Status:              bep3types.SWAP_STATUS_OPEN,
 			CrossChain:          true,
-			Direction:           bep3types.Outgoing,
+			Direction:           bep3types.SWAP_DIRECTION_OUTGOING,
 		},
 		{
 			Amount:              sdk.NewCoins(sdk.NewInt64Coin("bnb", 1_00_000_000)),
@@ -78,9 +78,9 @@ func init() {
 			SenderOtherChain:    addrs.Bnb.Users[0].Address.String(),
 			RecipientOtherChain: addrs.Bnb.Deputys.Bnb.HotWallet.Address.String(),
 			ClosedBlock:         0, // default for open swaps
-			Status:              bep3types.Open,
+			Status:              bep3types.SWAP_STATUS_OPEN,
 			CrossChain:          true,
-			Direction:           bep3types.Incoming,
+			Direction:           bep3types.SWAP_DIRECTION_OUTGOING,
 		},
 	}
 	testBnbSwaps = []bnbtypes.AtomicSwap{
@@ -120,6 +120,7 @@ func init() {
 		},
 	}
 }
+
 func TestGetClaimableKavaSwaps(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
@@ -130,7 +131,7 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 
 	kc.EXPECT().
 		GetOpenOutgoingSwaps().
-		Return(testKavaSwaps[:1], nil) // only return outgoing swaps
+		Return(mapAtomicSwapsToResponses(testKavaSwaps[:1]), nil) // only return outgoing swaps
 
 	bc.EXPECT().
 		GetRandomNumberFromSwap([]byte(calcBnbSwapID(testBnbSwaps[0], addrs.Kava.Users[0].Address.String()))).
@@ -152,7 +153,6 @@ func TestGetClaimableKavaSwaps(t *testing.T) {
 }
 
 func TestGetClaimableBnbSwaps(t *testing.T) {
-
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -189,15 +189,14 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 	kc := mock.NewMockKavaChainClient(ctrl)
 
 	// set endpoints to return testing data
-	cdc := app.MakeCodec()
-	kc.EXPECT().
-		GetCodec().
-		Return(cdc).AnyTimes()
+	encodingConfig := app.MakeEncodingConfig()
+
 	kc.EXPECT().
 		GetChainID().
 		Return("kava-localnet", nil).AnyTimes()
-	testAcc := authexported.Account(&authtypes.BaseAccount{
-		Address:       addrs.Kava.Users[0].Address,
+
+	testAcc := authtypes.AccountI(&authtypes.BaseAccount{
+		Address:       addrs.Kava.Users[0].Address.String(),
 		AccountNumber: 12,
 		Sequence:      34,
 	})
@@ -205,17 +204,38 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 		GetAccount(addrs.Kava.Users[0].Address).
 		Return(testAcc, nil).AnyTimes()
 
-	expectedTxJSON := `{
-		"type": "cosmos-sdk/StdTx",
-		"value": {
-			"msg": [
+	testID := mustDecodeBase64("nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=")
+	testRndNum := mustDecodeBase64("ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU=")
+
+	expectedTxJSON := `
+	{
+		"body": {
+			"messages": [
 				{
-					"type": "bep3/MsgClaimAtomicSwap",
-					"value": {
-						"from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
-						"swap_id": "9E3FDDA337B885622E8C0C6A7970C95BC312A97BB7BA38C26F0E3D7A44FB93A8",
-						"random_number": "6712DDF02589858704CF70CF39FFF8724FE71F1F2D7560878A97BBC5C1367535"
+					"@type": "/kava.bep3.v1beta1.MsgClaimAtomicSwap",
+					"from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
+					"swap_id": "nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=",
+					"random_number": "ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU="
+				}
+			],
+			"memo": "",
+			"timeout_height": "0",
+			"extension_options": [],
+			"non_critical_extension_options": []
+		},
+		"auth_info": {
+			"signer_infos": [
+				{
+					"public_key": {
+					"@type": "/cosmos.crypto.secp256k1.PubKey",
+					"key": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
+				},
+				"mode_info": {
+					"single": {
+						"mode": "SIGN_MODE_DIRECT"
 					}
+				},
+				"sequence": "34"
 				}
 			],
 			"fee": {
@@ -225,30 +245,30 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 						"amount": "62500"
 					}
 				],
-				"gas": "250000"
-			},
-			"signatures": [
-				{
-					"pub_key": {
-						"type": "tendermint/PubKeySecp256k1",
-						"value": "AuHcgEkmL+Ed4ZjXPDSLRQxmNotxh/l8hBJCi2EvZIh1"
-					},
-					"signature": "bQGaRBq9FuYDWpMEfPF6scgnayakdZCp6lB1d/JE+iUfKzw5B16iOhox+vENzxgQOIYb1VFJYyKP9o2gIrE4Sg=="
-				}
-			],
-			"memo": ""
-		}
-	}`
-	var expectedTx authtypes.StdTx
-	cdc.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
-	expectedTxBytes := tmtypes.Tx(cdc.MustMarshalBinaryLengthPrefixed(expectedTx))
+				"gas_limit": "250000",
+				"payer": "",
+				"granter": ""
+			}
+		},
+		"signatures": [
+			"kzb57JAozylztqS+FHQ27JVLpoO++LNj8meaK5Gs0nBujrJJyhFILq8c0XdDQFTpV7pEeIt4EOIKt+Hezuxf6w=="
+		]
+	}
+	`
+
+	var expectedTx tx.Tx
+	encodingConfig.Marshaler.MustUnmarshalJSON([]byte(expectedTxJSON), &expectedTx)
+	expectedTxBytes := tmtypes.Tx(encodingConfig.Marshaler.MustMarshal(&expectedTx))
+
+	broadcastTxRequest := tx.BroadcastTxRequest{
+		TxBytes: expectedTxBytes,
+		Mode:    tx.BroadcastMode_BROADCAST_MODE_SYNC,
+	}
 	// set expected tx
-	kc.EXPECT().BroadcastTx(expectedTxBytes)
+	kc.EXPECT().BroadcastTx(broadcastTxRequest)
 
 	// run function under test (mock will verify tx was created correctly)
-	testID := mustDecodeHex("9e3fdda337b885622e8c0c6a7970c95bc312a97bb7ba38c26f0e3d7a44fb93a8")
-	testRndNum := mustDecodeHex("6712ddf02589858704cf70cf39fff8724fe71f1f2d7560878a97bbc5c1367535")
-	_, err := constructAndSendClaim(kc, mnemonicsKavaUsers0, testID, testRndNum)
+	_, err := constructAndSendClaim(kc, encodingConfig, mnemonicsKavaUsers0, testID, testRndNum)
 	require.NoError(t, err)
 }
 
@@ -277,26 +297,46 @@ func getDeputyAddresses(addrs addresses.Addresses) DeputyAddresses {
 	}
 }
 
-func mustDecodeKavaAddress(address string) sdk.AccAddress {
-	aa, err := sdk.AccAddressFromBech32(address)
-	if err != nil {
-		panic(err)
-	}
-	return aa
-}
-
-func mustDecodeBnbAddress(address string) bnbtypes.AccAddress {
-	aa, err := bnbtypes.AccAddressFromBech32(address)
-	if err != nil {
-		panic(err)
-	}
-	return aa
-}
-
 func mustDecodeHex(hexString string) []byte {
 	bz, err := hex.DecodeString(hexString)
 	if err != nil {
 		panic(err)
 	}
 	return bz
+}
+
+func mustDecodeBase64(hexString string) []byte {
+	bz, err := base64.StdEncoding.DecodeString(hexString)
+	if err != nil {
+		panic(err)
+	}
+	return bz
+}
+
+func mapAtomicSwapsToResponses(atomicSwaps bep3types.AtomicSwaps) []bep3types.AtomicSwapResponse {
+	var swapResponses []bep3types.AtomicSwapResponse
+
+	for _, swap := range atomicSwaps {
+		swapResponses = append(swapResponses, mapAtomicSwapToResponse(swap))
+	}
+
+	return swapResponses
+}
+
+func mapAtomicSwapToResponse(atomicSwap bep3types.AtomicSwap) bep3types.AtomicSwapResponse {
+	return bep3types.AtomicSwapResponse{
+		Id:                  atomicSwap.GetSwapID().String(),
+		Amount:              atomicSwap.Amount,
+		RandomNumberHash:    atomicSwap.RandomNumberHash.String(),
+		ExpireHeight:        atomicSwap.ExpireHeight,
+		Timestamp:           atomicSwap.Timestamp,
+		Sender:              atomicSwap.Sender.String(),
+		Recipient:           atomicSwap.Recipient.String(),
+		SenderOtherChain:    atomicSwap.SenderOtherChain,
+		RecipientOtherChain: atomicSwap.RecipientOtherChain,
+		ClosedBlock:         atomicSwap.ClosedBlock,
+		Status:              atomicSwap.Status,
+		CrossChain:          atomicSwap.CrossChain,
+		Direction:           atomicSwap.Direction,
+	}
 }

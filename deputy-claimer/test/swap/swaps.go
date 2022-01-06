@@ -144,7 +144,7 @@ func kavaAddressFromMnemonic(mnemonic string) sdk.AccAddress {
 	if err != nil {
 		panic(fmt.Sprintf("invalid mnemonic: %v", err.Error()))
 	}
-	return keyManager.GetAddr()
+	return keyManager.GetKeyRing().GetAddress()
 }
 
 func bnbAddressFromMnemonic(mnemonic string) types.AccAddress {

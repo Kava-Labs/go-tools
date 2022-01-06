@@ -1,155 +1,192 @@
 package claim
 
 import (
+	"context"
+	"crypto/tls"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
+	"log"
+	"net/url"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/client/rpc"
-	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
-	authTypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	kavaRpc "github.com/kava-labs/go-sdk/client"
-	"github.com/kava-labs/kava/app"
-	bep3types "github.com/kava-labs/kava/x/bep3/types"
-	tmbytes "github.com/tendermint/tendermint/libs/bytes"
-	tmRPCTypes "github.com/tendermint/tendermint/rpc/core/types"
-	tmtypes "github.com/tendermint/tendermint/types"
-)
+	"github.com/cosmos/cosmos-sdk/types/query"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-// TODO use either rest or rpc, not both
+	tmbytes "github.com/tendermint/tendermint/libs/bytes"
+
+	"github.com/kava-labs/kava/app/params"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+)
 
 //go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
 
 type KavaChainClient interface {
-	GetOpenOutgoingSwaps() (bep3types.AtomicSwaps, error)
+	GetOpenOutgoingSwaps() ([]bep3types.AtomicSwapResponse, error)
 	GetRandomNumberFromSwap(id []byte) ([]byte, error)
-	GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error)
-	GetAccount(address sdk.AccAddress) (authexported.Account, error)
+	GetTxConfirmation(txHash []byte) (*sdk.TxResponse, error)
+	GetAccount(address sdk.AccAddress) (authtypes.AccountI, error)
 	GetChainID() (string, error)
-	BroadcastTx(tx tmtypes.Tx) error
-	GetCodec() *codec.Codec
+	BroadcastTx(tx txtypes.BroadcastTxRequest) error
 }
 
-var _ KavaChainClient = mixedKavaClient{}
+var _ KavaChainClient = grpcKavaClient{}
 
-type mixedKavaClient struct {
-	restURL, rpcURL string
-	codec           *codec.Codec
-	kavaSDKClient   *kavaRpc.KavaClient
+type grpcKavaClient struct {
+	encodingConfig params.EncodingConfig
+	GrpcClientConn *grpc.ClientConn
+	Auth           authtypes.QueryClient
+	Bep3           bep3types.QueryClient
+	Tx             txtypes.ServiceClient
+	Tm             tmservice.ServiceClient
 }
 
-func NewMixedKavaClient(restURL, rpcURL string, cdc *codec.Codec) mixedKavaClient {
-	// use a fake mnemonic as we're not using the kava client for signing
-	dummyMnemonic := "adult stem bus people vast riot eager faith sponsor unlock hold lion sport drop eyebrow loud angry couch panic east three credit grain talk"
-	return mixedKavaClient{
-		restURL:       restURL,
-		codec:         cdc,
-		kavaSDKClient: kavaRpc.NewKavaClient(cdc, dummyMnemonic, app.Bip44CoinType, rpcURL),
+func NewGrpcKavaClient(target string, encodingConfig params.EncodingConfig) grpcKavaClient {
+	grpcUrl, err := url.Parse(target)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var secureOpt grpc.DialOption
+	switch grpcUrl.Scheme {
+	case "http":
+		secureOpt = grpc.WithInsecure()
+	case "https":
+		creds := credentials.NewTLS(&tls.Config{})
+		secureOpt = grpc.WithTransportCredentials(creds)
+	default:
+		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
+	}
+
+	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
+	if err != nil {
+		panic(err)
+	}
+
+	return grpcKavaClient{
+		encodingConfig: encodingConfig,
+		GrpcClientConn: grpcConn,
+		Auth:           authtypes.NewQueryClient(grpcConn),
+		Bep3:           bep3types.NewQueryClient(grpcConn),
+		Tm:             tmservice.NewServiceClient(grpcConn),
+		Tx:             txtypes.NewServiceClient(grpcConn),
 	}
 }
 
-type restResponse struct {
-	Height int             `json:"height"`
-	Result json.RawMessage `json:"result"`
-}
+func (kc grpcKavaClient) GetOpenOutgoingSwaps() ([]bep3types.AtomicSwapResponse, error) {
+	res, err := kc.Bep3.AtomicSwaps(context.Background(), &bep3types.QueryAtomicSwapsRequest{
+		Status:    bep3types.SWAP_STATUS_OPEN,
+		Direction: bep3types.SWAP_DIRECTION_OUTGOING,
+		Pagination: &query.PageRequest{
+			Limit: 1000,
+		},
+	})
 
-func (kc mixedKavaClient) GetOpenOutgoingSwaps() (bep3types.AtomicSwaps, error) {
-	resp, err := http.Get(kc.restURL + "/bep3/swaps?direction=outgoing&status=open&limit=1000") // TODO handle higher limits
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	bz, err := ioutil.ReadAll(resp.Body)
+	return res.AtomicSwaps, nil
+}
+
+func (kc grpcKavaClient) GetAccount(address sdk.AccAddress) (authtypes.AccountI, error) {
+	res, err := kc.Auth.Account(context.Background(), &authtypes.QueryAccountRequest{
+		Address: address.String(),
+	})
 	if err != nil {
 		return nil, err
 	}
-	var res restResponse
-	kc.codec.MustUnmarshalJSON(bz, &res)
-	var swaps bep3types.AtomicSwaps
-	kc.codec.MustUnmarshalJSON(res.Result, &swaps)
-	return swaps, nil
-}
 
-func (kc mixedKavaClient) GetAccount(address sdk.AccAddress) (authexported.Account, error) {
-	resp, err := http.Get(kc.restURL + "/auth/accounts/" + address.String()) // TODO construct urls properly
+	var acc authtypes.AccountI
+	err = kc.encodingConfig.Marshaler.UnpackAny(res.Account, &acc)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	bz, err := ioutil.ReadAll(resp.Body)
+
+	return acc, nil
+}
+
+func (kc grpcKavaClient) GetTxConfirmation(txHash []byte) (*sdk.TxResponse, error) {
+	txHashStr := strings.ToLower(hex.EncodeToString(txHash))
+	res, err := kc.Tx.GetTx(context.Background(), &txtypes.GetTxRequest{
+		Hash: txHashStr,
+	})
 	if err != nil {
 		return nil, err
 	}
-	var res restResponse
-	kc.codec.MustUnmarshalJSON(bz, &res)
-	var account authexported.Account
-	kc.codec.MustUnmarshalJSON(res.Result, &account)
-	return account, nil
+
+	return res.TxResponse, nil
 }
 
-func (kc mixedKavaClient) GetTxConfirmation(txHash []byte) (*tmRPCTypes.ResultTx, error) {
-	return kc.kavaSDKClient.HTTP.Tx(txHash, false)
-}
-
-func (kc mixedKavaClient) BroadcastTx(tx tmtypes.Tx) error {
-	res, err := kc.kavaSDKClient.BroadcastTxSync(tx)
+func (kc grpcKavaClient) BroadcastTx(tx txtypes.BroadcastTxRequest) error {
+	res, err := kc.Tx.BroadcastTx(context.Background(), &tx)
 	if err != nil {
 		return err
 	}
-	if res.Code != 0 { // tx failed to be submitted to the mempool
-		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log) // TODO should return a named error
+
+	if res.TxResponse.Code != 0 { // tx failed to be submitted to the mempool
+		return fmt.Errorf("transaction failed to get into mempool: %s", res.TxResponse.RawLog) // TODO should return a named error
 	}
 	return nil
 }
 
-func (kc mixedKavaClient) GetChainID() (string, error) {
-	infoResp, err := http.Get(kc.restURL + "/node_info")
+func (kc grpcKavaClient) GetChainID() (string, error) {
+	latestBlock, err := kc.Tm.GetLatestBlock(context.Background(), &tmservice.GetLatestBlockRequest{})
 	if err != nil {
 		return "", err
 	}
-	defer infoResp.Body.Close()
-	infoBz, err := ioutil.ReadAll(infoResp.Body)
+
+	return latestBlock.Block.Header.ChainID, nil
+}
+
+func (kc grpcKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3types.AtomicSwapResponse, error) {
+	strID := strings.ToLower(hex.EncodeToString(id))
+	res, err := kc.Bep3.AtomicSwap(context.Background(), &bep3types.QueryAtomicSwapRequest{
+		SwapId: strID,
+	})
 	if err != nil {
-		return "", err
+		return bep3types.AtomicSwapResponse{}, err
 	}
-	var nodeInfo rpc.NodeInfoResponse
-	kc.codec.MustUnmarshalJSON(infoBz, &nodeInfo)
-	return nodeInfo.Network, nil
+
+	return res.AtomicSwap, nil
 }
 
-func (kc mixedKavaClient) GetSwapByID(id tmbytes.HexBytes) (bep3types.AtomicSwap, error) {
-	return kc.kavaSDKClient.GetSwapByID(id)
-}
-
-func (kc mixedKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
+func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	strID := strings.ToLower(hex.EncodeToString(id))
 	query := fmt.Sprintf(`claim_atomic_swap.atomic_swap_id='%s'`, strID) // must be lowercase hex for querying to work
-	res, err := kc.kavaSDKClient.HTTP.TxSearch(query, false, 1, 1000, "")
+
+	// Event format is "{eventType}.{eventAttribute}={value}"
+	// https://github.com/cosmos/cosmos-sdk/blob/9fd866e3820b3510010ae172b682d71594cd8c14/x/auth/tx/service.go#L43
+	res, err := kc.Tx.GetTxsEvent(context.Background(), &txtypes.GetTxsEventRequest{
+		Events: []string{
+			query,
+		},
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	if len(res.Txs) < 1 {
+
+	if len(res.Txs) == 0 {
 		return nil, fmt.Errorf("no claim txs found")
 	}
-	var stdTx authTypes.StdTx
-	err = kc.codec.UnmarshalBinaryLengthPrefixed(res.Txs[0].Tx, &stdTx) // TODO handle case of there being more than one tx
-	if err != nil {
-		return nil, err
-	}
-	claim, ok := stdTx.Msgs[0].(bep3types.MsgClaimAtomicSwap) // TODO handle the case of multiple messages
-	if !ok {
-		return nil, fmt.Errorf("unable to decode msg into MsgClaimAtomicSwap")
-	}
-	return claim.RandomNumber, nil
-}
 
-func (kc mixedKavaClient) GetCodec() *codec.Codec {
-	// TODO codec is passed in at creation, it shouldn't need to be pulled out again
-	return kc.codec
+	parsedTx, err := kc.encodingConfig.TxConfig.TxDecoder()(res.TxResponses[0].Tx.Value)
+	if err != nil {
+		return nil, fmt.Errorf("decode tx error: %w", err)
+	}
+
+	for _, msg := range parsedTx.GetMsgs() {
+		switch realMsg := msg.(type) {
+		case *bep3types.MsgClaimAtomicSwap:
+			return realMsg.RandomNumber, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no claim tx found")
 }

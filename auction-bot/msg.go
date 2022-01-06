@@ -9,7 +9,7 @@ func CreateBidMsgs(keeper sdk.AccAddress, auctionBids AuctionInfos) []auctiontyp
 	msgs := make([]auctiontypes.MsgPlaceBid, len(auctionBids))
 
 	for index, bid := range auctionBids {
-		msgs[index] = auctiontypes.NewMsgPlaceBid(bid.ID, bid.Bidder, bid.Amount)
+		msgs[index] = auctiontypes.NewMsgPlaceBid(bid.ID, bid.Bidder.String(), bid.Amount)
 	}
 
 	return msgs
