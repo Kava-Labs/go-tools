@@ -184,7 +184,7 @@ func (kc grpcKavaClient) GetRandomNumberFromSwap(id []byte) ([]byte, error) {
 	for _, msg := range parsedTx.GetMsgs() {
 		switch realMsg := msg.(type) {
 		case *bep3types.MsgClaimAtomicSwap:
-			return realMsg.RandomNumber, nil
+			return hex.DecodeString(realMsg.RandomNumber)
 		}
 	}
 
