@@ -26,8 +26,6 @@ import (
 //go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
 
 type KavaChainClient interface {
-	// GetOpenOutgoingSwaps() ([]bep3types.AtomicSwapResponse, error)
-	GetRandomNumberFromSwap(id []byte) ([]byte, error)
 	GetTxConfirmation(txHash []byte) (*sdk.TxResponse, error)
 	GetAccount(address sdk.AccAddress) (authtypes.AccountI, error)
 	GetChainID() (string, error)
