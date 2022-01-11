@@ -2,21 +2,20 @@ package claimer
 
 import (
 	"context"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	tmlog "github.com/tendermint/tendermint/libs/log"
-
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bkeys "github.com/kava-labs/binance-chain-go-sdk/keys"
+
+	kava "github.com/kava-labs/kava/app"
+
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
-	kava "github.com/kava-labs/kava/app"
 )
 
 var JobQueueSize = 1000
@@ -47,12 +46,9 @@ func (d Dispatcher) Start(ctx context.Context) {
 		kavaKeys <- &secp256k1.PrivKey{Key: privKeyBytes}
 	}
 
-	// Start Kava HTTP client
-	logger := tmlog.NewTMLogger(tmlog.NewSyncWriter(os.Stdout))
-	kavaClient, err := NewKavaClient(d.config.Kava.Endpoint, logger)
-	if err != nil {
-		panic(err)
-	}
+	// Start Kava GRPC client
+	encodingConfig := kava.MakeEncodingConfig()
+	kavaClient := NewGrpcKavaClient(d.config.Kava.Endpoint, encodingConfig)
 
 	// Set up Binance Chain client
 	bncNetwork := btypes.TestNetwork

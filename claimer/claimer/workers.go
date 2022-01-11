@@ -1,7 +1,6 @@
 package claimer
 
 import (
-	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -12,7 +11,7 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
+	"github.com/kava-labs/go-tools/signing"
 )
 
 const (
@@ -80,13 +80,13 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
 	return nil
 }
 
-func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.ClaimJob, privKey cryptotypes.PrivKey) error {
+func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.ClaimJob, privKey cryptotypes.PrivKey) error {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
 
-	swap, err := client.GetSwapByID(context.Background(), swapID)
+	swap, err := client.GetSwapByID(swapID)
 	if err != nil {
 		return NewErrorRetryable(err)
 	}
@@ -108,7 +108,9 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		return NewErrorFailed(fmt.Errorf("msg basic validation failed: \n%v", msg))
 	}
 
-	txBuilder := client.encodingConfig.TxConfig.NewTxBuilder()
+	encodingConfig := client.GetEncodingCoding()
+
+	txBuilder := encodingConfig.TxConfig.NewTxBuilder()
 	txBuilder.SetMsgs(&msg)
 	txBuilder.SetGasLimit(ClaimTxDefaultGas)
 	txBuilder.SetFeeAmount(calculateFee(ClaimTxDefaultGas, DefaultGasPrice))
@@ -118,74 +120,50 @@ func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.Clai
 		return NewErrorFailed(err)
 	}
 
-	signatureData := signing.SingleSignatureData{
-		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
-		Signature: nil,
-	}
-	sigV2 := signing.SignatureV2{
-		PubKey:   privKey.PubKey(),
-		Data:     &signatureData,
-		Sequence: sequence,
-	}
-	if err := txBuilder.SetSignatures(sigV2); err != nil {
-		return NewErrorFailed(err)
-	}
-
 	signerData := authsigning.SignerData{
 		ChainID:       config.ChainID,
 		AccountNumber: accountNumber,
 		Sequence:      sequence,
 	}
-	signBytes, err := client.encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
+
+	_, txBytes, err := signing.Sign(encodingConfig, privKey, txBuilder, signerData)
 	if err != nil {
-		return NewErrorFailed(err)
-	}
-	signature, err := privKey.Sign(signBytes)
-	if err != nil {
-		return NewErrorFailed(err)
+		return err
 	}
 
-	sigV2.Data = &signing.SingleSignatureData{
-		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
-		Signature: signature,
-	}
-	if err := txBuilder.SetSignatures(sigV2); err != nil {
-		return NewErrorFailed(err)
+	request := txtypes.BroadcastTxRequest{
+		TxBytes: txBytes,
+		Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
 	}
 
-	txBytes, err := client.encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
-	if err != nil {
-		return NewErrorFailed(err)
-	}
-
-	res, err := client.BroadcastTxSync(context.Background(), txBytes)
+	res, err := client.BroadcastTx(request)
 	if err != nil {
 		if broadcastErrorIsRetryable(err) {
 			return NewErrorRetryable(err)
 		}
 		return NewErrorFailed(err)
 	}
-	if res.Code != 0 {
-		if errorCodeIsRetryable(res.Codespace, res.Code) {
-			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.Log))
+	if res.TxResponse.Code != 0 {
+		if errorCodeIsRetryable(res.TxResponse.Codespace, res.TxResponse.Code) {
+			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
 		}
-		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.Log))
+		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
 	}
 	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
 		log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Debug("checking for tx confirmation") // TODO use non global logger, with swap ID field already included
-		queryRes, err := client.GetTxConfirmation(context.Background(), res.Hash)
+		queryRes, err := client.GetTxConfirmation([]byte(res.TxResponse.TxHash))
 		if err != nil {
 			return false, nil // poll again, it can't find the tx or node is down/slow
 		}
-		if queryRes.TxResult.Code != 0 {
-			return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+		if queryRes.Code != 0 {
+			return true, fmt.Errorf("tx rejected from block: %s", queryRes.Logs) // return error, found tx but it didn't work
 		}
 		return true, nil // return nothing, found successfully confirmed tx
 	})
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-	log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.Hash.String())
+	log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.TxResponse.TxHash)
 	return nil
 }
 
@@ -209,8 +187,8 @@ func errorCodeIsRetryable(codespace string, code uint32) bool {
 	return temporaryErrorCodes[codespace][code]
 }
 
-func getAccountNumbers(client *KavaClient, fromAddr sdk.AccAddress) (uint64, uint64, error) {
-	acc, err := client.GetAccount(context.Background(), fromAddr)
+func getAccountNumbers(client KavaChainClient, fromAddr sdk.AccAddress) (uint64, uint64, error) {
+	acc, err := client.GetAccount(fromAddr)
 	if err != nil {
 		return 0, 0, err
 	}
