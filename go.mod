@@ -8,7 +8,7 @@ require (
 	github.com/joho/godotenv v1.4.0
 	github.com/kava-labs/binance-chain-go-sdk v1.2.5-kava
 	github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd
-	github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69
+	github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b
 	github.com/kava-labs/tendermint v0.32.3-kava1
 	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.7.0

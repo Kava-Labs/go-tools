@@ -1,7 +1,6 @@
 package claim
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"testing"
 	"time"
@@ -204,8 +203,8 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 		GetAccount(addrs.Kava.Users[0].Address).
 		Return(testAcc, nil).AnyTimes()
 
-	testID := mustDecodeBase64("nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=")
-	testRndNum := mustDecodeBase64("ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU=")
+	testID := mustDecodeHex("9E3FDDA337B885622E8C0C6A7970C95BC312A97BB7BA38C26F0E3D7A44FB93A8")
+	testRndNum := mustDecodeHex("6712DDF02589858704CF70CF39FFF8724FE71F1F2D7560878A97BBC5C1367535")
 
 	expectedTxJSON := `
 	{
@@ -214,8 +213,8 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 				{
 					"@type": "/kava.bep3.v1beta1.MsgClaimAtomicSwap",
 					"from": "kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc",
-					"swap_id": "nj/doze4hWIujAxqeXDJW8MSqXu3ujjCbw49ekT7k6g=",
-					"random_number": "ZxLd8CWJhYcEz3DPOf/4ck/nHx8tdWCHipe7xcE2dTU="
+					"swap_id": "9E3FDDA337B885622E8C0C6A7970C95BC312A97BB7BA38C26F0E3D7A44FB93A8",
+					"random_number": "6712DDF02589858704CF70CF39FFF8724FE71F1F2D7560878A97BBC5C1367535"
 				}
 			],
 			"memo": "",
@@ -251,7 +250,7 @@ func TestConstructAndSendKavaClaim(t *testing.T) {
 			}
 		},
 		"signatures": [
-			"kzb57JAozylztqS+FHQ27JVLpoO++LNj8meaK5Gs0nBujrJJyhFILq8c0XdDQFTpV7pEeIt4EOIKt+Hezuxf6w=="
+			"peP51h1yaY5MhEdVe5T4/l1yvJ8fYfMHTMip/a9A8eJzYOW1SFQFubS1FMNXBbLEsM37MzajDMkvuHnDuPPmoQ=="
 		]
 	}
 	`
@@ -299,14 +298,6 @@ func getDeputyAddresses(addrs addresses.Addresses) DeputyAddresses {
 
 func mustDecodeHex(hexString string) []byte {
 	bz, err := hex.DecodeString(hexString)
-	if err != nil {
-		panic(err)
-	}
-	return bz
-}
-
-func mustDecodeBase64(hexString string) []byte {
-	bz, err := base64.StdEncoding.DecodeString(hexString)
 	if err != nil {
 		panic(err)
 	}
