@@ -8,7 +8,7 @@ require (
 	github.com/kava-labs/binance-chain-go-sdk v1.2.5-kava
 	github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd
 	github.com/kava-labs/go-tools v0.0.0-20220105190757-b0a6146a2540
-	github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69
+	github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0

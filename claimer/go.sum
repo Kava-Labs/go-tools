@@ -524,6 +524,8 @@ github.com/kava-labs/go-tools v0.0.0-20220105190757-b0a6146a2540/go.mod h1:aIRQs
 github.com/kava-labs/kava v0.15.2-0.20211214192138-d38371cf2b96/go.mod h1:wU25qemKfQ97r0EXQBeDgBlyx0aTqyf2KQGcM2xWdCQ=
 github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69 h1:9Gfe2cRBsxJk87kSntfov4hR31sschW+OoyRXx+vYCg=
 github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69/go.mod h1:wU25qemKfQ97r0EXQBeDgBlyx0aTqyf2KQGcM2xWdCQ=
+github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b h1:pWNse+gPttYLkNgDZfkhkz9k2+wWNxFb38OpskIA130=
+github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b/go.mod h1:lUMcS7UHOYL+zXE4KUPZvGNBnpitT5nXMnRiMQzM72w=
 github.com/kava-labs/tendermint v0.32.3-kava1 h1:6wP6pj7py2JKZLkpAiK+/SZzNiUW+3lwgXETdJga1yI=
 github.com/kava-labs/tendermint v0.32.3-kava1/go.mod h1:BAvRCANby+2EoWrAd4t3es+Mda8Z3gPSlHpM8st7G+g=
 github.com/kava-labs/tm-db v0.1.1-kava h1:NePVNPem4Frne+SGqxSQoEtkqy2zWR/8mrSCSfUskww=
