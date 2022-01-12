@@ -26,7 +26,7 @@ import (
 //go:generate mockgen -destination mock/kava_client.go -package mock . KavaChainClient
 
 type KavaChainClient interface {
-	GetTxConfirmation(txHash []byte) (*sdk.TxResponse, error)
+	GetTxConfirmation(txHash string) (*sdk.TxResponse, error)
 	GetAccount(address sdk.AccAddress) (authtypes.AccountI, error)
 	GetChainID() (string, error)
 	BroadcastTx(tx txtypes.BroadcastTxRequest) (*txtypes.BroadcastTxResponse, error)
@@ -94,10 +94,9 @@ func (kc grpcKavaClient) GetAccount(address sdk.AccAddress) (authtypes.AccountI,
 	return acc, nil
 }
 
-func (kc grpcKavaClient) GetTxConfirmation(txHash []byte) (*sdk.TxResponse, error) {
-	txHashStr := strings.ToLower(hex.EncodeToString(txHash))
+func (kc grpcKavaClient) GetTxConfirmation(txHash string) (*sdk.TxResponse, error) {
 	res, err := kc.Tx.GetTx(context.Background(), &txtypes.GetTxRequest{
-		Hash: txHashStr,
+		Hash: txHash,
 	})
 	if err != nil {
 		return nil, err

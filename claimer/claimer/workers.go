@@ -151,7 +151,7 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 	}
 	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
 		log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Debug("checking for tx confirmation") // TODO use non global logger, with swap ID field already included
-		queryRes, err := client.GetTxConfirmation([]byte(res.TxResponse.TxHash))
+		queryRes, err := client.GetTxConfirmation(res.TxResponse.TxHash)
 		if err != nil {
 			return false, nil // poll again, it can't find the tx or node is down/slow
 		}
