@@ -363,6 +363,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 	return responses, nil
 }
 
+// Sign signs a populated TxBuilder and returns a signed Tx and raw transaction bytes
 func Sign(
 	encodingConfig params.EncodingConfig,
 	privKey cryptotypes.PrivKey,
