@@ -203,7 +203,7 @@ func constructAndSendClaim(
 		Sequence:      account.GetSequence(),
 	}
 
-	_, txBytes, err := signing.Sign(encodingConfig, privKey, txBuilder, signerData)
+	_, txBytes, err := signing.Sign(encodingConfig.TxConfig, privKey, txBuilder, signerData)
 	if err != nil {
 		return nil, err
 	}

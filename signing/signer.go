@@ -238,7 +238,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						Sequence:      broadcastTxSeq,
 					}
 
-					tx, txBytes, err := Sign(s.encodingConfig, s.privKey, txBuilder, signerData)
+					tx, txBytes, err := Sign(s.encodingConfig.TxConfig, s.privKey, txBuilder, signerData)
 
 					response = &MsgResponse{
 						Request: *currentRequest,
@@ -365,7 +365,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 
 // Sign signs a populated TxBuilder and returns a signed Tx and raw transaction bytes
 func Sign(
-	encodingConfig params.EncodingConfig,
+	txConfig sdkclient.TxConfig,
 	privKey cryptotypes.PrivKey,
 	txBuilder sdkclient.TxBuilder,
 	signerData authsigning.SignerData,
@@ -383,7 +383,7 @@ func Sign(
 		return txBuilder.GetTx(), nil, err
 	}
 
-	signBytes, err := encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
+	signBytes, err := txConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
 	if err != nil {
 		return txBuilder.GetTx(), nil, err
 	}
@@ -400,7 +400,7 @@ func Sign(
 		return txBuilder.GetTx(), nil, err
 	}
 
-	txBytes, err := encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := txConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
 		return txBuilder.GetTx(), nil, err
 	}
