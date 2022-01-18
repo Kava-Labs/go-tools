@@ -8,19 +8,20 @@ import (
 	"strings"
 	"time"
 
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
-	"github.com/kava-labs/go-sdk/keys"
-	bep3 "github.com/kava-labs/kava/x/bep3/types"
+	bep3types "github.com/kava-labs/kava/x/bep3/types"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
-	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
+	"github.com/kava-labs/go-tools/signing"
 )
 
 const (
@@ -79,89 +80,90 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
 	return nil
 }
 
-func claimOnKava(config config.KavaConfig, client *KavaClient, claim server.ClaimJob, keyManager keys.KeyManager) error {
+func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.ClaimJob, privKey cryptotypes.PrivKey) error {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
 
-	swap, err := client.GetAtomicSwap(swapID)
+	swap, err := client.GetSwapByID(swapID)
 	if err != nil {
 		return NewErrorRetryable(err)
 	}
-	if swap.Status == bep3.NULL {
+	if swap.Status == bep3types.SWAP_STATUS_UNSPECIFIED {
 		return NewErrorRetryable(fmt.Errorf("swap %s not found in state", swapID))
-	} else if swap.Status == bep3.Expired || swap.Status == bep3.Completed {
+	} else if swap.Status == bep3types.SWAP_STATUS_EXPIRED || swap.Status == bep3types.SWAP_STATUS_COMPLETED {
 		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", hex.EncodeToString(swapID), swap.Status))
 	}
 
-	fromAddr := keyManager.GetAddr()
+	fromAddr := sdk.AccAddress(privKey.PubKey().Address())
 
 	randomNumber, err := hex.DecodeString(claim.RandomNumber)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
 
-	msg := bep3.NewMsgClaimAtomicSwap(fromAddr, swapID, randomNumber)
+	msg := bep3types.NewMsgClaimAtomicSwap(fromAddr.String(), swapID, randomNumber)
 	if err := msg.ValidateBasic(); err != nil {
 		return NewErrorFailed(fmt.Errorf("msg basic validation failed: \n%v", msg))
 	}
 
-	signMsg := &authtypes.StdSignMsg{
-		ChainID:       config.ChainID,
-		AccountNumber: 0,
-		Sequence:      0,
-		Fee:           calculateFee(ClaimTxDefaultGas, DefaultGasPrice),
-		Msgs:          []sdk.Msg{msg},
-		Memo:          "",
-	}
+	encodingConfig := client.GetEncodingCoding()
+
+	txBuilder := encodingConfig.TxConfig.NewTxBuilder()
+	txBuilder.SetMsgs(&msg)
+	txBuilder.SetGasLimit(ClaimTxDefaultGas)
+	txBuilder.SetFeeAmount(calculateFee(ClaimTxDefaultGas, DefaultGasPrice))
 
 	sequence, accountNumber, err := getAccountNumbers(client, fromAddr)
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-	signMsg.Sequence = sequence
-	signMsg.AccountNumber = accountNumber
 
-	signedMsg, err := keyManager.Sign(*signMsg, client.cdc)
+	signerData := authsigning.SignerData{
+		ChainID:       config.ChainID,
+		AccountNumber: accountNumber,
+		Sequence:      sequence,
+	}
+
+	_, txBytes, err := signing.Sign(encodingConfig, privKey, txBuilder, signerData)
 	if err != nil {
-		return NewErrorFailed(err)
-	}
-	tx := tmtypes.Tx(signedMsg)
-
-	maxTxLength := 1024 * 1024
-	if len(tx) > maxTxLength {
-		return NewErrorFailed(fmt.Errorf("the tx data exceeds max length %d ", maxTxLength))
+		return err
 	}
 
-	res, err := client.BroadcastTxSync(tx)
+	request := txtypes.BroadcastTxRequest{
+		TxBytes: txBytes,
+		Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
+	}
+
+	res, err := client.BroadcastTx(request)
 	if err != nil {
 		if broadcastErrorIsRetryable(err) {
 			return NewErrorRetryable(err)
 		}
 		return NewErrorFailed(err)
 	}
-	if res.Code != 0 {
-		if errorCodeIsRetryable(res.Codespace, res.Code) {
-			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.Log))
+	if res.TxResponse.Code != 0 {
+		if errorCodeIsRetryable(res.TxResponse.Codespace, res.TxResponse.Code) {
+			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
 		}
-		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.Log))
+		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
 	}
 	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
 		log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Debug("checking for tx confirmation") // TODO use non global logger, with swap ID field already included
-		queryRes, err := client.GetTxConfirmation(res.Hash)
+		queryRes, err := client.GetTxConfirmation(res.TxResponse.TxHash)
 		if err != nil {
 			return false, nil // poll again, it can't find the tx or node is down/slow
 		}
-		if queryRes.TxResult.Code != 0 {
-			return true, fmt.Errorf("tx rejected from block: %s", queryRes.TxResult.Log) // return error, found tx but it didn't work
+		if queryRes.Code != 0 {
+			return true, fmt.Errorf("tx rejected from block: %s", queryRes.Logs) // return error, found tx but it didn't work
 		}
 		return true, nil // return nothing, found successfully confirmed tx
 	})
 	if err != nil {
 		return NewErrorFailed(err)
 	}
-	log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.Hash.String())
+	log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.TxResponse.TxHash)
 	return nil
 }
 
@@ -185,7 +187,7 @@ func errorCodeIsRetryable(codespace string, code uint32) bool {
 	return temporaryErrorCodes[codespace][code]
 }
 
-func getAccountNumbers(client *KavaClient, fromAddr sdk.AccAddress) (uint64, uint64, error) {
+func getAccountNumbers(client KavaChainClient, fromAddr sdk.AccAddress) (uint64, uint64, error) {
 	acc, err := client.GetAccount(fromAddr)
 	if err != nil {
 		return 0, 0, err
@@ -218,7 +220,7 @@ func pollWithBackoff(timeout, initialInterval time.Duration, pollFunc func() (bo
 }
 
 // calculateFee calculates the total fee to be paid based on a total gas and gas price.
-func calculateFee(gas uint64, gasPrice sdk.DecCoin) authtypes.StdFee {
+func calculateFee(gas uint64, gasPrice sdk.DecCoin) sdk.Coins {
 	var coins sdk.Coins
 	if gas > 0 {
 		coins = sdk.NewCoins(sdk.NewCoin(
@@ -226,5 +228,5 @@ func calculateFee(gas uint64, gasPrice sdk.DecCoin) authtypes.StdFee {
 			gasPrice.Amount.MulInt64(int64(gas)).Ceil().TruncateInt(),
 		))
 	}
-	return authtypes.NewStdFee(gas, coins)
+	return coins
 }

@@ -3,9 +3,8 @@ package main
 import (
 	"context"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	kava "github.com/kava-labs/kava/app"
-	"github.com/sirupsen/logrus"
+	"github.com/kava-labs/kava/app"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
@@ -18,9 +17,7 @@ func main() {
 	configPath := pflag.String("config", config.DefaultConfigPath, "path to config file")
 	pflag.Parse()
 
-	// Load kava claimers
-	sdkConfig := sdk.GetConfig()
-	kava.SetBech32AddressPrefixes(sdkConfig)
+	app.SetSDKConfig()
 
 	// Load config
 	cfg, err := config.GetConfig(*configPath)
@@ -28,7 +25,7 @@ func main() {
 		panic(err)
 	}
 
-	log.SetLevel(logrus.DebugLevel)
+	log.SetLevel(log.DebugLevel)
 
 	dispatcher := claimer.NewDispatcher(*cfg)
 	ctx := context.Background()
