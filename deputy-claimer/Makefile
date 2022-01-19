@@ -30,7 +30,7 @@ docker-login:
 
 .PHONY: docker-build
 docker-build:
-	$(DOCKER) build -t $(IMAGE_NAME):$(COMMIT_ID_SHORT) .
+	cd ..; $(DOCKER) build -t $(IMAGE_NAME):$(COMMIT_ID_SHORT) -f deputy-claimer/Dockerfile .
 
 .PHONY: docker-tag
 docker-tag:
