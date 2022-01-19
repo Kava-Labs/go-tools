@@ -19,7 +19,7 @@ type AssetInfo struct {
 // AuctionData defines a map of AssetInfo and array of current auctions
 type AuctionData struct {
 	Assets   map[string]AssetInfo
-	Auctions auctiontypes.Auctions
+	Auctions []auctiontypes.Auction
 }
 
 // GetAuctionData returns AuctionData for current auctions

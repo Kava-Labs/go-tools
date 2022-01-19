@@ -1,6 +1,7 @@
 package auctions
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -28,7 +29,7 @@ type InfoResponse struct {
 type AuctionClient interface {
 	GetInfo() (*InfoResponse, error)
 	GetPrices(height int64) (pricefeedtypes.CurrentPrices, error)
-	GetAuctions(height int64) (auctiontypes.Auctions, error)
+	GetAuctions(height int64) ([]auctiontypes.Auction, error)
 	GetMarkets(height int64) (cdptypes.CollateralParams, error)
 	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
@@ -36,14 +37,14 @@ type AuctionClient interface {
 // RpcAuctionClient defines a client for interacting with auctions via rpc
 type RpcAuctionClient struct {
 	rpc       RpcClient
-	cdc       *codec.Codec
+	cdc       codec.LegacyAmino
 	PageLimit int
 }
 
 var _ AuctionClient = (*RpcAuctionClient)(nil)
 
 // NewRpcAuctionClient returns a new RpcAuctionClient
-func NewRpcAuctionClient(rpc RpcClient, cdc *codec.Codec) *RpcAuctionClient {
+func NewRpcAuctionClient(rpc RpcClient, cdc codec.LegacyAmino) *RpcAuctionClient {
 	return &RpcAuctionClient{
 		rpc:       rpc,
 		cdc:       cdc,
@@ -53,7 +54,7 @@ func NewRpcAuctionClient(rpc RpcClient, cdc *codec.Codec) *RpcAuctionClient {
 
 // GetInfo returns the current chain info
 func (c *RpcAuctionClient) GetInfo() (*InfoResponse, error) {
-	result, err := c.rpc.Status()
+	result, err := c.rpc.Status(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -117,11 +118,11 @@ func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets
 }
 
 // GetAuctions gets all the currently running auctions
-func (c *RpcAuctionClient) GetAuctions(height int64) (auctiontypes.Auctions, error) {
+func (c *RpcAuctionClient) GetAuctions(height int64) ([]auctiontypes.Auction, error) {
 	path := fmt.Sprintf("custom/%s/%s", auctiontypes.QuerierRoute, auctiontypes.QueryGetAuctions)
 
 	page := 1
-	var auctions auctiontypes.Auctions
+	var auctions []auctiontypes.Auction
 
 	for {
 		params := auctiontypes.NewQueryAllAuctionParams(page, c.PageLimit, "", "", "", sdk.AccAddress{})
@@ -136,7 +137,7 @@ func (c *RpcAuctionClient) GetAuctions(height int64) (auctiontypes.Auctions, err
 			return nil, err
 		}
 
-		var pagedAuctions auctiontypes.Auctions
+		var pagedAuctions []auctiontypes.Auction
 		err = c.cdc.UnmarshalJSON(data, &pagedAuctions)
 		if err != nil {
 			return nil, err
@@ -160,7 +161,7 @@ func (c *RpcAuctionClient) abciQuery(
 	height int64) ([]byte, error) {
 	opts := rpcclient.ABCIQueryOptions{Height: height, Prove: false}
 
-	result, err := c.rpc.ABCIQueryWithOptions(path, data, opts)
+	result, err := c.rpc.ABCIQueryWithOptions(context.Background(), path, data, opts)
 	if err != nil {
 		return []byte{}, err
 	}
