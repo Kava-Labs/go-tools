@@ -1,7 +1,7 @@
 FROM golang:1.15.6-buster as build-env
 
 ADD . /src
-RUN cd /src && go build -o /main
+RUN cd /src/deputy-claimer && go build -o /main
 
 FROM debian:buster
 
