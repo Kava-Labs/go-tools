@@ -10,7 +10,7 @@ docker-compose up -d
 
 # wait until the chains are operational
 echo "waiting for kava node to start"
-while ! docker-compose exec kavanode curl --fail localhost:26657/status > /dev/null
+while ! docker-compose exec kavanode curl --silent --fail localhost:26657/status
 do
     sleep 1
 done

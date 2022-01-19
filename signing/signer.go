@@ -77,7 +77,7 @@ func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
 	go func() {
 		for {
 			request := authtypes.QueryAccountRequest{
-				Address: getAccAddress(s.privKey).String(),
+				Address: GetAccAddress(s.privKey).String(),
 			}
 			response, err := s.authClient.Account(context.Background(), &request)
 
@@ -238,7 +238,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						Sequence:      broadcastTxSeq,
 					}
 
-					tx, txBytes, err := s.sign(txBuilder, signerData)
+					tx, txBytes, err := Sign(s.encodingConfig.TxConfig, s.privKey, txBuilder, signerData)
 
 					response = &MsgResponse{
 						Request: *currentRequest,
@@ -363,13 +363,19 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 	return responses, nil
 }
 
-func (s *Signer) sign(txBuilder sdkclient.TxBuilder, signerData authsigning.SignerData) (authsigning.Tx, []byte, error) {
+// Sign signs a populated TxBuilder and returns a signed Tx and raw transaction bytes
+func Sign(
+	txConfig sdkclient.TxConfig,
+	privKey cryptotypes.PrivKey,
+	txBuilder sdkclient.TxBuilder,
+	signerData authsigning.SignerData,
+) (authsigning.Tx, []byte, error) {
 	signatureData := signing.SingleSignatureData{
 		SignMode:  signing.SignMode_SIGN_MODE_DIRECT,
 		Signature: nil,
 	}
 	sigV2 := signing.SignatureV2{
-		PubKey:   s.privKey.PubKey(),
+		PubKey:   privKey.PubKey(),
 		Data:     &signatureData,
 		Sequence: signerData.Sequence,
 	}
@@ -377,11 +383,11 @@ func (s *Signer) sign(txBuilder sdkclient.TxBuilder, signerData authsigning.Sign
 		return txBuilder.GetTx(), nil, err
 	}
 
-	signBytes, err := s.encodingConfig.TxConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
+	signBytes, err := txConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
 	if err != nil {
 		return txBuilder.GetTx(), nil, err
 	}
-	signature, err := s.privKey.Sign(signBytes)
+	signature, err := privKey.Sign(signBytes)
 	if err != nil {
 		return txBuilder.GetTx(), nil, err
 	}
@@ -394,7 +400,7 @@ func (s *Signer) sign(txBuilder sdkclient.TxBuilder, signerData authsigning.Sign
 		return txBuilder.GetTx(), nil, err
 	}
 
-	txBytes, err := s.encodingConfig.TxConfig.TxEncoder()(txBuilder.GetTx())
+	txBytes, err := txConfig.TxEncoder()(txBuilder.GetTx())
 	if err != nil {
 		return txBuilder.GetTx(), nil, err
 	}
@@ -402,6 +408,6 @@ func (s *Signer) sign(txBuilder sdkclient.TxBuilder, signerData authsigning.Sign
 	return txBuilder.GetTx(), txBytes, nil
 }
 
-func getAccAddress(privKey cryptotypes.PrivKey) sdk.AccAddress {
+func GetAccAddress(privKey cryptotypes.PrivKey) sdk.AccAddress {
 	return privKey.PubKey().Address().Bytes()
 }

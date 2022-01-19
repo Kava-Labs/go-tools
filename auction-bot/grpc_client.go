@@ -136,7 +136,7 @@ func (c *GrpcClient) AllAuctions(ctx context.Context) ([]auctiontypes.Auction, e
 			return nil, err
 		}
 
-		for _, anyAuction := range auctionsRes.Auction {
+		for _, anyAuction := range auctionsRes.Auctions {
 			var auction auctiontypes.Auction
 			if err = c.cdc.UnpackAny(anyAuction, &auction); err != nil {
 				return nil, err
@@ -147,7 +147,7 @@ func (c *GrpcClient) AllAuctions(ctx context.Context) ([]auctiontypes.Auction, e
 
 		key = auctionsRes.Pagination.NextKey
 
-		if len(auctionsRes.Auction) < PageLimit {
+		if len(auctionsRes.Auctions) < PageLimit {
 			return auctions, nil
 		}
 	}

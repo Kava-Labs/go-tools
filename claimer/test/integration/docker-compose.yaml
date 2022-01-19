@@ -13,11 +13,13 @@ services:
         command:
             - sh
             - -c
-            - /root/.kvd/config/init-data-directory.sh && kvd start --pruning=nothing --rpc.laddr=tcp://0.0.0.0:26657
-        image: kava/kava:v0.12.0
+            - /root/.kava/config/init-data-directory.sh && kava start
+              --pruning=nothing --rpc.laddr=tcp://0.0.0.0:26657
+        image: kava/kava:upgrade-v44
         ports:
             - 26657:26657
+            - 1317:1317
+            - 9090:9090
         volumes:
-            - ./kava/initstate/.kvd/config:/root/.kvd/config
-            - ./kava/initstate/.kvcli/config:/root/.kvcli/config
+            - ./kava/initstate/.kava/config:/root/.kava/config
 version: "3"

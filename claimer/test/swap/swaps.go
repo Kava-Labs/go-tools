@@ -15,14 +15,10 @@ import (
 
 // KavaSwap holds all parameters required to create a HTLT on the kava chain.
 type KavaSwap struct {
-	bep3types.AtomicSwap // TODO inline fields
-	SenderMnemonic       string
-	HeightSpan           uint64
+	bep3types.AtomicSwap
+	SenderMnemonic string
+	HeightSpan     uint64
 }
-
-// TODO
-// add New(Outgoing/Incoming)KavaSwap methods?
-// add validation checks on input params (like heightspan ≥ 0)?
 
 func NewKavaSwap(senderMnemonic string, recipient sdk.AccAddress, senderOtherChain, recipientOtherChain string, amount sdk.Coins, timestamp int64, rndHash []byte, heightspan int64) KavaSwap {
 	return KavaSwap{

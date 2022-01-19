@@ -44,10 +44,16 @@ type BnbClaimer struct {
 	deputyAddresses DeputyAddresses
 }
 
-func NewBnbClaimer(kavaRestURL, kavaRPCURL, bnbRPCURL string, depAddrs DeputyAddresses, mnemonics []string) BnbClaimer {
-	cdc := app.MakeCodec()
+func NewBnbClaimer(
+	kavaGrpcURL string,
+	bnbRPCURL string,
+	depAddrs DeputyAddresses,
+	mnemonics []string,
+) BnbClaimer {
+	encodingConfig := app.MakeEncodingConfig()
+
 	return BnbClaimer{
-		kavaClient:      NewMixedKavaClient(kavaRestURL, kavaRPCURL, cdc),
+		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig),
 		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
 		mnemonics:       mnemonics,
 		deputyAddresses: depAddrs,
@@ -73,7 +79,6 @@ func (bc BnbClaimer) Start(ctx context.Context) {
 }
 
 func (bc BnbClaimer) fetchAndClaimSwaps() error {
-
 	claimableSwaps, err := getClaimableBnbSwaps(bc.kavaClient, bc.bnbClient, bc.deputyAddresses)
 	if err != nil {
 		return fmt.Errorf("could not fetch claimable swaps: %w", err)

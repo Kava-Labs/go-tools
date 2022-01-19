@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package integration
@@ -12,18 +13,19 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	"github.com/stretchr/testify/require"
+
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
-	"github.com/kava-labs/go-sdk/client"
-	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
-	"github.com/kava-labs/go-tools/deputy-claimer/test/swap"
 	"github.com/kava-labs/kava/app"
 	kavatypes "github.com/kava-labs/kava/x/bep3/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/claimer/claimer"
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
+	"github.com/kava-labs/go-tools/claimer/test/addresses"
+	"github.com/kava-labs/go-tools/claimer/test/swap"
 )
 
 func TestMain(m *testing.M) {
@@ -36,7 +38,7 @@ func TestClaimSwapKava(t *testing.T) {
 
 	addrs := addresses.GetAddresses()
 
-	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaNodeURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL)
 	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -48,13 +50,13 @@ func TestClaimSwapKava(t *testing.T) {
 		bnbtypes.Coins{{Denom: "BNB", Amount: 500_000_000}},
 	)
 	// only need the receiving chain swap created
-	_, err := kavaSwapper.Create(swap1.KavaSwap, client.Commit)
+	_, err := kavaSwapper.Create(swap1.KavaSwap, txtypes.BroadcastMode_BROADCAST_MODE_BLOCK)
 	require.NoError(t, err)
 
 	cfg := config.Config{
 		Kava: config.KavaConfig{
 			ChainID:   "kava-localnet",
-			Endpoint:  addresses.KavaNodeURL,
+			Endpoint:  addresses.KavaGrpcURL,
 			Mnemonics: kavaUserMenmonics(addrs)[2:],
 		},
 		BinanceChain: config.BinanceChainConfig{
@@ -75,7 +77,13 @@ func TestClaimSwapKava(t *testing.T) {
 
 	status, err := kavaSwapper.FetchStatus(swap1.KavaSwap)
 	require.NoError(t, err)
-	require.Equalf(t, kavatypes.Completed, status, "expected swap status '%s', actual '%s'", kavatypes.Completed, status)
+	require.Equalf(
+		t,
+		kavatypes.SWAP_STATUS_COMPLETED,
+		status,
+		"expected swap status '%s', actual '%s'",
+		kavatypes.SWAP_STATUS_COMPLETED, status,
+	)
 }
 func TestClaimSwapBnb(t *testing.T) {
 	time.Sleep(1 * time.Second)
@@ -99,7 +107,7 @@ func TestClaimSwapBnb(t *testing.T) {
 	cfg := config.Config{
 		Kava: config.KavaConfig{
 			ChainID:   "kava-localnet",
-			Endpoint:  addresses.KavaNodeURL,
+			Endpoint:  addresses.KavaGrpcURL,
 			Mnemonics: kavaUserMenmonics(addrs)[2:],
 		},
 		BinanceChain: config.BinanceChainConfig{

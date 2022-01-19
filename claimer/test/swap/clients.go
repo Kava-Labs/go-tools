@@ -147,7 +147,7 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 		Sequence:      account.GetSequence(),
 	}
 
-	_, txBytes, err := signing.Sign(swapClient.encodingConfig.TxConfig, privKey, txBuilder, signerData)
+	_, txBytes, err := signing.Sign(swapClient.encodingConfig, privKey, txBuilder, signerData)
 	if err != nil {
 		return "", err
 	}
@@ -160,7 +160,7 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 		return "", err
 	}
 	if res.TxResponse.Code != 0 {
-		return res.TxResponse.TxHash, fmt.Errorf("tx rejected with code %v: %v", res.TxResponse.Code, res)
+		return res.TxResponse.TxHash, fmt.Errorf("tx rejected: %v", res)
 	}
 
 	return res.TxResponse.TxHash, nil
