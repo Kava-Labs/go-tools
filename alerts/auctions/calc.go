@@ -23,7 +23,7 @@ func CalculateTotalAuctionsUSDValue(data *AuctionData) (sdk.Dec, error) {
 		lot := auction.GetLot()
 		assetInfo, ok := data.Assets[lot.Denom]
 		if !ok {
-			return sdk.Dec{}, fmt.Errorf("Missing asset info for %s", lot.Denom)
+			return sdk.Dec{}, fmt.Errorf("missing asset info for %s", lot.Denom)
 		}
 
 		usdValue := CalculateUSDValue(lot, assetInfo)

@@ -76,11 +76,11 @@ var runAuctionsCmd = &cobra.Command{
 		http.Logger = logger
 
 		// Create codec for messages
-		cdc := kava.MakeCodec()
+		encodingConfig := kava.MakeEncodingConfig()
 
 		// Create rpc client for fetching data
 		logger.Info("creating rpc client")
-		auctionClient := auctions.NewRpcAuctionClient(http, cdc)
+		auctionClient := auctions.NewRpcAuctionClient(http, *encodingConfig.Amino)
 
 		firstIteration := true
 
@@ -111,7 +111,7 @@ var runAuctionsCmd = &cobra.Command{
 			logger.Info(fmt.Sprintf("Total auction value $%s", totalValue))
 
 			// Total value has not exceeded threshold, continue
-			if totalValue.Cmp(config.UsdThreshold.Int) != 1 {
+			if totalValue.LT(config.UsdThreshold) {
 				continue
 			}
 

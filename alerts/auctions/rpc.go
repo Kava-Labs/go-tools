@@ -1,6 +1,7 @@
 package auctions
 
 import (
+	"context"
 	"errors"
 
 	"github.com/tendermint/tendermint/libs/bytes"
@@ -9,8 +10,9 @@ import (
 )
 
 type RpcClient interface {
-	Status() (*ctypes.ResultStatus, error)
+	Status(ctx context.Context) (*ctypes.ResultStatus, error)
 	ABCIQueryWithOptions(
+		ctx context.Context,
 		path string,
 		data bytes.HexBytes,
 		opts rpcclient.ABCIQueryOptions,
