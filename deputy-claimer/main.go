@@ -14,7 +14,7 @@ import (
 
 type Config struct {
 	BnbRPCURL     string
-	kavaGrpcURL   string
+	KavaGrpcURL   string
 	Deputies      claim.DeputyAddresses
 	BnbMnemonics  []string
 	KavaMnemonics []string
@@ -22,7 +22,7 @@ type Config struct {
 
 type ConfigSimple struct {
 	BnbRPCURL   string
-	kavaGrpcURL string
+	KavaGrpcURL string
 	Deputies    map[string]struct {
 		Kava string
 		Bnb  string
@@ -55,7 +55,7 @@ func loadConfig() (Config, error) {
 
 	cfg := Config{
 		BnbRPCURL:     temp.BnbRPCURL,
-		kavaGrpcURL:   temp.kavaGrpcURL,
+		KavaGrpcURL:   temp.KavaGrpcURL,
 		Deputies:      deputies,
 		BnbMnemonics:  temp.BnbMnemonics,
 		KavaMnemonics: temp.KavaMnemonics,
@@ -76,13 +76,13 @@ func main() {
 	}
 
 	kavaClaimer := claim.NewKavaClaimer(
-		cfg.kavaGrpcURL,
+		cfg.KavaGrpcURL,
 		cfg.BnbRPCURL,
 		cfg.Deputies,
 		cfg.KavaMnemonics,
 	)
 	bnbClaimer := claim.NewBnbClaimer(
-		cfg.kavaGrpcURL,
+		cfg.KavaGrpcURL,
 		cfg.BnbRPCURL,
 		cfg.Deputies,
 		cfg.BnbMnemonics,
