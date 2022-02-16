@@ -19,6 +19,8 @@ import (
 )
 
 type MsgRequest struct {
+	// ID is used to easily match MsgRequests with the corresponding MsgResponse
+	ID        string
 	Msgs      []sdk.Msg
 	GasLimit  uint64
 	FeeAmount sdk.Coins
