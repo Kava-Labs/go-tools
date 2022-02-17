@@ -7,8 +7,14 @@ import (
 	"testing"
 
 	"github.com/kava-labs/go-tools/testutil"
+	"github.com/kava-labs/kava/app"
 	"github.com/stretchr/testify/suite"
 )
+
+func TestMain(m *testing.M) {
+	app.SetSDKConfig()
+	os.Exit(m.Run())
+}
 
 type nodeRunner interface {
 	Start() error

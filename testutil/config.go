@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/server/config"
-	"github.com/kava-labs/kava/app"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/p2p"
@@ -23,7 +24,7 @@ type NodeConfigBuilder struct {
 	PrivValidator *privval.FilePV
 	NodeKey       *p2p.NodeKey
 	GenesisDoc    types.GenesisDoc
-	// TODO include client keys?
+	// TODO include client keys/config?
 }
 
 func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
@@ -35,7 +36,17 @@ func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
 		PrivKey: nodePrivKey,
 	}
 
-	appState, err := json.MarshalIndent(app.NewDefaultGenesisState(), "", "  ")
+	privVal := privval.GenFilePV(tmCfg.PrivValidatorKeyFile(), tmCfg.PrivValidatorStateFile())
+
+	chainID := "kava-localnet"
+	valPubKey, err := cryptocodec.FromTmPubKeyInterface(privVal.Key.PubKey)
+	if err != nil {
+		panic(err)
+	}
+	valOperPrivKey := secp256k1.GenPrivKey() // TODO support using a mnemonic in the client key store
+	appGen := DefaultKavaAppGenesis(valPubKey, valOperPrivKey, chainID)
+
+	appState, err := json.MarshalIndent(appGen, "", "  ")
 	if err != nil {
 		panic(err)
 	}
@@ -43,11 +54,11 @@ func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
 	return &NodeConfigBuilder{
 		AppConfig:     config.DefaultConfig(),
 		TMConfig:      tmCfg,
-		PrivValidator: privval.GenFilePV(tmCfg.PrivValidatorKeyFile(), tmCfg.PrivValidatorStateFile()),
+		PrivValidator: privVal,
 		NodeKey:       nodeKey,
 		GenesisDoc: types.GenesisDoc{
 			GenesisTime:     time.Now(),
-			ChainID:         "kava-localnet",
+			ChainID:         chainID,
 			InitialHeight:   1,
 			ConsensusParams: types.DefaultConsensusParams(),
 			Validators:      nil,
@@ -56,13 +67,6 @@ func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
 		},
 	}
 }
-
-/*
-TODO Genesis setup
-- change denoms to kava
-- add account and coins
-- add validator gentx
-*/
 
 func WriteNodeConfig(
 	appConfig *config.Config,
