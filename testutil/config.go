@@ -43,7 +43,7 @@ func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
 	if err != nil {
 		panic(err)
 	}
-	valOperPrivKey := secp256k1.GenPrivKey() // TODO support using a mnemonic in the client key store
+	valOperPrivKey := secp256k1.GenPrivKey() // TODO store key somewhere
 	appGen := DefaultKavaAppGenesis(valPubKey, valOperPrivKey, chainID)
 
 	appState, err := json.MarshalIndent(appGen, "", "  ")

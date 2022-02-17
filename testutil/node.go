@@ -93,14 +93,14 @@ func (nr *DockerNodeRunner) Start() error {
 
 	fmt.Println("waiting") // TODO wait for startup or exit
 	time.Sleep(5 * time.Second)
-	statusCh, errCh := nr.dockerClient.ContainerWait(ctx, nr.containerID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			return err
-		}
-	case <-statusCh:
-	}
+	// statusCh, errCh := nr.dockerClient.ContainerWait(ctx, nr.containerID, container.WaitConditionNotRunning)
+	// select {
+	// case err := <-errCh:
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// case <-statusCh:
+	// }
 
 	out, err := nr.dockerClient.ContainerLogs(ctx, nr.containerID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
@@ -114,20 +114,23 @@ func (nr *DockerNodeRunner) Start() error {
 }
 
 func (nr *DockerNodeRunner) Stop() error {
-	return fmt.Errorf("TODO")
+	timeout := time.Minute
+	return nr.dockerClient.ContainerStop(context.Background(), nr.containerID, &timeout)
 }
 
 func (nr *DockerNodeRunner) Cleanup() error {
-	ctx := context.Background()
-	err := nr.dockerClient.ContainerRemove(ctx, nr.containerID, types.ContainerRemoveOptions{})
+	if err := nr.Stop(); err != nil { // TODO what happens if it's already stopped?
+		return err
+	}
+
+	err := nr.dockerClient.ContainerRemove(context.Background(), nr.containerID, types.ContainerRemoveOptions{})
 	if err != nil {
 		return err
 	}
 
-	// TODO
-	// if err := os.RemoveAll(nr.rootDir); err != nil {
-	// 	return err
-	// }
+	if err := os.RemoveAll(nr.rootDir); err != nil {
+		return err
+	}
 
 	return nil
 }
