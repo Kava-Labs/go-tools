@@ -19,12 +19,13 @@ import (
 )
 
 type MsgRequest struct {
-	// ID is used to easily match MsgRequests with the corresponding MsgResponse
-	ID        string
 	Msgs      []sdk.Msg
 	GasLimit  uint64
 	FeeAmount sdk.Coins
 	Memo      string
+	// Arbitrary data to be referenced in the corresponding MsgResponse, unused
+	// in signing. This is mostly useful to match MsgResponses with MsgRequests.
+	Data interface{}
 }
 
 type MsgResponse struct {
