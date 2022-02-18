@@ -2,73 +2,97 @@ package testutil
 
 import (
 	"context"
-	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/server/config"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
-	tmconfig "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/privval"
-	tmtypes "github.com/tendermint/tendermint/types"
+	"github.com/docker/go-connections/nat"
 )
+
+// The node runner uses a fixed version of the kava image. The volume mount paths (for the config files) depend on the internals of this image.
+const kavaImage = "kava/kava:v0.16.1"
 
 type DockerNodeRunner struct {
 	dockerClient *client.Client
 	containerID  string
-	rootDir      string
+	nodeConfig   NodeConfig
+
+	rootDir string
 }
 
-func NewDockerNodeRunner(
-	appConfig *config.Config,
-	tmConfig *tmconfig.Config,
-	privValidator *privval.FilePV,
-	nodeKey *p2p.NodeKey,
-	genesisDoc tmtypes.GenesisDoc,
-) (*DockerNodeRunner, error) {
+func NewDockerNodeRunner(nodeConfig NodeConfig) (*DockerNodeRunner, error) {
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := WriteNodeConfig(appConfig, tmConfig, privValidator, nodeKey, genesisDoc); err != nil { // TODO maybe move into Setup()
-		return nil, err
-	}
-
 	return &DockerNodeRunner{
 		dockerClient: cli,
-		rootDir:      tmConfig.BaseConfig.RootDir,
+		nodeConfig:   nodeConfig,
+
+		rootDir: nodeConfig.TMConfig.BaseConfig.RootDir,
 	}, nil
 }
 
-func (nr *DockerNodeRunner) Start() error {
+func (nr *DockerNodeRunner) Init() error {
 
-	ctx := context.Background()
-
-	image := "kava/kava:v0.16.1"
-	reader, err := nr.dockerClient.ImagePull(ctx, image, types.ImagePullOptions{})
-	if err != nil {
+	if err := WriteNodeConfig(nr.nodeConfig); err != nil {
 		return err
 	}
 
+	ctx := context.Background()
+
+	reader, err := nr.dockerClient.ImagePull(ctx, kavaImage, types.ImagePullOptions{})
+	if err != nil {
+		return err
+	}
 	defer reader.Close()
-	io.Copy(os.Stdout, reader)
+	io.Copy(os.Stdout, reader) // TODO
+
+	grpcPort := nat.Port(nr.extractGRPCPort() + "/tcp")
+	rpcPort := nat.Port(nr.extractRPCPort() + "/tcp")
+	apiPort := nat.Port(nr.extractAPIPort() + "/tcp")
 
 	resp, err := nr.dockerClient.ContainerCreate(
 		ctx,
 		&container.Config{
-			Image: image,
+			Image: kavaImage,
 			Cmd:   []string{"kava", "start"},
-			Tty:   false,
+			ExposedPorts: nat.PortSet{
+				rpcPort:  struct{}{},
+				grpcPort: struct{}{},
+				apiPort:  struct{}{},
+			},
 		},
 		&container.HostConfig{
+			PortBindings: nat.PortMap{
+				rpcPort: []nat.PortBinding{
+					{
+						HostIP:   "localhost",
+						HostPort: rpcPort.Port(),
+					},
+				},
+				grpcPort: []nat.PortBinding{
+					{
+						HostIP:   "localhost",
+						HostPort: grpcPort.Port(),
+					},
+				},
+				apiPort: []nat.PortBinding{
+					{
+						HostIP:   "localhost",
+						HostPort: apiPort.Port(),
+					},
+				},
+			},
 			Mounts: []mount.Mount{
 				{
 					Type:   mount.TypeBind,
@@ -87,29 +111,27 @@ func (nr *DockerNodeRunner) Start() error {
 
 	nr.containerID = resp.ID
 
+	return nil
+}
+
+func (nr *DockerNodeRunner) Start() error {
+	ctx := context.Background()
+
 	if err := nr.dockerClient.ContainerStart(ctx, nr.containerID, types.ContainerStartOptions{}); err != nil {
 		return err
 	}
 
-	fmt.Println("waiting") // TODO wait for startup or exit
-	time.Sleep(5 * time.Second)
-	// statusCh, errCh := nr.dockerClient.ContainerWait(ctx, nr.containerID, container.WaitConditionNotRunning)
-	// select {
-	// case err := <-errCh:
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// case <-statusCh:
-	// }
-
-	out, err := nr.dockerClient.ContainerLogs(ctx, nr.containerID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
-	if err != nil {
+	if err := nr.waitForNextBlock(); err != nil {
 		return err
 	}
-	defer out.Close()
 
-	stdcopy.StdCopy(os.Stdout, os.Stderr, out)
+	return nil
+}
 
+func (nr *DockerNodeRunner) waitForNextBlock() error {
+	// TODO wait until a block is produced, or the container exits
+	// If container exits, the container logs may be useful for the user.
+	time.Sleep(3 * time.Second)
 	return nil
 }
 
@@ -128,9 +150,60 @@ func (nr *DockerNodeRunner) Cleanup() error {
 		return err
 	}
 
-	if err := os.RemoveAll(nr.rootDir); err != nil {
-		return err
-	}
+	// if err := os.RemoveAll(nr.rootDir); err != nil {
+	// 	return err
+	// }
 
 	return nil
+}
+
+func (nr *DockerNodeRunner) RPCAddress() string {
+	return "http://localhost:" + nr.extractRPCPort()
+}
+func (nr *DockerNodeRunner) GRPCAddress() string {
+	return "localhost:" + nr.extractGRPCPort()
+}
+func (nr *DockerNodeRunner) APIAddress() string {
+	return "http://localhost:" + nr.extractAPIPort()
+}
+
+func (nr *DockerNodeRunner) extractGRPCPort() string {
+	port, err := parsePortFromAddress(nr.nodeConfig.AppConfig.GRPC.Address)
+	if err != nil {
+		return ""
+	}
+	return port
+}
+
+func (nr *DockerNodeRunner) extractRPCPort() string {
+	port, err := parsePortFromAddress(nr.nodeConfig.TMConfig.RPC.ListenAddress)
+	if err != nil {
+		return ""
+	}
+	return port
+}
+
+func (nr *DockerNodeRunner) extractAPIPort() string {
+	port, err := parsePortFromAddress(nr.nodeConfig.AppConfig.API.Address)
+	if err != nil {
+		return ""
+	}
+	return port
+}
+
+func parsePortFromAddress(address string) (string, error) {
+	const urlParseErrMsg = "too many colons in address"
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		if !strings.Contains(err.Error(), urlParseErrMsg) {
+			return "", err
+		}
+		uri, err := url.ParseRequestURI(address)
+		if err != nil {
+			return "", err
+		}
+		return uri.Port(), nil
+
+	}
+	return port, nil
 }

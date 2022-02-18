@@ -29,7 +29,11 @@ func DefaultKavaAppGenesis(consensusKey cryptotypes.PubKey, valOperPrivKey crypt
 
 	abBuilder := app.NewAuthBankGenesisBuilder().WithSimpleAccount(
 		valOperPrivKey.PubKey().Address().Bytes(),
-		sdk.NewCoins(sdk.NewInt64Coin(govDenom, 1e12)),
+		sdk.NewCoins(
+			sdk.NewInt64Coin(govDenom, 1e15),
+			sdk.NewInt64Coin("acoin", 1e15),
+			sdk.NewInt64Coin("bcoin", 1e15),
+		),
 	)
 	for k, v := range abBuilder.BuildMarshalled(cdc) {
 		genState[k] = v

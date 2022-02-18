@@ -9,25 +9,27 @@ import (
 
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/server/config"
 	tmconfig "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	"github.com/tendermint/tendermint/p2p"
 	"github.com/tendermint/tendermint/privval"
 	"github.com/tendermint/tendermint/types"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
-type NodeConfigBuilder struct {
+type NodeConfig struct {
 	AppConfig     *config.Config
 	TMConfig      *tmconfig.Config
 	PrivValidator *privval.FilePV
 	NodeKey       *p2p.NodeKey
 	GenesisDoc    types.GenesisDoc
-	// TODO include client keys/config?
+	WhalePrivKey  cryptotypes.PrivKey // TODO store all keys(/mnemonics?) used in gen accounts (could be written out to keyring files)
+	// TODO include client.toml?
 }
 
-func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
+// TODO enable api by default
+func NewDefaultNodeConfig(homeDir string) NodeConfig {
 	tmCfg := tmconfig.DefaultConfig()
 	tmCfg.RootDir = homeDir
 
@@ -43,7 +45,7 @@ func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
 	if err != nil {
 		panic(err)
 	}
-	valOperPrivKey := secp256k1.GenPrivKey() // TODO store key somewhere
+	valOperPrivKey := secp256k1.GenPrivKey()
 	appGen := DefaultKavaAppGenesis(valPubKey, valOperPrivKey, chainID)
 
 	appState, err := json.MarshalIndent(appGen, "", "  ")
@@ -51,7 +53,7 @@ func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
 		panic(err)
 	}
 
-	return &NodeConfigBuilder{
+	return NodeConfig{
 		AppConfig:     config.DefaultConfig(),
 		TMConfig:      tmCfg,
 		PrivValidator: privVal,
@@ -65,18 +67,13 @@ func NewDefaultNodeConfig(homeDir string) *NodeConfigBuilder {
 			AppHash:         nil,
 			AppState:        appState,
 		},
+		WhalePrivKey: valOperPrivKey,
 	}
 }
 
-func WriteNodeConfig(
-	appConfig *config.Config,
-	tmConfig *tmconfig.Config,
-	privValidator *privval.FilePV,
-	nodeKey *p2p.NodeKey,
-	genesisDoc tmtypes.GenesisDoc,
-) error {
+func WriteNodeConfig(cfg NodeConfig) error {
 
-	rootDir := tmConfig.BaseConfig.RootDir // TODO theres lots of root dirs
+	rootDir := cfg.TMConfig.BaseConfig.RootDir // TODO theres lots of root dirs
 	if rootDir == "" {
 		return fmt.Errorf("expected valid home directory, got '%s'", rootDir)
 	}
@@ -85,28 +82,28 @@ func WriteNodeConfig(
 	if err := os.MkdirAll(filepath.Dir(appCfgPath), 0777); err != nil { // TODO permissions?
 		return err
 	}
-	config.WriteConfigFile(appCfgPath, appConfig)
+	config.WriteConfigFile(appCfgPath, cfg.AppConfig)
 
 	tmCfgPath := filepath.Join(rootDir, "config", "config.toml") // TODO import name?
-	tmconfig.WriteConfigFile(tmCfgPath, tmConfig)
+	tmconfig.WriteConfigFile(tmCfgPath, cfg.TMConfig)
 
-	if err := os.MkdirAll(filepath.Dir(tmConfig.PrivValidatorKeyFile()), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.TMConfig.PrivValidatorKeyFile()), 0777); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(tmConfig.PrivValidatorStateFile()), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.TMConfig.PrivValidatorStateFile()), 0777); err != nil {
 		return err
 	}
-	privValidator.Save()
+	cfg.PrivValidator.Save()
 
-	if err := os.MkdirAll(filepath.Dir(tmConfig.NodeKeyFile()), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.TMConfig.NodeKeyFile()), 0777); err != nil {
 		return err
 	}
-	nodeKey.SaveAs(tmConfig.NodeKeyFile())
+	cfg.NodeKey.SaveAs(cfg.TMConfig.NodeKeyFile())
 
-	if err := os.MkdirAll(filepath.Dir(tmConfig.GenesisFile()), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.TMConfig.GenesisFile()), 0777); err != nil {
 		return err
 	}
-	genesisDoc.SaveAs(tmConfig.GenesisFile())
+	cfg.GenesisDoc.SaveAs(cfg.TMConfig.GenesisFile())
 
 	return nil
 }
