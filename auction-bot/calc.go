@@ -148,6 +148,9 @@ func calculateProposedBid(currentBid, lot, maxbid sdk.Coin, assetInfoLot, assetI
 		return sdk.Coin{}, false
 	}
 	minBid := currentBid.Amount.ToDec().Mul(d("1.0105")).RoundInt()
+	if minBid.GT(maxbid.Amount) {
+		minBid = maxbid.Amount
+	}
 
 	for _, bidIncrement := range bidsToTry {
 		bidAmountInt := maxbid.Amount.ToDec().Mul(bidIncrement).TruncateInt()
