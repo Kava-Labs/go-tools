@@ -1,7 +1,8 @@
-FROM golang:1.17.5-bullseye as build-env
+FROM --platform=$BUILDPLATFORM golang:1.17.5-bullseye as build-env
 
+ARG TARGETOS TARGETARCH
 ADD . /src
-RUN cd /src/auction-bot && go build -o /main
+RUN cd /src/auction-bot && GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /main
 
 FROM debian:bullseye
 

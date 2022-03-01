@@ -2,7 +2,7 @@ AWS:=aws
 AWS_REGION:=us-east-1
 AWS_ACCOUNT_ID=$(shell aws sts get-caller-identity --query 'Account' --output text)
 DOCKER:=docker
-IMAGE_NAME:=auction-bot
+IMAGE_NAME:=auction-bot-service
 COMMIT_ID_SHORT:=$(shell git rev-parse --short HEAD)
 DOCKER_REPOSITORY_URL:=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
 
@@ -15,14 +15,6 @@ docker-login:
 	docker login --username AWS --password-stdin \
 	$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
-.PHONY: docker-build
-docker-build:
-	cd ..; $(DOCKER) build -t $(IMAGE_NAME):$(COMMIT_ID_SHORT) -f auction-bot/Dockerfile .
-
-.PHONY: docker-tag
-docker-tag:
-	$(DOCKER) tag $(IMAGE_NAME):$(COMMIT_ID_SHORT) $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT)
-
-.PHONY: docker-push
-docker-push:
-	$(DOCKER) push $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT)
+.PHONY: docker-build-and-push
+docker-build-and-push:
+	cd ..; $(DOCKER) buildx build --platform linux/amd64  -t $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT) -f auction-bot/Dockerfile --push . 
