@@ -125,14 +125,18 @@ func main() {
 		}
 	}()
 
+	priceErrors := 0
 	for {
 		data, err := GetAuctionData(grpcClient, encodingConfig.Marshaler)
 		if err != nil {
-			fmt.Printf("error fetching prices...")
+			priceErrors += 1
 			continue
 		}
+		logger.Info(fmt.Sprintf("fetched prices after %d attempt(s)\n", priceErrors+1))
+		priceErrors = 0
 
 		latestHeight, err := grpcClient.LatestHeight()
+
 		if err != nil {
 			continue
 		}
