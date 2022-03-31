@@ -18,6 +18,7 @@ import (
 )
 
 var _auctionsServiceName = "AuctionAlerts"
+var _inefficientAuctionServiceName = "InefficientAuctionAlerts"
 
 var auctionsCmd = &cobra.Command{
 	Use:   "auctions",
@@ -40,14 +41,14 @@ var runAuctionsCmd = &cobra.Command{
 
 		// Create a new alert persister backed with DynamoDB. If AWS config is
 		// invalid, exits with error
-		db, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaRpcUrl)
+		auctionDB, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaRpcUrl)
 		if err != nil {
 			return err
 		}
 
 		// Get last alert to test if we can successfully fetch from DynamoDB
-		if _, _, err := db.GetLatestAlert(); err != nil {
-			return fmt.Errorf("failed to fetch alert times from DynamoDB: %v", err)
+		if _, _, err := auctionDB.GetLatestAlert(); err != nil {
+			return fmt.Errorf("failed to fetch auction alert times from DynamoDB: %v", err)
 		}
 
 		// bootstrap kava chain config
@@ -102,6 +103,56 @@ var runAuctionsCmd = &cobra.Command{
 
 			logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
 
+			inEfficientAuctions, err := auctions.CheckInefficientAuctions(data, config.InefficientAuctionUSDThreshold, config.InefficientRatio, config.InefficientTimeRemaining)
+			if err != nil {
+				logger.Error(err.Error())
+				continue
+			}
+
+			for _, auction := range inEfficientAuctions {
+				inefficientAuctionDB, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _inefficientAuctionServiceName+fmt.Sprint(auction.GetID()), config.KavaRpcUrl)
+				if err != nil {
+					return err
+				}
+				usdBid := auctions.CalculateUSDValue(auction.GetBid(), data.Assets[auction.GetBid().Denom])
+				usdLot := auctions.CalculateUSDValue(auction.GetLot(), data.Assets[auction.GetLot().Denom])
+				if _, _, err := inefficientAuctionDB.GetLatestAlert(); err != nil {
+					return fmt.Errorf("failed to fetch inefficient auction alert time from DynamoDB: %v", err)
+				}
+				warningMsg := fmt.Sprintf(
+					"Inefficient auction:\nAuction ID: %d\nBid: %s (USD Value: $%s)\nLot: %s (USD Value: $%s)\nEnd time: %s\nTime Remaining: %s\n",
+					auction.GetID(), auction.GetBid(), usdBid.TruncateInt(), auction.GetLot(), usdLot.TruncateInt(), auction.GetEndTime().Round(time.Minute), time.Until(auction.GetEndTime()).Round(time.Minute),
+				)
+				logger.Info(warningMsg)
+
+				lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&inefficientAuctionDB, config.AlertFrequency)
+				if err != nil {
+					logger.Error("Failed to check alert interval: %v", err.Error())
+					continue
+				}
+
+				// If current time in UTC is before (previous timestamp + alert frequency), skip alert
+				if !canAlert {
+					logger.Info(fmt.Sprintf("Alert already sent within the last %v. (Last was %v, next at %v)",
+						config.AlertFrequency,
+						lastAlert.Timestamp.Format(time.RFC3339),
+						lastAlert.Timestamp.Add(config.AlertFrequency).Format(time.RFC3339),
+					))
+
+					continue
+				}
+
+				logger.Info("Sending alert to Slack")
+
+				if err := slackAlerter.Warn(
+					config.SlackChannelId,
+					warningMsg,
+				); err != nil {
+					logger.Error("Failed to send Slack alert", err.Error())
+				}
+
+			}
+
 			totalValue, err := auctions.CalculateTotalAuctionsUSDValue(data)
 			if err != nil {
 				logger.Error(err.Error())
@@ -121,7 +172,7 @@ var runAuctionsCmd = &cobra.Command{
 			)
 			logger.Info(warningMsg)
 
-			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&db, config.AlertFrequency)
+			lastAlert, canAlert, err := alerter.GetAndSaveLastAlert(&auctionDB, config.AlertFrequency)
 			if err != nil {
 				logger.Error("Failed to check alert interval: %v", err.Error())
 				continue

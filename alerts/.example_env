@@ -7,7 +7,14 @@ INTERVAL="10m"
 ALERT_FREQUENCY="8h"
 
 # Auctions 
+# US dollar value of auctions that triggers alert
 USD_THRESHOLD="100000"
+# US dollar value of 1 auction that triggers inefficiency alert
+INEFFICIENT_AUCTION_USD_THRESHOLD="2000"
+# Ratio of bid:lot USD value which triggers inefficienty alert
+INEFFICIENT_AUCTION_RATIO="0.9"
+# Time remaining on an auction before the inefficienty alert will trigger.
+INEFFICIENT_AUCTION_TIME_THRESHOLD="10h"
 
 # USDX
 USDX_DEVIATION="0.25"
