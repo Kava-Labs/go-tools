@@ -157,8 +157,18 @@ func main() {
 		}
 		logger.Info(fmt.Sprintf("total usdx for bids %s", totalBids))
 
+		auctionDups := make(map[uint64]int64)
+		for _, bid := range msgs {
+			auctionDups[bid.AuctionId] = auctionDups[bid.AuctionId] + 1
+		}
+
+		for auctionID, numDups := range auctionDups {
+			logger.Info(fmt.Sprintf("auction id %d dups %d", auctionID, numDups))
+		}
+
 		// gas limit of one bit
 		gasBaseLimit := uint64(300000)
+
 		// max gas price to get into any block
 		gasPrice := 0.25
 
