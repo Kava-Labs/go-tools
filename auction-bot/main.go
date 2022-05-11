@@ -169,6 +169,8 @@ func main() {
 				// copy slice to avoid slice re-use
 				requestMsgBatch := make([]sdk.Msg, batchSize)
 				copy(requestMsgBatch, msgBatch)
+				// reset batch
+				msgBatch = []sdk.Msg{}
 
 				// add up total gas for tx
 				gasLimit := gasBaseLimit * uint64(batchSize)
