@@ -163,7 +163,9 @@ func main() {
 		}
 
 		for auctionID, numDups := range auctionDups {
-			logger.Info(fmt.Sprintf("auction id %d dups %d", auctionID, numDups))
+			if numDups > 1 {
+				logger.Info(fmt.Sprintf("auction id %d dups %d", auctionID, numDups))
+			}
 		}
 
 		// gas limit of one bit
