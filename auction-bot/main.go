@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -93,7 +94,7 @@ func main() {
 		grpcClient.Auth,
 		grpcClient.Tx,
 		privKey,
-		10,
+		100,
 	)
 
 	// channels to communicate with signer
@@ -150,12 +151,42 @@ func main() {
 
 		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
 
-		for _, msg := range msgs {
-			requests <- signing.MsgRequest{
-				Msgs:      []sdk.Msg{&msg},
-				GasLimit:  300000,
-				FeeAmount: sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(15000))),
-				Memo:      "",
+		// gas limit of one bit
+		gasBaseLimit := uint64(300000)
+		// max gas price to get into any block
+		gasPrice := 0.25
+
+		// aggregator for msgs between loops
+		msgBatch := []sdk.Msg{}
+		// total number of messages
+		numMsgs := len(msgs)
+
+		for i, msg := range msgs {
+			// collect msgs
+			msgBatch = append(msgBatch, &msg)
+
+			// when batch is 10 or on the last loop, send request
+			if len(msgBatch) == 10 || i == numMsgs-1 {
+				// batch size may be less for last loop
+				batchSize := len(msgBatch)
+
+				// copy slice to avoid slice re-use
+				requestMsgBatch := make([]sdk.Msg, batchSize)
+				copy(requestMsgBatch, msgBatch)
+				// reset batch
+				msgBatch = []sdk.Msg{}
+
+				// add up total gas for tx
+				gasLimit := gasBaseLimit * uint64(batchSize)
+				// calculate gas fee amount, ceil so we stay over limit on rounding
+				feeAmount := int64(math.Ceil(float64(gasLimit) * gasPrice))
+
+				requests <- signing.MsgRequest{
+					Msgs:      requestMsgBatch,
+					GasLimit:  gasLimit,
+					FeeAmount: sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(feeAmount))),
+					Memo:      "",
+				}
 			}
 		}
 
