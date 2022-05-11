@@ -148,8 +148,15 @@ func main() {
 		auctionBids := GetBids(data, sdk.AccAddress(privKey.PubKey().Address()), config.ProfitMargin)
 
 		msgs := CreateBidMsgs(sdk.AccAddress(privKey.PubKey().Address()), auctionBids)
-
 		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
+
+		totalUsdx := sdk.ZeroInt()
+		for _, bid := range msgs {
+			if bid.Amount.Denom == "usdx" {
+				totalUsdx = totalUsdx.Add(bid.Amount.Amount)
+			}
+		}
+		logger.Info(fmt.Sprintf("total usdx for bids %s", totalUsdx))
 
 		// gas limit of one bit
 		gasBaseLimit := uint64(300000)
