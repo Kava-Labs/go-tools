@@ -7,6 +7,8 @@ import (
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 )
 
+const USTDenom = "ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C"
+
 type AuctionInfo struct {
 	ID     uint64
 	Bidder sdk.AccAddress
@@ -18,6 +20,13 @@ type AuctionInfos []AuctionInfo
 func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionInfos {
 	var auctionBidInfos AuctionInfos
 	for _, auction := range data.Auctions {
+
+		// skip all UST auctions
+		if auction.GetLot().Denom == USTDenom {
+			fmt.Println("skipping auction %d with lot %s", auction.GetID(), auction.GetLot())
+			continue
+		}
+
 		switch auction.GetType() {
 		case auctiontypes.CollateralAuctionType:
 			switch auction.GetPhase() {
