@@ -9,6 +9,10 @@ import (
 
 const USTDenom = "ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C"
 const BusdDenom = "busd"
+const BtcbDenom = "btcb"
+const ukavaDenom = "ukava"
+const hardDenom = "hard"
+const usdxDenom = "usdx"
 
 type AuctionInfo struct {
 	ID     uint64
@@ -23,9 +27,18 @@ func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionIn
 	var auctions int
 	for _, auction := range data.Auctions {
 
-		// skip all UST auctions
-		if auction.GetBid().Denom != BusdDenom {
+		if auction.GetBid().Denom != usdxDenom {
 			// fmt.Printf("skipping auction %d with lot %s", auction.GetID(), auction.GetLot())
+			continue
+		}
+		// skip all UST auctions
+		if auction.GetLot().Denom == USTDenom {
+			continue
+		}
+		if auction.GetLot().Denom == hardDenom {
+			continue
+		}
+		if auction.GetPhase() != auctiontypes.ForwardAuctionPhase {
 			continue
 		}
 		auctions++
