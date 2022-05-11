@@ -8,6 +8,7 @@ import (
 )
 
 const USTDenom = "ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C"
+const BusdDenom = "busd"
 
 type AuctionInfo struct {
 	ID     uint64
@@ -19,13 +20,15 @@ type AuctionInfos []AuctionInfo
 
 func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionInfos {
 	var auctionBidInfos AuctionInfos
+	var auctions int
 	for _, auction := range data.Auctions {
 
 		// skip all UST auctions
-		if auction.GetLot().Denom == USTDenom {
-			fmt.Println("skipping auction %d with lot %s", auction.GetID(), auction.GetLot())
+		if auction.GetBid().Denom != BusdDenom {
+			// fmt.Printf("skipping auction %d with lot %s", auction.GetID(), auction.GetLot())
 			continue
 		}
+		auctions++
 
 		switch auction.GetType() {
 		case auctiontypes.CollateralAuctionType:
@@ -55,7 +58,7 @@ func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionIn
 			fmt.Printf("unsupported auction type: %s\n", auction.GetType())
 		}
 	}
-
+	fmt.Printf("checked %d auctions\n", auctions)
 	return auctionBidInfos
 }
 
@@ -169,15 +172,15 @@ func calculateProposedBid(currentBid, lot, maxbid sdk.Coin, assetInfoLot, assetI
 		bidCoin := sdk.NewCoin(maxbid.Denom, bidAmountInt)
 		bidUSDValue := calculateUSDValue(bidCoin, assetInfoBid)
 		if sdk.OneDec().Sub((bidUSDValue.Quo(lotUSDValue))).GTE(margin) {
-			fmt.Printf(`
-	Auction id: %d
-	Increment tried: %s
-	Proposed Bid: %s
-	Proposed Bid USD Value: %s
-	Lot USD Value: %s
-`,
-				id, bidIncrement, bidCoin, bidUSDValue, lotUSDValue,
-			)
+			// 			fmt.Printf(`
+			// 	Auction id: %d
+			// 	Increment tried: %s
+			// 	Proposed Bid: %s
+			// 	Proposed Bid USD Value: %s
+			// 	Lot USD Value: %s
+			// `,
+			// 				id, bidIncrement, bidCoin, bidUSDValue, lotUSDValue,
+			// 			)
 			return bidCoin, true
 		}
 	}
@@ -211,15 +214,15 @@ func calculateProposedLot(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid Asset
 			continue
 		}
 		if sdk.OneDec().Sub((bidUSDValue.Quo(proposedLotUSDValue))).GTE(margin) {
-			fmt.Printf(`
-	Auction id: %d
-	Increment tried: %s
-	Proposed Lot: %s
-	Proposed Lot USD Value: %s
-	Bid USD Value: %s
-`,
-				id, lotIncrement, proposedLotCoin, proposedLotUSDValue, bidUSDValue,
-			)
+			// 			fmt.Printf(`
+			// 	Auction id: %d
+			// 	Increment tried: %s
+			// 	Proposed Lot: %s
+			// 	Proposed Lot USD Value: %s
+			// 	Bid USD Value: %s
+			// `,
+			// 				id, lotIncrement, proposedLotCoin, proposedLotUSDValue, bidUSDValue,
+			// 			)
 			return proposedLotCoin, true
 		}
 	}

@@ -155,7 +155,7 @@ func main() {
 			totalBids = totalBids.Add(bid.Amount)
 
 		}
-		logger.Info(fmt.Sprintf("total usdx for bids %s", totalBids))
+		logger.Info(fmt.Sprintf("total for bids %s", totalBids))
 
 		auctionDups := make(map[uint64]int64)
 		for _, bid := range msgs {
@@ -181,7 +181,8 @@ func main() {
 
 		for i, msg := range msgs {
 			// collect msgs
-			msgBatch = append(msgBatch, &msg)
+			msgCopy := msg
+			msgBatch = append(msgBatch, &msgCopy)
 
 			// when batch is 10 or on the last loop, send request
 			if len(msgBatch) == 10 || i == numMsgs-1 {
