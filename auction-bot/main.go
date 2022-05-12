@@ -172,7 +172,7 @@ func main() {
 		gasBaseLimit := uint64(300000)
 
 		// max gas price to get into any block
-		gasPrice := 0.25
+		gasPrice := 0.05
 
 		// aggregator for msgs between loops
 		msgBatch := []sdk.Msg{}
@@ -180,6 +180,7 @@ func main() {
 		numMsgs := len(msgs)
 
 		for i, msg := range msgs {
+			logger.Info(fmt.Sprintf("%v", msg))
 			// collect msgs
 			msgCopy := msg
 			msgBatch = append(msgBatch, &msgCopy)
