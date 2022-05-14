@@ -7,6 +7,16 @@ import (
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 )
 
+const USTDenom = "ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C"
+const atomDenom = "ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2"
+const aktDenom = "ibc/799FDD409719A1122586A629AE8FCA17380351A51C1F47A80A1B8E7F2A491098"
+const BusdDenom = "busd"
+const BtcbDenom = "btcb"
+const ukavaDenom = "ukava"
+const hardDenom = "hard"
+const usdxDenom = "usdx"
+const swpDenom = "swp"
+
 type AuctionInfo struct {
 	ID     uint64
 	Bidder sdk.AccAddress
@@ -17,7 +27,19 @@ type AuctionInfos []AuctionInfo
 
 func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionInfos {
 	var auctionBidInfos AuctionInfos
+	var auctions int
+	debt := sdk.NewCoin("debt", sdk.ZeroInt())
 	for _, auction := range data.Auctions {
+		// Only non-UST auctions
+		if auction.GetLot().Denom == USTDenom {
+			continue
+		}
+		auctions++
+		da, ok := auction.(*auctiontypes.CollateralAuction)
+		if ok {
+			debt = debt.Add(da.CorrespondingDebt)
+		}
+
 		switch auction.GetType() {
 		case auctiontypes.CollateralAuctionType:
 			switch auction.GetPhase() {
@@ -46,7 +68,8 @@ func GetBids(data *AuctionData, keeper sdk.AccAddress, margin sdk.Dec) AuctionIn
 			fmt.Printf("unsupported auction type: %s\n", auction.GetType())
 		}
 	}
-
+	fmt.Printf("checked %d auctions\n", auctions)
+	fmt.Printf("total debt: %s\n", debt)
 	return auctionBidInfos
 }
 
@@ -160,15 +183,15 @@ func calculateProposedBid(currentBid, lot, maxbid sdk.Coin, assetInfoLot, assetI
 		bidCoin := sdk.NewCoin(maxbid.Denom, bidAmountInt)
 		bidUSDValue := calculateUSDValue(bidCoin, assetInfoBid)
 		if sdk.OneDec().Sub((bidUSDValue.Quo(lotUSDValue))).GTE(margin) {
-			fmt.Printf(`
-	Auction id: %d
-	Increment tried: %s
-	Proposed Bid: %s
-	Proposed Bid USD Value: %s
-	Lot USD Value: %s
-`,
-				id, bidIncrement, bidCoin, bidUSDValue, lotUSDValue,
-			)
+			// 			fmt.Printf(`
+			// 	Auction id: %d
+			// 	Increment tried: %s
+			// 	Proposed Bid: %s
+			// 	Proposed Bid USD Value: %s
+			// 	Lot USD Value: %s
+			// `,
+			// 				id, bidIncrement, bidCoin, bidUSDValue, lotUSDValue,
+			// 			)
 			return bidCoin, true
 		}
 	}
@@ -202,15 +225,15 @@ func calculateProposedLot(lot, maxbid sdk.Coin, assetInfoLot, assetInfoBid Asset
 			continue
 		}
 		if sdk.OneDec().Sub((bidUSDValue.Quo(proposedLotUSDValue))).GTE(margin) {
-			fmt.Printf(`
-	Auction id: %d
-	Increment tried: %s
-	Proposed Lot: %s
-	Proposed Lot USD Value: %s
-	Bid USD Value: %s
-`,
-				id, lotIncrement, proposedLotCoin, proposedLotUSDValue, bidUSDValue,
-			)
+			// 			fmt.Printf(`
+			// 	Auction id: %d
+			// 	Increment tried: %s
+			// 	Proposed Lot: %s
+			// 	Proposed Lot USD Value: %s
+			// 	Bid USD Value: %s
+			// `,
+			// 				id, lotIncrement, proposedLotCoin, proposedLotUSDValue, bidUSDValue,
+			// 			)
 			return proposedLotCoin, true
 		}
 	}

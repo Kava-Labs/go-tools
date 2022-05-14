@@ -70,6 +70,12 @@ func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
 		if !ok {
 			return nil, fmt.Errorf("no price for market id %s", market.SpotMarketID)
 		}
+
+		// fix usdx price at $1 USD
+		if market.Denom == "usdx" {
+			price = sdk.OneDec()
+		}
+
 		assetInfo[market.Denom] = AssetInfo{
 			Price:            price,
 			ConversionFactor: market.ConversionFactor,

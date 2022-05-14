@@ -148,13 +148,31 @@ func main() {
 		auctionBids := GetBids(data, sdk.AccAddress(privKey.PubKey().Address()), config.ProfitMargin)
 
 		msgs := CreateBidMsgs(sdk.AccAddress(privKey.PubKey().Address()), auctionBids)
-
 		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
+
+		totalBids := sdk.Coins{}
+		for _, bid := range msgs {
+			totalBids = totalBids.Add(bid.Amount)
+
+		}
+		logger.Info(fmt.Sprintf("total for bids %s", totalBids))
+
+		auctionDups := make(map[uint64]int64)
+		for _, bid := range msgs {
+			auctionDups[bid.AuctionId] = auctionDups[bid.AuctionId] + 1
+		}
+
+		for auctionID, numDups := range auctionDups {
+			if numDups > 1 {
+				logger.Info(fmt.Sprintf("auction id %d dups %d", auctionID, numDups))
+			}
+		}
 
 		// gas limit of one bit
 		gasBaseLimit := uint64(300000)
+
 		// max gas price to get into any block
-		gasPrice := 0.25
+		gasPrice := 0.05
 
 		// aggregator for msgs between loops
 		msgBatch := []sdk.Msg{}
@@ -162,8 +180,10 @@ func main() {
 		numMsgs := len(msgs)
 
 		for i, msg := range msgs {
+			logger.Info(fmt.Sprintf("%v", msg))
 			// collect msgs
-			msgBatch = append(msgBatch, &msg)
+			msgCopy := msg
+			msgBatch = append(msgBatch, &msgCopy)
 
 			// when batch is 10 or on the last loop, send request
 			if len(msgBatch) == 10 || i == numMsgs-1 {
