@@ -172,7 +172,7 @@ func main() {
 		gasBaseLimit := uint64(300000)
 
 		// max gas price to get into any block
-		gasPrice := 0.02
+		gasPrice := 0.05
 
 		// aggregator for msgs between loops
 		msgBatch := []sdk.Msg{}
