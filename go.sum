@@ -499,7 +499,6 @@ github.com/kava-labs/go-amino v0.14.1-kava h1:mXiFIiRjc45RR+vs7cKO5Sk/kpZFapulBX
 github.com/kava-labs/go-amino v0.14.1-kava/go.mod h1:CVdr4CKxHrPCYuU60BWOsl21+ldnqXbUhh6wQc6AQIM=
 github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd h1:ACVehZL8cm1Goc4X/MCy1E2mu/38Jxoyxky2RR1XqHk=
 github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd/go.mod h1:0N9L8VKQHCOT7zCtrjikI8BlIovT7Z4uV9QWuRnndoY=
-github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69 h1:9Gfe2cRBsxJk87kSntfov4hR31sschW+OoyRXx+vYCg=
 github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69/go.mod h1:wU25qemKfQ97r0EXQBeDgBlyx0aTqyf2KQGcM2xWdCQ=
 github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b h1:pWNse+gPttYLkNgDZfkhkz9k2+wWNxFb38OpskIA130=
 github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b/go.mod h1:lUMcS7UHOYL+zXE4KUPZvGNBnpitT5nXMnRiMQzM72w=
