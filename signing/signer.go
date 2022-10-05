@@ -366,6 +366,11 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 	return responses, nil
 }
 
+// Address returns the address of the Signer
+func (s *Signer) Address() sdk.AccAddress {
+	return GetAccAddress(s.privKey)
+}
+
 // Sign signs a populated TxBuilder and returns a signed Tx and raw transaction bytes
 func Sign(
 	txConfig sdkclient.TxConfig,
