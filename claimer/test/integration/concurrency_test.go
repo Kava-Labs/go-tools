@@ -23,7 +23,7 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 
 	addrs := addresses.GetAddresses()
 
-	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL, kavaChainID)
 	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -54,12 +54,12 @@ func TestClaimConcurrentSwapsKava(t *testing.T) {
 
 	cfg := config.Config{
 		Kava: config.KavaConfig{
-			ChainID:   "kava-localnet",
+			ChainID:   kavaChainID,
 			Endpoint:  addresses.KavaGrpcURL,
 			Mnemonics: kavaUserMenmonics(addrs)[1:],
 		},
 		BinanceChain: config.BinanceChainConfig{
-			ChainID:  "Binance-Chain-Tigris",
+			ChainID:  binanceChainID,
 			Endpoint: addresses.BnbNodeURL,
 			Mnemonic: bnbUserMenmonics(addrs)[0],
 		},
