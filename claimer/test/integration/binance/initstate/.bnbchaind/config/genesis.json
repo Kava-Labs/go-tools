@@ -288,6 +288,7 @@
         "max_validators": 21,
         "min_delegation_change": "100000000",
         "min_self_delegation": "1000000000000",
+        "reward_distribution_batch_size": "1000",
         "unbonding_time": "604800000000000"
       },
       "pool": {

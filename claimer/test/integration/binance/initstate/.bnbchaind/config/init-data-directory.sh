@@ -5,8 +5,8 @@ set -e
 # It's designed to run before the chain starts to properly initialize the data directory in case `bnbchaind init` was not run.
 # This behaviour should probably live in tendermint.
 
-configDir=$HOME/.bnbchaind/config
-dataDir=$HOME/.bnbchaind/data
+configDir=$HOME/config
+dataDir=$HOME/data
 valStateFile=$dataDir/priv_validator_state.json
 
 if ! test -f "$valStateFile"; then
