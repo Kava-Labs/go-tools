@@ -149,7 +149,7 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 		Sequence:      account.GetSequence(),
 	}
 
-	_, txBytes, err := signing.Sign(swapClient.encodingConfig, privKey, txBuilder, signerData)
+	_, txBytes, err := signing.Sign(swapClient.encodingConfig.TxConfig, privKey, txBuilder, signerData)
 	if err != nil {
 		return "", err
 	}

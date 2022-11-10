@@ -126,7 +126,7 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 		Sequence:      sequence,
 	}
 
-	_, txBytes, err := signing.Sign(encodingConfig, privKey, txBuilder, signerData)
+	_, txBytes, err := signing.Sign(encodingConfig.TxConfig, privKey, txBuilder, signerData)
 	if err != nil {
 		return err
 	}
