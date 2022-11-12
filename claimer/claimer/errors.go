@@ -42,26 +42,34 @@ func (er ErrorRetryable) Error() string {
 	return er.Err.Error()
 }
 
-// Retry retries the given function for n attempts, sleeping x seconds between attempt
-func Retry(attempts int, sleep time.Duration, f func() error) {
-	var err error
+// Retry retries the given function for n attempts, sleeping x seconds between attempts.
+func Retry(attempts int, sleep time.Duration, logger log.FieldLogger, f func() (interface{}, error)) {
 	for i := 0; ; i++ {
-		err = f()
+		result, err := f()
 		if err == nil {
+			logger.WithFields(log.Fields{
+				"tx_hash": result,
+			}).Info("claim confirmed")
 			return
 		}
 
 		if i >= (attempts - 1) {
-			break
+			logger.WithFields(log.Fields{
+				"error": fmt.Errorf("timed out after %d attempts, last error: %s", attempts, err.Error()),
+			}).Error("claim abandoned")
+			return
 		}
 
 		if errors.As(err, &ErrorFailed{}) {
-			log.Error("failed: ", err.Error())
+			logger.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("claim failed")
 			return
 		}
 
 		time.Sleep(sleep)
-		log.Info("retrying: ", err.Error())
+		logger.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Debug("claim retrying")
 	}
-	log.Error(fmt.Errorf("timed out after %d attempts, last error: %s", attempts, err.Error()))
 }

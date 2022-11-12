@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/cosmos/cosmos-sdk v0.44.5
+	github.com/google/uuid v1.1.2
 	github.com/gorilla/mux v1.8.0
 	github.com/kava-labs/binance-chain-go-sdk v1.2.5-kava
 	github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd

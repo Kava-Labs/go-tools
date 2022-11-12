@@ -22,7 +22,7 @@ func main() {
 	// Load config
 	cfg, err := config.GetConfig(*configPath)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	log.SetLevel(log.DebugLevel)

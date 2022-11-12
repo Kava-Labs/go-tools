@@ -379,6 +379,7 @@ github.com/google/pprof v0.0.0-20210226084205-cbba55b83ad5/go.mod h1:kpwsk12EmLe
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/uuid v1.0.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.1.2 h1:EVhdT+1Kseyi1/pUmXKaFxYsDNy9RQYkMWRH68J/W7Y=
 github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+vpHVxEJEs9eg=
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
@@ -498,8 +499,6 @@ github.com/kava-labs/go-amino v0.14.1-kava h1:mXiFIiRjc45RR+vs7cKO5Sk/kpZFapulBX
 github.com/kava-labs/go-amino v0.14.1-kava/go.mod h1:CVdr4CKxHrPCYuU60BWOsl21+ldnqXbUhh6wQc6AQIM=
 github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd h1:ACVehZL8cm1Goc4X/MCy1E2mu/38Jxoyxky2RR1XqHk=
 github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd/go.mod h1:0N9L8VKQHCOT7zCtrjikI8BlIovT7Z4uV9QWuRnndoY=
-github.com/kava-labs/go-tools v0.0.0-20220105190757-b0a6146a2540 h1:lLNTpT6q229LXs+3o1gt2LRb71yWUJ90r+g0+4/lKo4=
-github.com/kava-labs/go-tools v0.0.0-20220105190757-b0a6146a2540/go.mod h1:aIRQs+JIplFLIVDJDV3SiLMPJk26Oe4HEeEeLQupV2k=
 github.com/kava-labs/go-tools v0.0.0-20221005173922-f83a05d33945 h1:Jgo+fVMV9G35uewFaZLqSub8MQX3rVTaBVNY+TCvR1A=
 github.com/kava-labs/go-tools v0.0.0-20221005173922-f83a05d33945/go.mod h1:jignPuIhdrfAf71cn0hJXA89BhAkUZnu01i/H1bZDGM=
 github.com/kava-labs/kava v0.15.2-0.20211214221953-de3c74c88e69/go.mod h1:wU25qemKfQ97r0EXQBeDgBlyx0aTqyf2KQGcM2xWdCQ=

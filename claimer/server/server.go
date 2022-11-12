@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -21,14 +22,16 @@ const (
 
 // ClaimJob defines a claim request received by the server
 type ClaimJob struct {
+	ID           string
 	TargetChain  string
 	SwapID       string
 	RandomNumber string
 }
 
 // NewClaimJob instantiates a new instance of ClaimJob
-func NewClaimJob(targetChain, swapID, randomNumber string) ClaimJob {
+func NewClaimJob(id, targetChain, swapID, randomNumber string) ClaimJob {
 	return ClaimJob{
+		ID:           id,
 		TargetChain:  targetChain,
 		SwapID:       swapID,
 		RandomNumber: randomNumber,
@@ -62,7 +65,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
+// claim handles requests to submit a claim for a bep3 swap
 func (s *Server) claim(w http.ResponseWriter, r *http.Request) {
+	requestID := uuid.New().String()
+	log.WithFields(log.Fields{
+		"request_id": requestID,
+		"url":        r.URL.String(),
+	}).Info("claim request received")
+
 	w.Header().Set("Content-Type", "application/json")
 
 	targetChain := r.URL.Query().Get(RestTargetChain)
@@ -91,9 +101,14 @@ func (s *Server) claim(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(fmt.Sprintf(`{"message": "claim request received, attempting to process..."}`)))
 
-	log.Info(fmt.Sprintf("Received claim request for %s on %s", swapID, targetChain))
-	claimJob := NewClaimJob(targetChain, swapID, randomNumber)
+	claimJob := NewClaimJob(requestID, targetChain, swapID, randomNumber)
 	s.Claims <- claimJob
+
+	log.WithFields(log.Fields{
+		"request_id":   requestID,
+		"swap_id":      swapID,
+		"target_chain": targetChain,
+	}).Info(fmt.Sprintf("claim request submitted"))
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
