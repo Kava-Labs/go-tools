@@ -83,14 +83,14 @@ func (d Dispatcher) Start(ctx context.Context) {
 				go func() {
 					// release the mnemonic when done
 					defer func() { kavaKeys <- key }()
-					Retry(30, 20*time.Second, logger, func() (interface{}, error) {
+					Retry(30, 20*time.Second, logger, func() (string, string, error) {
 						return claimOnKava(d.config.Kava, kavaClient, claim, key)
 					})
 				}()
 			case server.TargetBinance, server.TargetBinanceChain:
 				// TODO make binance safe for concurrent requests
 				go func() {
-					Retry(30, 20*time.Second, logger, func() (interface{}, error) {
+					Retry(30, 20*time.Second, logger, func() (string, string, error) {
 						return claimOnBinanceChain(bnbClient, claim)
 					})
 				}()
