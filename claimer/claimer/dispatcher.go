@@ -74,7 +74,7 @@ func (d Dispatcher) Start(ctx context.Context) {
 				"swap_id":      claim.SwapID,
 				"target_chain": claim.TargetChain,
 			})
-			logger.Info("claim request processing")
+			logger.Info("claim request begin processing")
 			switch strings.ToUpper(claim.TargetChain) {
 			case server.TargetKava:
 				// fetch an available mnemonic, waiting if none available // TODO should respect ctx

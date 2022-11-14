@@ -108,7 +108,7 @@ func (s *Server) claim(w http.ResponseWriter, r *http.Request) {
 		"request_id":   requestID,
 		"swap_id":      swapID,
 		"target_chain": targetChain,
-	}).Info(fmt.Sprintf("claim request submitted"))
+	}).Info(fmt.Sprintf("claim request submitted to queue for processing"))
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
