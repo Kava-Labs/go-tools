@@ -22,18 +22,6 @@ docker-login:
 	docker login --username AWS --password-stdin \
 	$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 
-.PHONY: docker-build
-docker-build:
-	$(DOCKER) build -t $(IMAGE_NAME):$(COMMIT_ID_SHORT) .
-
-.PHONY: docker-tag
-docker-tag:
-	$(DOCKER) tag $(IMAGE_NAME):$(COMMIT_ID_SHORT) $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT)
-
-.PHONY: docker-push
-docker-push:
-	$(DOCKER) push $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT)
-
 .PHONY: docker-build-and-push
 docker-build-and-push:
 	cd ..; $(DOCKER) buildx build --platform linux/amd64  -t $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT) -f claimer/Dockerfile --push .
