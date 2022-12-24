@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/cosmos/cosmos-sdk v0.44.5
 	github.com/google/uuid v1.1.2
+	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/kava-labs/binance-chain-go-sdk v1.2.5-kava
 	github.com/kava-labs/go-sdk v0.5.1-0.20211220154055-4aeeffe85ecd
@@ -56,7 +57,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/google/btree v1.0.0 // indirect
-	github.com/gorilla/handlers v1.5.1 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect

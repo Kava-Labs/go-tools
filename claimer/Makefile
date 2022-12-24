@@ -33,3 +33,7 @@ docker-tag:
 .PHONY: docker-push
 docker-push:
 	$(DOCKER) push $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT)
+
+.PHONY: docker-build-and-push
+docker-build-and-push:
+	cd ..; $(DOCKER) buildx build --platform linux/amd64  -t $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT) -f claimer/Dockerfile --push .

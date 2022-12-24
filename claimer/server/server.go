@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -57,7 +58,7 @@ func (s *Server) Start() error {
 	r.HandleFunc("/claim", s.claim).Methods(http.MethodPost)
 	r.HandleFunc("/status", s.status)
 	r.HandleFunc("/", s.notFound)
-	s.httpServer = &http.Server{Addr: ":8080", Handler: r}
+	s.httpServer = &http.Server{Addr: ":8080", Handler: handlers.CORS(handlers.AllowedOrigins([]string{"*"}))(r)}
 	return s.httpServer.ListenAndServe()
 }
 
