@@ -1,5 +1,4 @@
 //go:build integration
-// +build integration
 
 package integration
 
@@ -28,6 +27,11 @@ import (
 	"github.com/kava-labs/go-tools/claimer/test/swap"
 )
 
+const (
+	kavaChainID    = "kavalocalnet_8888-1"
+	binanceChainID = "Binance-Chain-Tigris"
+)
+
 func TestMain(m *testing.M) {
 	sdkConfig := sdk.GetConfig()
 	app.SetBech32AddressPrefixes(sdkConfig)
@@ -38,7 +42,7 @@ func TestClaimSwapKava(t *testing.T) {
 
 	addrs := addresses.GetAddresses()
 
-	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL)
+	kavaSwapper := swap.NewKavaSwapClient(addresses.KavaGrpcURL, kavaChainID)
 	swapBuilder := swap.NewDefaultSwapBuilder(
 		addrs.Kava.Deputys.Bnb.HotWallet.Mnemonic,
 		addrs.Bnb.Deputys.Bnb.HotWallet.Mnemonic,
@@ -55,12 +59,12 @@ func TestClaimSwapKava(t *testing.T) {
 
 	cfg := config.Config{
 		Kava: config.KavaConfig{
-			ChainID:   "kava-localnet",
+			ChainID:   kavaChainID,
 			Endpoint:  addresses.KavaGrpcURL,
 			Mnemonics: kavaUserMenmonics(addrs)[2:],
 		},
 		BinanceChain: config.BinanceChainConfig{
-			ChainID:  "Binance-Chain-Tigris",
+			ChainID:  binanceChainID,
 			Endpoint: addresses.BnbNodeURL,
 			Mnemonic: bnbUserMenmonics(addrs)[0],
 		},
@@ -106,12 +110,12 @@ func TestClaimSwapBnb(t *testing.T) {
 
 	cfg := config.Config{
 		Kava: config.KavaConfig{
-			ChainID:   "kava-localnet",
+			ChainID:   kavaChainID,
 			Endpoint:  addresses.KavaGrpcURL,
 			Mnemonics: kavaUserMenmonics(addrs)[2:],
 		},
 		BinanceChain: config.BinanceChainConfig{
-			ChainID:  "Binance-Chain-Tigris",
+			ChainID:  binanceChainID,
 			Endpoint: addresses.BnbNodeURL,
 			Mnemonic: bnbUserMenmonics(addrs)[0],
 		},

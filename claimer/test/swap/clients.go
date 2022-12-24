@@ -28,6 +28,7 @@ import (
 // KavaSwapClient handles sending txs to modify a kava swap on chain.
 // It can create, claim, or refund a swap.
 type KavaSwapClient struct {
+	chainID        string
 	encodingConfig params.EncodingConfig
 	GrpcClientConn *grpc.ClientConn
 	Auth           authtypes.QueryClient
@@ -35,7 +36,7 @@ type KavaSwapClient struct {
 	Bep3           bep3types.QueryClient
 }
 
-func NewKavaSwapClient(target string) KavaSwapClient {
+func NewKavaSwapClient(target string, chainID string) KavaSwapClient {
 	grpcUrl, err := url.Parse(target)
 	if err != nil {
 		log.Fatal(err)
@@ -58,6 +59,7 @@ func NewKavaSwapClient(target string) KavaSwapClient {
 	}
 
 	return KavaSwapClient{
+		chainID:        chainID,
 		encodingConfig: app.MakeEncodingConfig(),
 		GrpcClientConn: grpcConn,
 		Auth:           authtypes.NewQueryClient(grpcConn),
@@ -142,12 +144,12 @@ func (swapClient KavaSwapClient) broadcastMsg(msg sdk.Msg, signerMnemonic string
 	}
 
 	signerData := authsigning.SignerData{
-		ChainID:       "kava-localnet",
+		ChainID:       swapClient.chainID,
 		AccountNumber: account.GetAccountNumber(),
 		Sequence:      account.GetSequence(),
 	}
 
-	_, txBytes, err := signing.Sign(swapClient.encodingConfig, privKey, txBuilder, signerData)
+	_, txBytes, err := signing.Sign(swapClient.encodingConfig.TxConfig, privKey, txBuilder, signerData)
 	if err != nil {
 		return "", err
 	}

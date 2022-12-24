@@ -1,21 +1,23 @@
 services:
     bnbnode:
-        build: ./binance
+        image: "ghcr.io/bnb-chain/node:0.10.2"
         command:
             - sh
             - -c
-            - /root/.bnbchaind/config/init-data-directory.sh && bnbchaind start
+            - /data/config/init-data-directory.sh && bnbchaind start --home /data
         ports:
             - 26658:26657
         volumes:
-            - ./binance/initstate/.bnbchaind/config:/root/.bnbchaind/config
+            - ./binance/initstate/.bnbchaind/config:/data/config
+            # add cli data directory to persist keys between restarts
+            - ./binance/initstate/.bnbcli/keys:/data/.bnbcli/keys
     kavanode:
         command:
             - sh
             - -c
             - /root/.kava/config/init-data-directory.sh && kava start
               --pruning=nothing --rpc.laddr=tcp://0.0.0.0:26657
-        image: kava/kava:upgrade-v44
+        image: kava/kava:v0.19.1
         ports:
             - 26657:26657
             - 1317:1317

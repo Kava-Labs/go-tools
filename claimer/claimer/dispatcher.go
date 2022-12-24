@@ -11,6 +11,7 @@ import (
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bkeys "github.com/kava-labs/binance-chain-go-sdk/keys"
+	log "github.com/sirupsen/logrus"
 
 	kava "github.com/kava-labs/kava/app"
 
@@ -68,6 +69,12 @@ func (d Dispatcher) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case claim := <-d.jobQueue:
+			logger := log.WithFields(log.Fields{
+				"request_id":   claim.ID,
+				"swap_id":      claim.SwapID,
+				"target_chain": claim.TargetChain,
+			})
+			logger.Info("claim request begin processing")
 			switch strings.ToUpper(claim.TargetChain) {
 			case server.TargetKava:
 				// fetch an available mnemonic, waiting if none available // TODO should respect ctx
@@ -76,14 +83,14 @@ func (d Dispatcher) Start(ctx context.Context) {
 				go func() {
 					// release the mnemonic when done
 					defer func() { kavaKeys <- key }()
-					Retry(30, 20*time.Second, func() error {
+					Retry(30, 20*time.Second, logger, func() (string, string, error) {
 						return claimOnKava(d.config.Kava, kavaClient, claim, key)
 					})
 				}()
 			case server.TargetBinance, server.TargetBinanceChain:
 				// TODO make binance safe for concurrent requests
 				go func() {
-					Retry(30, 20*time.Second, func() error {
+					Retry(30, 20*time.Second, logger, func() (string, string, error) {
 						return claimOnBinanceChain(bnbClient, claim)
 					})
 				}()

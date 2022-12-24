@@ -22,7 +22,6 @@ echo "done"
 # don't exit on error, just capture exit code (https://stackoverflow.com/questions/11231937/bash-ignoring-error-for-a-particular-command)
 # use -count=1 to disable test result caching
 go test . -count=1 -tags integration -v && exitStatus=$? || exitStatus=$?
-# go test . -count=1 -tags integration -v -covermode=atomic -coverpkg="github.com/kava-labs/go-tools/deputy-claimer/claim" -coverprofile=coverage.out && exitStatus=$? || exitStatus=$?
 
 # remove the deputy and chains
 docker-compose down

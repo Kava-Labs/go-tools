@@ -5,11 +5,12 @@
       "auctions": [],
       "next_auction_id": "1",
       "params": {
-        "bid_duration": "600s",
+        "forward_bid_duration": "24h",
         "increment_collateral": "0.010000000000000000",
         "increment_debt": "0.010000000000000000",
         "increment_surplus": "0.010000000000000000",
-        "max_auction_duration": "172800s"
+        "max_auction_duration": "172800s",
+        "reverse_bid_duration": "1h"
       }
     },
     "auth": {
@@ -193,6 +194,9 @@
         "tx_sig_limit": "7",
         "tx_size_cost_per_byte": "10"
       }
+    },
+    "authz": {
+      "authorization": []
     },
     "bank": {
       "balances": [
@@ -570,8 +574,59 @@
       "validator_historical_rewards": [],
       "validator_slash_events": []
     },
+    "earn": {
+      "params": {
+        "allowed_vaults": []
+      },
+      "vault_records": [],
+      "vault_share_records": []
+    },
     "evidence": {
       "evidence": []
+    },
+    "evm": {
+      "accounts": [],
+      "params": {
+        "chain_config": {
+          "arrow_glacier_block": null,
+          "berlin_block": "0",
+          "byzantium_block": "0",
+          "constantinople_block": "0",
+          "dao_fork_block": "0",
+          "dao_fork_support": true,
+          "eip150_block": "0",
+          "eip150_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "eip155_block": "0",
+          "eip158_block": "0",
+          "homestead_block": "0",
+          "istanbul_block": "0",
+          "london_block": null,
+          "merge_fork_block": null,
+          "muir_glacier_block": "0",
+          "petersburg_block": "0"
+        },
+        "eip712_allowed_msgs": [],
+        "enable_call": true,
+        "enable_create": true,
+        "evm_denom": "akava",
+        "extra_eips": []
+      }
+    },
+    "evmutil": {
+      "accounts": [],
+      "params": {
+        "enabled_conversion_pairs": []
+      }
+    },
+    "feemarket": {
+      "block_gas": "0",
+      "params": {
+        "base_fee": "1000000000",
+        "base_fee_change_denominator": 8,
+        "elasticity_multiplier": 2,
+        "enable_height": "0",
+        "no_base_fee": true
+      }
     },
     "genutil": {
       "gen_txs": [
@@ -600,7 +655,7 @@
           },
           "body": {
             "extension_options": [],
-            "memo": "23a5601684fa065ce9d953af5fc7d4347050ad14@192.168.1.248:26656",
+            "memo": "23a5601684fa065ce9d953af5fc7d4347050ad14@172.24.0.2:26656",
             "messages": [
               {
                 "@type": "/cosmos.staking.v1beta1.MsgCreateValidator",
@@ -633,7 +688,7 @@
             "timeout_height": "0"
           },
           "signatures": [
-            "Zwixvde6iJ8pZ+MtD7mzIGbTnJene6E16dMZQT98FZcDu6eonBpu+ORDWVkQDuuHv7PjrM6UPcXMdEk9Fwa+ow=="
+            "+/RGqaHOuKa81wTTeVh2oJ8zjUxX0Te0rpU7eLSYvGIThTkBWNqw0tdqx5KS6Rv7Rksbv/FgYub5SJbS+PDCqQ=="
           ]
         }
       ]
@@ -785,6 +840,11 @@
         "accumulation_times": [],
         "multi_reward_indexes": []
       },
+      "earn_claims": [],
+      "earn_reward_state": {
+        "accumulation_times": [],
+        "multi_reward_indexes": []
+      },
       "hard_borrow_reward_state": {
         "accumulation_times": [],
         "multi_reward_indexes": []
@@ -842,6 +902,7 @@
             "start": "2020-01-01T00:00:00Z"
           }
         ],
+        "earn_reward_periods": [],
         "hard_borrow_reward_periods": [
           {
             "active": true,
@@ -870,6 +931,7 @@
             "start": "2021-07-20T00:00:00Z"
           }
         ],
+        "savings_reward_periods": [],
         "swap_reward_periods": [],
         "usdx_minting_reward_periods": [
           {
@@ -883,6 +945,11 @@
             "start": "2021-07-20T14:00:00Z"
           }
         ]
+      },
+      "savings_claims": [],
+      "savings_reward_state": {
+        "accumulation_times": [],
+        "multi_reward_indexes": []
       },
       "swap_claims": [],
       "swap_reward_state": {
@@ -904,9 +971,14 @@
     "kavadist": {
       "params": {
         "active": true,
+        "infrastructure_params": {
+          "core_rewards": [],
+          "infrastructure_periods": [],
+          "partner_rewards": []
+        },
         "periods": [
           {
-            "end": "2021-08-22T15:20:00Z",
+            "end": "2025-08-22T15:20:00Z",
             "inflation": "1.000000003022265980",
             "start": "2020-08-22T15:20:00Z"
           }
@@ -914,6 +986,7 @@
       },
       "previous_block_time": "1970-01-01T00:00:00Z"
     },
+    "liquid": {},
     "mint": {
       "minter": {
         "annual_provisions": "0.000000000000000000",
@@ -1053,84 +1126,96 @@
       },
       "posted_prices": [
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "bnb:usd",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "21.962650000000001782"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "bnb:usd:30",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "21.962650000000001782"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "btc:usd",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "10500.962650000000001782"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "btc:usd:30",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "10500.962650000000001782"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "xrp:usd",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "0.252650000000001782"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "xrp:usd:30",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "0.252650000000001782"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "busd:usd",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "1.000000000000000000"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "busd:usd:30",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "1.000000000000000000"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "usdx:usd",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "1.000000000000000000"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "kava:usd",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "2.000000000000000000"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "kava:usd:30",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "2.000000000000000000"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "hard:usd",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "0.500000000000000000"
         },
         {
-          "expiry": "2021-07-20T00:00:00Z",
+          "expiry": "2050-01-01T00:00:00Z",
           "market_id": "hard:usd:30",
           "oracle_address": "kava1acge4tcvhf3q6fh53fgwaa7vsq40wvx6wn50em",
           "price": "0.500000000000000000"
         }
       ]
+    },
+    "router": {},
+    "savings": {
+      "deposits": [],
+      "params": {
+        "supported_denoms": [
+          "usdx",
+          "ukava",
+          "hard",
+          "swp"
+        ]
+      }
     },
     "slashing": {
       "missed_blocks": [],
@@ -1175,9 +1260,11 @@
       },
       "port_id": "transfer"
     },
-    "upgrade": {}
+    "upgrade": {},
+    "validatorvesting": null,
+    "vesting": {}
   },
-  "chain_id": "kava-localnet",
+  "chain_id": "kavalocalnet_8888-1",
   "consensus_params": {
     "block": {
       "max_bytes": "200000",
@@ -1196,6 +1283,6 @@
     },
     "version": {}
   },
-  "genesis_time": "2020-09-29T16:44:00Z",
+  "genesis_time": "2022-10-20T00:00:00Z",
   "initial_height": "1"
 }

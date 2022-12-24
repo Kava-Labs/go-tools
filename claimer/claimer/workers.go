@@ -16,8 +16,6 @@ import (
 	brpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	btypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
-	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/kava-labs/go-tools/claimer/config"
 	"github.com/kava-labs/go-tools/claimer/server"
@@ -39,73 +37,77 @@ var (
 	DefaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
 )
 
-func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) error {
+func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) (string, string, error) {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
-		return NewErrorFailed(err)
+		return "", "", NewErrorFailed(err)
 	}
 
 	swap, err := bnbHTTP.GetSwapByID(swapID[:])
 	if err != nil {
 		if strings.Contains(err.Error(), "zero records") {
-			return NewErrorRetryable(fmt.Errorf("swap %s not found in state", claim.SwapID))
+			return "", "", NewErrorRetryable(fmt.Errorf("swap %s not found in state", claim.SwapID))
 		}
-		return NewErrorFailed(err)
+		return "", "", NewErrorFailed(err)
 	}
+	// return the swap recipient to add to logs to help in debugging
+	recipient := swap.To.String()
 
 	status, err := bnbHTTP.Status()
 	if err != nil {
-		return NewErrorRetryable(err)
+		return "", recipient, NewErrorRetryable(err)
 	}
 
 	if swap.Status != btypes.Open || status.SyncInfo.LatestBlockHeight >= swap.ExpireHeight {
-		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", claim.SwapID, swap.Status))
+		return "", recipient, NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", claim.SwapID, swap.Status))
 	}
 
 	randomNumber, err := hex.DecodeString(claim.RandomNumber)
 	if err != nil {
-		return NewErrorFailed(err)
+		return "", recipient, NewErrorFailed(err)
 	}
 
 	res, err := bnbHTTP.ClaimHTLT(swapID[:], randomNumber[:], brpc.Commit)
 	if err != nil {
-		return NewErrorFailed(err)
+		return "", recipient, NewErrorFailed(err)
 	}
 
 	if res.Code != 0 {
-		return NewErrorFailed(errors.New(res.Log))
+		return "", recipient, NewErrorFailed(errors.New(res.Log))
 	}
 
-	log.Info("Claim tx sent to Binance Chain: ", res.Hash.String())
-	return nil
+	return res.Hash.String(), recipient, nil
 }
 
-func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.ClaimJob, privKey cryptotypes.PrivKey) error {
+func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.ClaimJob, privKey cryptotypes.PrivKey) (string, string, error) {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
-		return NewErrorFailed(err)
+		return "", "", NewErrorFailed(err)
 	}
 
 	swap, err := client.GetSwapByID(swapID)
 	if err != nil {
-		return NewErrorRetryable(err)
+		return "", "", NewErrorRetryable(err)
 	}
+	// return the swap recipient to add to logs to help in debugging
+	recipient := swap.Recipient
+
 	if swap.Status == bep3types.SWAP_STATUS_UNSPECIFIED {
-		return NewErrorRetryable(fmt.Errorf("swap %s not found in state", swapID))
+		return "", recipient, NewErrorRetryable(fmt.Errorf("swap %s not found in state", swapID))
 	} else if swap.Status == bep3types.SWAP_STATUS_EXPIRED || swap.Status == bep3types.SWAP_STATUS_COMPLETED {
-		return NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", hex.EncodeToString(swapID), swap.Status))
+		return "", recipient, NewErrorFailed(fmt.Errorf("swap %s has status %s and cannot be claimed", hex.EncodeToString(swapID), swap.Status))
 	}
 
 	fromAddr := sdk.AccAddress(privKey.PubKey().Address())
 
 	randomNumber, err := hex.DecodeString(claim.RandomNumber)
 	if err != nil {
-		return NewErrorFailed(err)
+		return "", recipient, NewErrorFailed(err)
 	}
 
 	msg := bep3types.NewMsgClaimAtomicSwap(fromAddr.String(), swapID, randomNumber)
 	if err := msg.ValidateBasic(); err != nil {
-		return NewErrorFailed(fmt.Errorf("msg basic validation failed: \n%v", msg))
+		return "", recipient, NewErrorFailed(fmt.Errorf("msg basic validation failed: \n%v", msg))
 	}
 
 	encodingConfig := client.GetEncodingCoding()
@@ -117,7 +119,7 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 
 	sequence, accountNumber, err := getAccountNumbers(client, fromAddr)
 	if err != nil {
-		return NewErrorFailed(err)
+		return "", recipient, NewErrorFailed(err)
 	}
 
 	signerData := authsigning.SignerData{
@@ -126,9 +128,9 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 		Sequence:      sequence,
 	}
 
-	_, txBytes, err := signing.Sign(encodingConfig, privKey, txBuilder, signerData)
+	_, txBytes, err := signing.Sign(encodingConfig.TxConfig, privKey, txBuilder, signerData)
 	if err != nil {
-		return err
+		return "", recipient, NewErrorFailed(err)
 	}
 
 	request := txtypes.BroadcastTxRequest{
@@ -139,18 +141,17 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 	res, err := client.BroadcastTx(request)
 	if err != nil {
 		if broadcastErrorIsRetryable(err) {
-			return NewErrorRetryable(err)
+			return "", recipient, NewErrorRetryable(err)
 		}
-		return NewErrorFailed(err)
+		return "", recipient, NewErrorFailed(err)
 	}
 	if res.TxResponse.Code != 0 {
 		if errorCodeIsRetryable(res.TxResponse.Codespace, res.TxResponse.Code) {
-			return NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
+			return "", recipient, NewErrorRetryable(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
 		}
-		return NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
+		return "", recipient, NewErrorFailed(fmt.Errorf("tx rejected from mempool: %s", res.TxResponse.Logs))
 	}
 	err = pollWithBackoff(TxConfirmationTimeout, TxConfirmationPollInterval, func() (bool, error) {
-		log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Debug("checking for tx confirmation") // TODO use non global logger, with swap ID field already included
 		queryRes, err := client.GetTxConfirmation(res.TxResponse.TxHash)
 		if err != nil {
 			return false, nil // poll again, it can't find the tx or node is down/slow
@@ -161,10 +162,10 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 		return true, nil // return nothing, found successfully confirmed tx
 	})
 	if err != nil {
-		return NewErrorFailed(err)
+		return "", recipient, NewErrorFailed(err)
 	}
-	log.WithFields(logrus.Fields{"swapID": claim.SwapID}).Info("Claim tx sent to Kava: ", res.TxResponse.TxHash)
-	return nil
+
+	return res.TxResponse.TxHash, recipient, nil
 }
 
 func broadcastErrorIsRetryable(err error) bool {

@@ -1,11 +1,14 @@
+AWS:=aws
+AWS_REGION:=us-east-1
+AWS_ACCOUNT_ID=$(shell aws sts get-caller-identity --query 'Account' --output text)
 DOCKER:=docker
 IMAGE_NAME:=claimer
 COMMIT_ID_SHORT:=$(shell git rev-parse --short HEAD)
-DOCKER_REPOSITORY_URL:=kava/$(IMAGE_NAME)
+DOCKER_REPOSITORY_URL:=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(IMAGE_NAME)
 
 .PHONY: install
 install:
-	go install -mod=readonly ./
+	go install ./
 
 .PHONY: test-integration
 test-integration:
@@ -13,9 +16,15 @@ test-integration:
 	go vet -tags integration ./...
 	cd test/integration && ./run-tests.sh
 
+.PHONY: docker-login
+docker-login:
+	$(AWS) ecr get-login-password --region $(AWS_REGION) | \
+	docker login --username AWS --password-stdin \
+	$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+
 .PHONY: docker-build
 docker-build:
-	cd .. ; $(DOCKER) build -t $(IMAGE_NAME):$(COMMIT_ID_SHORT) -f claimer/Dockerfile .
+	$(DOCKER) build -t $(IMAGE_NAME):$(COMMIT_ID_SHORT) .
 
 .PHONY: docker-tag
 docker-tag:
