@@ -71,6 +71,7 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("Found %d auctions\n", len(auctionEndMap))
+	fmt.Printf("Auction end data: %v \n", auctionEndMap)
 
 	//
 	// fetch the final clearing data for auctions that the bidder address won
@@ -83,7 +84,7 @@ func main() {
 	}
 
 	// write auction results to file
-	csvFile, err := os.Create("auction_summary_20220612_20220620.csv")
+	csvFile, err := os.Create("auction_summary_20221215_20221217.csv")
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
@@ -92,29 +93,31 @@ func main() {
 
 	w := csv.NewWriter(csvFile)
 	defer w.Flush()
-	err = w.Write([]string{"Asset Purchased", "Amount Purchase", "Asset Paid", "Amount Paid"})
+	err = w.Write([]string{"Asset Purchased", "Amount Purchased", "Asset Paid", "Amount Paid", "Initial Lot", "Liquidated Account", "Winning Bidder Account"})
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
 
-	for _, apMap := range auctionClearingMap {
-		for _, ap := range apMap {
-			row := []string{
-				denomMap[ap.AmountPurchased.Denom],
-				ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
-				denomMap[ap.AmountPaid.Denom],
-				ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPaid.Denom].ToDec())).String()}
-			err := w.Write(row)
-			if err != nil {
-				logger.Error(err.Error())
-				os.Exit(1)
-			}
+	for _, ap := range auctionClearingMap {
+		row := []string{
+			denomMap[ap.AmountPurchased.Denom],
+			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
+			denomMap[ap.AmountPaid.Denom],
+			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPaid.Denom].ToDec())).String(),
+			ap.InitialLot.String(),
+			ap.LiquidatedAccount,
+			ap.WinningBidder,
+		}
+		err := w.Write(row)
+		if err != nil {
+			logger.Error(err.Error())
+			os.Exit(1)
 		}
 	}
 
 	// write in-bound transfers to file
-	csvFile, err = os.Create("auction_transfers_20220612_20220620.csv")
+	csvFile, err = os.Create("auction_transfers_20221215_20221217.csv")
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)

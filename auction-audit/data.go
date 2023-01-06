@@ -84,11 +84,11 @@ type auctionPair struct {
 	height int64
 }
 
-func GetAuctionClearingData(client GrpcClient, endMap map[uint64]int64, bidder sdk.AccAddress) (map[string]map[string]auctionProceeds, error) {
+func GetAuctionClearingData(client GrpcClient, endMap map[uint64]int64, bidder sdk.AccAddress) (map[uint64]auctionProceeds, error) {
 	rawOutput := make(chan *auctiontypes.QueryAuctionResponse)
 	pairs := make(chan auctionPair)
 
-	clearingMap := make(map[string]map[string]auctionProceeds)
+	clearingMap := make(map[uint64]auctionProceeds)
 
 	// buffer output and order
 	go func() {
@@ -109,22 +109,24 @@ func GetAuctionClearingData(client GrpcClient, endMap map[uint64]int64, bidder s
 		client.cdc.UnpackAny(res.Auction, &auc)
 		col, ok := auc.(*auctiontypes.CollateralAuction)
 		if ok {
-			if col.Bidder.Equals(bidder) {
-				_, ok := clearingMap[col.GetLot().Denom]
-				if ok {
-					ap, ok2 := clearingMap[col.GetLot().Denom][col.GetBid().Denom]
-					if ok2 {
-						ap.AmountPurchased = ap.AmountPurchased.Add(col.GetLot())
-						ap.AmountPaid = ap.AmountPaid.Add(col.GetBid())
-						clearingMap[col.GetLot().Denom][col.GetBid().Denom] = ap
-					} else {
-						clearingMap[col.GetLot().Denom][col.GetBid().Denom] = auctionProceeds{AmountPurchased: col.GetLot(), AmountPaid: col.GetBid()}
-					}
-				} else {
-					clearingMap[col.GetLot().Denom] = make(map[string]auctionProceeds)
-					clearingMap[col.GetLot().Denom][col.GetBid().Denom] = auctionProceeds{AmountPurchased: col.GetLot(), AmountPaid: col.GetBid()}
+			ap, ok2 := clearingMap[col.GetID()]
+			if ok2 {
+				ap.AmountPurchased = ap.AmountPurchased.Add(col.GetLot())
+				ap.AmountPaid = ap.AmountPaid.Add(col.GetBid())
+				ap.InitialLot = sdk.Coin{Denom: col.GetLot().Denom, Amount: col.GetLotReturns().Weights[0]}
+				ap.LiquidatedAccount = col.GetLotReturns().Addresses[0].String()
+				ap.WinningBidder = col.GetBidder().String()
+				clearingMap[col.GetID()] = ap
+			} else {
+				clearingMap[col.GetID()] = auctionProceeds{
+					AmountPurchased:   col.GetLot(),
+					AmountPaid:        col.GetBid(),
+					InitialLot:        sdk.Coin{Denom: col.GetLot().Denom, Amount: col.GetLotReturns().Weights[0]},
+					LiquidatedAccount: col.GetLotReturns().Addresses[0].String(),
+					WinningBidder:     col.GetBidder().String(),
 				}
 			}
+
 		}
 		if i == len(endMap) {
 			break
@@ -218,8 +220,11 @@ func sortBlocks(unsorted <-chan *tmservice.GetBlockByHeightResponse, sorted chan
 }
 
 type auctionProceeds struct {
-	AmountPurchased sdk.Coin
-	AmountPaid      sdk.Coin
+	AmountPurchased   sdk.Coin
+	AmountPaid        sdk.Coin
+	InitialLot        sdk.Coin
+	LiquidatedAccount string
+	WinningBidder     string
 }
 
 type BlockHeap []*tmservice.GetBlockByHeightResponse
