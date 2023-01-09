@@ -64,19 +64,28 @@ func main() {
 	//
 	// crawl blocks to find auctions and inbound transfers
 	//
-	auctionEndMap, transferMap, err := GetAuctionEndData(grpcClient, config.StartHeight, config.EndHeight, config.BidderAddress)
+	auctionIdToHeightMap, transferMap, err := GetAuctionEndData(
+		grpcClient,
+		config.StartHeight,
+		config.EndHeight,
+		config.BidderAddress,
+	)
 	if err != nil {
 		logger.Error("failed to fetch auction end data")
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	fmt.Printf("Found %d auctions\n", len(auctionEndMap))
-	fmt.Printf("Auction end data: %v \n", auctionEndMap)
+	fmt.Printf("Found %d auctions\n", len(auctionIdToHeightMap))
+	fmt.Printf("Auction end data: %v \n", auctionIdToHeightMap)
 
 	//
 	// fetch the final clearing data for auctions that the bidder address won
 	//
-	auctionClearingMap, err := GetAuctionClearingData(grpcClient, auctionEndMap, config.BidderAddress)
+	auctionClearingMap, err := GetAuctionClearingData(
+		grpcClient,
+		auctionIdToHeightMap,
+		config.BidderAddress,
+	)
 	if err != nil {
 		logger.Error("failed to fetch auction clearing data")
 		logger.Error(err.Error())
@@ -93,7 +102,15 @@ func main() {
 
 	w := csv.NewWriter(csvFile)
 	defer w.Flush()
-	err = w.Write([]string{"Asset Purchased", "Amount Purchased", "Asset Paid", "Amount Paid", "Initial Lot", "Liquidated Account", "Winning Bidder Account"})
+	err = w.Write([]string{
+		"Asset Purchased",
+		"Amount Purchased",
+		"Asset Paid",
+		"Amount Paid",
+		"Initial Lot",
+		"Liquidated Account",
+		"Winning Bidder Account",
+	})
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
@@ -146,33 +163,4 @@ func main() {
 			}
 		}
 	}
-
-}
-
-var denomMap = map[string]string{
-	"usdx":  "USDX",
-	"bnb":   "BNB",
-	"btcb":  "BTC",
-	"hard":  "HARD",
-	"ukava": "KAVA",
-	"xrpb":  "XRP",
-	"busd":  "BUSD",
-	"ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2": "ATOM",
-	"swp": "SWP",
-	"ibc/799FDD409719A1122586A629AE8FCA17380351A51C1F47A80A1B8E7F2A491098": "AKT",
-	"ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C": "UST",
-}
-
-var conversionMap = map[string]sdk.Int{
-	"usdx":  sdk.NewInt(1000000),
-	"bnb":   sdk.NewInt(100000000),
-	"btcb":  sdk.NewInt(100000000),
-	"hard":  sdk.NewInt(1000000),
-	"ukava": sdk.NewInt(1000000),
-	"xrpb":  sdk.NewInt(100000000),
-	"busd":  sdk.NewInt(100000000),
-	"ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2": sdk.NewInt(1000000),
-	"swp": sdk.NewInt(1000000),
-	"ibc/799FDD409719A1122586A629AE8FCA17380351A51C1F47A80A1B8E7F2A491098": sdk.NewInt(1000000),
-	"ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C": sdk.NewInt(1000000),
 }

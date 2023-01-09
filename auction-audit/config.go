@@ -50,7 +50,7 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 
 	bidderStr := loader.Get(bidderEnvKey)
 	if bidderStr == "" {
-		return Config{}, fmt.Errorf("%s not set", bidderStr)
+		return Config{}, fmt.Errorf("%s not set", bidderEnvKey)
 	}
 	acc, err := sdk.AccAddressFromBech32(bidderStr)
 	if err != nil {

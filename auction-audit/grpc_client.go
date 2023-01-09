@@ -8,7 +8,10 @@ import (
 	sdkClient "github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/codec"
+	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
+	cdptypes "github.com/kava-labs/kava/x/cdp/types"
+	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -19,6 +22,9 @@ type GrpcClient struct {
 	GrpcClientConn *grpc.ClientConn
 	Tm             tmservice.ServiceClient
 	Auction        auctiontypes.QueryClient
+	Tx             txtypes.ServiceClient
+	CDP            cdptypes.QueryClient
+	Pricefeed      pricefeedtypes.QueryClient
 }
 
 func NewGrpcClient(target string, cdc codec.Codec, txConfig sdkClient.TxConfig) GrpcClient {
@@ -49,5 +55,8 @@ func NewGrpcClient(target string, cdc codec.Codec, txConfig sdkClient.TxConfig) 
 		GrpcClientConn: grpcConn,
 		Tm:             tmservice.NewServiceClient(grpcConn),
 		Auction:        auctiontypes.NewQueryClient(grpcConn),
+		Tx:             txtypes.NewServiceClient(grpcConn),
+		CDP:            cdptypes.NewQueryClient(grpcConn),
+		Pricefeed:      pricefeedtypes.NewQueryClient(grpcConn),
 	}
 }
