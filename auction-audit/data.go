@@ -3,16 +3,13 @@ package main
 import (
 	"container/heap"
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
-	"github.com/cosmos/cosmos-sdk/types/tx"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
-	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -24,130 +21,6 @@ const (
 // 	heights := make(chan int64)
 // 	rawOutput := make(chan)
 // }
-
-type CDPAuctionPair struct {
-	CdpId     sdk.Int
-	AuctionId sdk.Int
-}
-
-func getCdpAuctionPairFromTxResponse(txResponse *sdk.TxResponse) (CDPAuctionPair, error) {
-	var cdpId sdk.Int
-	var auctionId sdk.Int
-	cdpIdFound := false
-	auctionIdFound := false
-
-	for _, log := range txResponse.Logs {
-		for _, event := range log.Events {
-			if event.Type != cdptypes.EventTypeCdpLiquidation &&
-				event.Type != auctiontypes.EventTypeAuctionStart {
-				continue
-			}
-
-			for _, attr := range event.Attributes {
-				if attr.Key == cdptypes.AttributeKeyCdpID {
-					id, ok := sdk.NewIntFromString(attr.Value)
-					if !ok {
-						return CDPAuctionPair{}, fmt.Errorf("failed to parse cdp id: %s", attr.Value)
-					}
-
-					cdpId = id
-					cdpIdFound = true
-				}
-
-				if attr.Key == auctiontypes.AttributeKeyAuctionID {
-					id, ok := sdk.NewIntFromString(attr.Value)
-					if !ok {
-						return CDPAuctionPair{}, fmt.Errorf("failed to parse auction id: %s", attr.Value)
-					}
-
-					auctionId = id
-					auctionIdFound = true
-				}
-			}
-		}
-	}
-
-	if !cdpIdFound || !auctionIdFound {
-		return CDPAuctionPair{},
-			fmt.Errorf("failed to find cdp and/or auction id in tx response: %s", txResponse.TxHash)
-	}
-
-	return CDPAuctionPair{
-		CdpId:     cdpId,
-		AuctionId: auctionId,
-	}, nil
-}
-
-func GetAuctionSourceCDP(
-	ctx context.Context,
-	client GrpcClient,
-	height int64,
-	auctionID int64,
-) (cdptypes.CDPResponse, error) {
-	res, err := client.Tx.GetTxsEvent(
-		ctx,
-		&tx.GetTxsEventRequest{
-			Events: []string{
-				// Query service concats multiple events with AND
-				"cdp_liquidation.module='cdp'",
-				fmt.Sprintf(
-					"tx.height=%d",
-					height,
-				),
-			},
-		},
-	)
-	if err != nil {
-		return cdptypes.CDPResponse{}, err
-	}
-
-	var pairs []CDPAuctionPair
-
-	// Get corresponding CDP from liquidate event
-	for _, tsRes := range res.TxResponses {
-		// There can be multiple liquidations in a single block
-		pair, err := getCdpAuctionPairFromTxResponse(tsRes)
-		if err != nil {
-			// There must be a matching event in every TxResponse, as we are
-			// querying for the matching event.
-			return cdptypes.CDPResponse{}, err
-		}
-
-		pairs = append(pairs, pair)
-	}
-
-	// Find matching CDP
-	var matchingCdpId sdk.Int
-	found := false
-	for _, pair := range pairs {
-		if pair.AuctionId.Equal(sdk.NewInt(auctionID)) {
-			matchingCdpId = pair.CdpId
-			found = true
-		}
-	}
-
-	if !found {
-		return cdptypes.CDPResponse{}, fmt.Errorf("failed to find matching CDP for auction ID %d", auctionID)
-	}
-
-	// Query CDP at height 1 before liquidation, as it is deleted when liquidated
-	queryCtx := ctxAtHeight(height - 1)
-
-	// Fetch CDP to determine original value prior to liquidation
-	cdpRes, err := client.CDP.Cdps(queryCtx, &cdptypes.QueryCdpsRequest{
-		ID: uint64(matchingCdpId.Int64()),
-	})
-
-	if err != nil {
-		return cdptypes.CDPResponse{}, err
-	}
-
-	if len(cdpRes.Cdps) == 0 {
-		return cdptypes.CDPResponse{}, fmt.Errorf("cdp %d was not found at block %d", matchingCdpId.Int64(), height-1)
-	}
-
-	return cdpRes.Cdps[0], nil
-}
 
 func GetAuctionEndData(
 	client GrpcClient,

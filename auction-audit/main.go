@@ -78,6 +78,8 @@ func main() {
 	fmt.Printf("Found %d auctions\n", len(auctionIdToHeightMap))
 	fmt.Printf("Auction end data: %v \n", auctionIdToHeightMap)
 
+	// Fetch initial assets pre-liquidation, from CDP or HARD
+
 	//
 	// fetch the final clearing data for auctions that the bidder address won
 	//
