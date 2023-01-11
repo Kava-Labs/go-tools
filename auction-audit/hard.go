@@ -137,8 +137,8 @@ func GetHardDepositAtHeight(
 func GetAuctionSourceHARD(
 	ctx context.Context,
 	client GrpcClient,
-	auctionID int64,
-) (hardtypes.DepositResponse, error) {
+	auctionID uint64,
+) (hardtypes.DepositResponse, int64, error) {
 	res, err := client.Tx.GetTxsEvent(
 		ctx,
 		&tx.GetTxsEventRequest{
@@ -152,20 +152,23 @@ func GetAuctionSourceHARD(
 		},
 	)
 	if err != nil {
-		return hardtypes.DepositResponse{}, err
+		return hardtypes.DepositResponse{}, 0, err
 	}
 
 	pairs, err := getHardAuctionPairs(res.TxResponses)
 	if err != nil {
-		return hardtypes.DepositResponse{}, err
+		return hardtypes.DepositResponse{}, 0, err
 	}
 
 	// Find matching address
-	matchingPair, found := pairs.FindPairWithAuctionID(sdk.NewInt(auctionID))
+	matchingPair, found := pairs.FindPairWithAuctionID(sdk.NewIntFromUint64(auctionID))
 	if !found {
-		return hardtypes.DepositResponse{}, fmt.Errorf("failed to find matching hard deposit for auction ID %d", auctionID)
+		return hardtypes.DepositResponse{}, 0, fmt.Errorf("failed to find matching hard deposit for auction ID %d", auctionID)
 	}
 
 	// Deposit deleted when liquidated, query at previous block
-	return GetHardDepositAtHeight(client, matchingPair.Height-1, matchingPair.Address)
+	depositHeight := matchingPair.Height - 1
+
+	deposit, err := GetHardDepositAtHeight(client, depositHeight, matchingPair.Address)
+	return deposit, depositHeight, err
 }

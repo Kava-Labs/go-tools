@@ -22,12 +22,13 @@ func TestGetAuctionSourceHardDeposit(t *testing.T) {
 		encodingConfig.TxConfig,
 	)
 
-	sourceDeposit, err := main.GetAuctionSourceHARD(
+	sourceDeposit, height, err := main.GetAuctionSourceHARD(
 		context.Background(),
 		grpcClient,
 		13807,
 	)
 	require.NoError(t, err)
 
+	require.Equal(t, 0, height)
 	require.Equal(t, "kava1dpujcdhzfxykgzahuzzn9ywwdrlga5z2ggud6k", sourceDeposit.Depositor)
 }

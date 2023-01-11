@@ -78,8 +78,6 @@ func main() {
 	fmt.Printf("Found %d auctions\n", len(auctionIdToHeightMap))
 	fmt.Printf("Auction end data: %v \n", auctionIdToHeightMap)
 
-	// Fetch initial assets pre-liquidation, from CDP or HARD
-
 	//
 	// fetch the final clearing data for auctions that the bidder address won
 	//
@@ -93,6 +91,10 @@ func main() {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
+
+	fullAuctionDataMap, err := GetAuctionValueData(context.Background(), grpcClient, auctionClearingMap)
+
+	// Fetch initial assets pre-liquidation, from CDP or HARD
 
 	// write auction results to file
 	csvFile, err := os.Create("auction_summary_20221215_20221217.csv")

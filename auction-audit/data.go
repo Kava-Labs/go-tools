@@ -3,6 +3,8 @@ package main
 import (
 	"container/heap"
 	"context"
+	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
@@ -10,12 +12,17 @@ import (
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
+	cdptypes "github.com/kava-labs/kava/x/cdp/types"
+	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	"google.golang.org/grpc/metadata"
 )
 
 const (
 	concurrency = 100
 )
+
+// AuctionIDToHeightMap maps auction ID -> block height
+type AuctionIDToHeightMap map[uint64]int64
 
 // func GetInboundTransfers(client GrpcClient, start, end int64) (map[*sdk.AccAddress]sdk.Coins, error) {
 // 	heights := make(chan int64)
@@ -26,7 +33,7 @@ func GetAuctionEndData(
 	client GrpcClient,
 	start, end int64,
 	bidder sdk.AccAddress,
-) (map[uint64]int64, map[string]sdk.Coins, error) {
+) (AuctionIDToHeightMap, map[string]sdk.Coins, error) {
 	// communication setup: heights -> worker pool -> raw ouput -> buffer -> sorted output
 	heights := make(chan int64)
 	rawOutput := make(chan *tmservice.GetBlockByHeightResponse)
@@ -49,7 +56,7 @@ func GetAuctionEndData(
 	go sortBlocks(rawOutput, sortedOutput, start)
 
 	// auction ID -> block height
-	aucMap := make(map[uint64]int64)
+	aucMap := make(AuctionIDToHeightMap)
 	// bidder address -> amount
 	transferMap := make(map[string]sdk.Coins)
 
@@ -57,25 +64,21 @@ func GetAuctionEndData(
 		for _, txBytes := range output.Block.Data.Txs {
 			tx, err := client.Decoder.TxDecoder()(txBytes)
 			if err != nil {
-				return map[uint64]int64{}, map[string]sdk.Coins{}, err
+				return AuctionIDToHeightMap{}, map[string]sdk.Coins{}, err
 			}
 
 			msgs := tx.GetMsgs()
 			for _, msg := range msgs {
-				bidMsg, ok := msg.(*auctiontypes.MsgPlaceBid)
-				if ok {
-					id := bidMsg.AuctionId
+				switch msg := msg.(type) {
+				case *auctiontypes.MsgPlaceBid:
+					id := msg.AuctionId
 					aucMap[id] = output.Block.Header.Height
-				}
-				sendMsg, ok := msg.(*banktypes.MsgSend)
-				if ok {
-					if sendMsg.ToAddress == bidder.String() {
-						sendAmount, found := transferMap[sendMsg.FromAddress]
-						if found {
-							transferMap[sendMsg.FromAddress] = sendAmount.Add(sendMsg.Amount...)
-						} else {
-							transferMap[sendMsg.FromAddress] = sendMsg.Amount
-						}
+				case *banktypes.MsgSend:
+					if msg.ToAddress == bidder.String() {
+						// Default empty coins if not found
+						sendAmount := transferMap[msg.FromAddress]
+
+						transferMap[msg.FromAddress] = sendAmount.Add(msg.Amount...)
 					}
 				}
 			}
@@ -117,32 +120,35 @@ func GetAuctionClearingData(
 			pairs <- auctionPair{id: id, height: height}
 		}
 	}()
+
 	i := 1
 	for res := range rawOutput {
 		var auc auctiontypes.Auction
 		client.cdc.UnpackAny(res.Auction, &auc)
 
-		// Get prices after auction ends
+		// TODO: Get prices after auction ends
 
 		col, ok := auc.(*auctiontypes.CollateralAuction)
 		if ok {
-			ap, ok2 := clearingMap[col.GetID()]
-			if ok2 {
+			ap, found := clearingMap[col.GetID()]
+
+			if found {
 				ap.AmountPurchased = ap.AmountPurchased.Add(col.GetLot())
 				ap.AmountPaid = ap.AmountPaid.Add(col.GetBid())
-				ap.InitialLot = sdk.Coin{Denom: col.GetLot().Denom, Amount: col.GetLotReturns().Weights[0]}
+				ap.InitialLot = sdk.NewCoin(col.GetLot().Denom, col.GetLotReturns().Weights[0])
 				ap.LiquidatedAccount = col.GetLotReturns().Addresses[0].String()
 				ap.WinningBidder = col.GetBidder().String()
+
 				clearingMap[col.GetID()] = ap
 			} else {
 				clearingMap[col.GetID()] = auctionProceeds{
+					ID:                col.GetID(),
 					AmountPurchased:   col.GetLot(),
 					AmountPaid:        col.GetBid(),
-					InitialLot:        sdk.Coin{Denom: col.GetLot().Denom, Amount: col.GetLotReturns().Weights[0]},
+					InitialLot:        sdk.NewCoin(col.GetLot().Denom, col.GetLotReturns().Weights[0]),
 					LiquidatedAccount: col.GetLotReturns().Addresses[0].String(),
 					WinningBidder:     col.GetBidder().String(),
-					// TODO: New fields
-					SourceModule: auc.GetInitiator(),
+					SourceModule:      auc.GetInitiator(),
 				}
 			}
 
@@ -152,7 +158,108 @@ func GetAuctionClearingData(
 		}
 		i++
 	}
+
 	return clearingMap, nil
+}
+
+type auctionValueQueryResponse struct {
+	auctionProceeds
+
+	height   int64
+	response interface{}
+}
+
+// GetAuctionValueData populates a map with before/after auction USD value data
+func GetAuctionValueData(
+	ctx context.Context,
+	client GrpcClient,
+	clearingData map[uint64]auctionProceeds,
+) (map[uint64]fullAuctionProceeds, error) {
+	responseChan := make(chan auctionValueQueryResponse)
+	requestChan := make(chan auctionProceeds)
+
+	dataMap := make(map[uint64]fullAuctionProceeds)
+
+	// spawn pool of workers
+	for i := 0; i < concurrency; i++ {
+		go fetchAuctionSourceValue(ctx, client, requestChan, responseChan)
+	}
+	// write heights to input channel
+	go func() {
+		for _, data := range clearingData {
+			requestChan <- data
+		}
+	}()
+
+	for auctionRes := range responseChan {
+		preLiquidationAmount := sdk.NewCoins()
+		var preLiquidationHeight int64
+
+		switch deposit := auctionRes.response.(type) {
+		case hardtypes.DepositResponse:
+			preLiquidationAmount = deposit.Amount
+		case *cdptypes.CDPResponse:
+			preLiquidationAmount = sdk.NewCoins(deposit.Collateral)
+		default:
+			return nil, fmt.Errorf("invalid query response type %T", auctionRes.response)
+		}
+
+		// Get USD value
+		beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(client, preLiquidationHeight, preLiquidationAmount, Spot)
+		if err != nil {
+			return nil, err
+		}
+
+		dataMap[auctionRes.ID] = fullAuctionProceeds{
+			auctionProceeds: auctionRes.auctionProceeds,
+			ValueBeforeUsd:  beforeUsdValue,
+		}
+	}
+
+	return dataMap, nil
+}
+
+func fetchAuctionSourceValue(
+	ctx context.Context,
+	client GrpcClient,
+	requestChan chan auctionProceeds,
+	responseChan chan auctionValueQueryResponse,
+) {
+	for req := range requestChan {
+		for {
+			switch req.SourceModule {
+			case "hard":
+				hardDeposit, height, err := GetAuctionSourceHARD(ctx, client, req.ID)
+				if err != nil {
+					// Print and retry
+					fmt.Fprintf(os.Stderr, "Error fetching auction source HARD deposit: %s", err)
+					continue
+				}
+
+				responseChan <- auctionValueQueryResponse{
+					auctionProceeds: req,
+
+					height:   height,
+					response: hardDeposit,
+				}
+			case "cdp":
+				cdpDeposit, height, err := GetAuctionSourceCDP(ctx, client, req.ID)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error fetching auction source CDP deposit: %s", err)
+					continue
+				}
+
+				responseChan <- auctionValueQueryResponse{
+					auctionProceeds: req,
+
+					height:   height,
+					response: cdpDeposit,
+				}
+			default:
+				fmt.Fprintf(os.Stderr, "Unhandled auction source module: %s", req.SourceModule)
+			}
+		}
+	}
 }
 
 // func GetAuctionAtHeight(client GrpcClient, id uint64, height int64) (auctiontypes.Auction, error) {
@@ -246,15 +353,21 @@ func sortBlocks(
 	}
 }
 
+type fullAuctionProceeds struct {
+	auctionProceeds
+
+	ValueBeforeUsd sdk.Dec
+	ValueAfterUsd  sdk.Dec
+	PercentLoss    sdk.Dec
+}
+
 type auctionProceeds struct {
+	ID                uint64
 	AmountPurchased   sdk.Coin
 	AmountPaid        sdk.Coin
 	InitialLot        sdk.Coin
 	LiquidatedAccount string
 	WinningBidder     string
-	ValueBeforeUsd    sdk.Int
-	ValueAfterUsd     sdk.Int
-	PercentLoss       sdk.Dec
 	SourceModule      string
 }
 

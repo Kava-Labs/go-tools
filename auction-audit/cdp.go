@@ -156,8 +156,8 @@ func GetCDPAtHeight(
 func GetAuctionSourceCDP(
 	ctx context.Context,
 	client GrpcClient,
-	auctionID int64,
-) (cdptypes.CDPResponse, error) {
+	auctionID uint64,
+) (cdptypes.CDPResponse, int64, error) {
 	res, err := client.Tx.GetTxsEvent(
 		ctx,
 		&tx.GetTxsEventRequest{
@@ -172,7 +172,7 @@ func GetAuctionSourceCDP(
 		},
 	)
 	if err != nil {
-		return cdptypes.CDPResponse{}, err
+		return cdptypes.CDPResponse{}, 0, err
 	}
 
 	var pairs CDPAuctionPairs
@@ -186,19 +186,22 @@ func GetAuctionSourceCDP(
 		if err != nil {
 			// There must be a matching event in every TxResponse, as we are
 			// querying for the matching event.
-			return cdptypes.CDPResponse{}, err
+			return cdptypes.CDPResponse{}, 0, err
 		}
 
 		pairs = append(pairs, pair)
 	}
 
 	// Get the corresponding CDP ID with the auction ID
-	matchingPair, found := pairs.FindPairWithAuctionID(sdk.NewInt(auctionID))
+	matchingPair, found := pairs.FindPairWithAuctionID(sdk.NewIntFromUint64(auctionID))
 
 	if !found {
-		return cdptypes.CDPResponse{}, fmt.Errorf("failed to find matching CDP for auction ID %d", auctionID)
+		return cdptypes.CDPResponse{}, 0, fmt.Errorf("failed to find matching CDP for auction ID %d", auctionID)
 	}
 
 	// Query CDP at height 1 before liquidation, as it is deleted when liquidated
-	return GetCDPAtHeight(client, matchingPair.Height-1, matchingPair.CdpId.Uint64())
+	depositHeight := matchingPair.Height - 1
+
+	cdp, err := GetCDPAtHeight(client, depositHeight, matchingPair.CdpId.Uint64())
+	return cdp, depositHeight, err
 }
