@@ -1,6 +1,10 @@
 package main
 
-import sdk "github.com/cosmos/cosmos-sdk/types"
+import (
+	"fmt"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+)
 
 var denomMap = map[string]string{
 	"usdx":  "USDX",
@@ -14,6 +18,44 @@ var denomMap = map[string]string{
 	"swp": "SWP",
 	"ibc/799FDD409719A1122586A629AE8FCA17380351A51C1F47A80A1B8E7F2A491098": "AKT",
 	"ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C": "UST",
+}
+
+var denomToPriceMarketMap = map[string]string{
+	"usdx":  "usdx",
+	"bnb":   "bnb",
+	"btcb":  "btc",
+	"hard":  "hard",
+	"ukava": "kava",
+	"xrpb":  "xrp",
+	"busd":  "busd",
+	"ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2": "atom",
+	"swp": "swp",
+	"ibc/799FDD409719A1122586A629AE8FCA17380351A51C1F47A80A1B8E7F2A491098": "akt",
+	"ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C": "ust",
+}
+
+type PriceType int
+
+const (
+	Spot PriceType = iota + 1
+	Twap30
+)
+
+func getMarketID(denom string, priceType PriceType) (string, error) {
+	market_name, found := denomToPriceMarketMap[denom]
+	if !found {
+		return "", fmt.Errorf("could not find market id for denom %s", denom)
+	}
+
+	if priceType == Spot {
+		return fmt.Sprintf("%s:usd", market_name), nil
+	}
+
+	if priceType == Twap30 {
+		return fmt.Sprintf("%s:usd:30", market_name), nil
+	}
+
+	return "", fmt.Errorf("invalid priceType")
 }
 
 var conversionMap = map[string]sdk.Int{

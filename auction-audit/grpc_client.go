@@ -11,6 +11,7 @@ import (
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
+	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -24,6 +25,7 @@ type GrpcClient struct {
 	Auction        auctiontypes.QueryClient
 	Tx             txtypes.ServiceClient
 	CDP            cdptypes.QueryClient
+	Hard           hardtypes.QueryClient
 	Pricefeed      pricefeedtypes.QueryClient
 }
 
@@ -57,6 +59,7 @@ func NewGrpcClient(target string, cdc codec.Codec, txConfig sdkClient.TxConfig) 
 		Auction:        auctiontypes.NewQueryClient(grpcConn),
 		Tx:             txtypes.NewServiceClient(grpcConn),
 		CDP:            cdptypes.NewQueryClient(grpcConn),
+		Hard:           hardtypes.NewQueryClient(grpcConn),
 		Pricefeed:      pricefeedtypes.NewQueryClient(grpcConn),
 	}
 }

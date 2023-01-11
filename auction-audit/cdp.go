@@ -16,6 +16,18 @@ type CDPAuctionPair struct {
 	AuctionId sdk.Int
 }
 
+type CDPAuctionPairs []CDPAuctionPair
+
+func (pairs CDPAuctionPairs) FindPairWithAuctionID(auctionID sdk.Int) (CDPAuctionPair, bool) {
+	for _, pair := range pairs {
+		if pair.AuctionId.Equal(auctionID) {
+			return pair, true
+		}
+	}
+
+	return CDPAuctionPair{}, false
+}
+
 type AttributesMap map[string]string
 
 func AttributesToMap(attrs []sdk.Attribute) AttributesMap {
@@ -163,7 +175,7 @@ func GetAuctionSourceCDP(
 		return cdptypes.CDPResponse{}, err
 	}
 
-	var pairs []CDPAuctionPair
+	var pairs CDPAuctionPairs
 
 	// Get corresponding CDP from liquidate event
 	for _, tsRes := range res.TxResponses {
@@ -180,15 +192,8 @@ func GetAuctionSourceCDP(
 		pairs = append(pairs, pair)
 	}
 
-	// Find matching CDP
-	var matchingPair CDPAuctionPair
-	found := false
-	for _, pair := range pairs {
-		if pair.AuctionId.Equal(sdk.NewInt(auctionID)) {
-			matchingPair = pair
-			found = true
-		}
-	}
+	// Get the corresponding CDP ID with the auction ID
+	matchingPair, found := pairs.FindPairWithAuctionID(sdk.NewInt(auctionID))
 
 	if !found {
 		return cdptypes.CDPResponse{}, fmt.Errorf("failed to find matching CDP for auction ID %d", auctionID)
