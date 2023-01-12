@@ -32,3 +32,25 @@ type BaseAuctionProceedsMap map[uint64]BaseAuctionProceeds
 
 // AuctionProceedsMap maps auction ID -> AuctionProceeds
 type AuctionProceedsMap map[uint64]AuctionProceeds
+
+// ToRecords converts AuctionProceedsMap to a 2D string array
+func (ap AuctionProceedsMap) ToRecords() [][]string {
+	var records [][]string
+
+	for _, ap := range ap {
+		records = append(records, []string{
+			DenomMap[ap.AmountPurchased.Denom],
+			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(ConversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
+			DenomMap[ap.AmountPaid.Denom],
+			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(ConversionMap[ap.AmountPaid.Denom].ToDec())).String(),
+			ap.InitialLot.String(),
+			ap.LiquidatedAccount,
+			ap.WinningBidder,
+			ap.UsdValueBefore.String(),
+			ap.UsdValueAfter.String(),
+			ap.PercentLoss.String(),
+		})
+	}
+
+	return records
+}

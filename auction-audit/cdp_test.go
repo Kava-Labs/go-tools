@@ -6,13 +6,14 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	main "github.com/kava-labs/go-tools/auction-audit"
+	"github.com/kava-labs/go-tools/auction-audit/config"
 	"github.com/kava-labs/kava/app"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetAuctionSourceCDP(t *testing.T) {
 	app.SetSDKConfig()
-	config, err := main.LoadConfig(&main.EnvLoader{})
+	config, err := config.LoadConfig(&config.EnvLoader{})
 	require.NoError(t, err)
 
 	encodingConfig := app.MakeEncodingConfig()

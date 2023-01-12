@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	main "github.com/kava-labs/go-tools/auction-audit"
+	"github.com/kava-labs/go-tools/auction-audit/config"
 	"github.com/kava-labs/kava/app"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetAuctionSourceHardDeposit(t *testing.T) {
 	app.SetSDKConfig()
-	config, err := main.LoadConfig(&main.EnvLoader{})
+	config, err := config.LoadConfig(&config.EnvLoader{})
 	require.NoError(t, err)
 
 	encodingConfig := app.MakeEncodingConfig()

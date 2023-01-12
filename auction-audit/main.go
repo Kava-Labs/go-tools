@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/csv"
 	"fmt"
 	"os"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/tendermint/tendermint/libs/log"
 
-	"github.com/kava-labs/go-tools/auction-audit/types"
+	"github.com/kava-labs/go-tools/auction-audit/config"
+	"github.com/kava-labs/go-tools/auction-audit/csv"
 	"github.com/kava-labs/kava/app"
 )
 
@@ -30,7 +29,7 @@ func tryMain(logger log.Logger) error {
 	//
 	// if config is not valid, exit with fatal error
 	//
-	config, err := LoadConfig(&EnvLoader{})
+	config, err := config.LoadConfig(&config.EnvLoader{})
 	if err != nil {
 		return err
 	}
@@ -61,7 +60,7 @@ func tryMain(logger log.Logger) error {
 	//
 	// crawl blocks to find auctions and inbound transfers
 	//
-	auctionIdToHeightMap, transferMap, err := GetAuctionEndData(
+	auctionIdToHeightMap, err := GetAuctionEndData(
 		grpcClient,
 		config.StartHeight,
 		config.EndHeight,
@@ -85,34 +84,18 @@ func tryMain(logger log.Logger) error {
 		return fmt.Errorf("failed to fetch auction clearing data: %w", err)
 	}
 
+	// Add additional information to auction data map including USD value before and after liquidation
 	fullAuctionDataMap, err := GetAuctionValueData(context.Background(), grpcClient, auctionClearingMap)
 	if err != nil {
 		return fmt.Errorf("failed to fetch source collateral data: %w", err)
 	}
 
-	var records [][]string
-
-	for _, ap := range fullAuctionDataMap {
-		records = append(records, []string{
-			types.DenomMap[ap.AmountPurchased.Denom],
-			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
-			types.DenomMap[ap.AmountPaid.Denom],
-			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPaid.Denom].ToDec())).String(),
-			ap.InitialLot.String(),
-			ap.LiquidatedAccount,
-			ap.WinningBidder,
-			ap.UsdValueBefore.String(),
-			ap.UsdValueAfter.String(),
-			ap.PercentLoss.String(),
-		})
-	}
-
-	outputFile, err := GetFileOutput("auction_summary", config)
+	outputFile, err := csv.GetFileOutput("auction_summary", config)
 	if err != nil {
 		return fmt.Errorf("failed to get file output: %w", err)
 	}
 
-	err = WriteCsv(
+	err = csv.WriteCsv(
 		outputFile,
 		[]string{
 			"Asset Purchased",
@@ -126,84 +109,10 @@ func tryMain(logger log.Logger) error {
 			"USD Value After Liquidation",
 			"Percent Loss",
 		},
-		records,
+		fullAuctionDataMap,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to write CSV: %w", err)
-	}
-
-	// Fetch initial assets pre-liquidation, from CDP or HARD
-
-	// write auction results to file
-	csvFile, err := os.Create("auction_summary_20221215_20221217.csv")
-	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
-	defer csvFile.Close()
-
-	w := csv.NewWriter(csvFile)
-	defer w.Flush()
-	err = w.Write([]string{
-		"Asset Purchased",
-		"Amount Purchased",
-		"Asset Paid",
-		"Amount Paid",
-		"Initial Lot",
-		"Liquidated Account",
-		"Winning Bidder Account",
-	})
-	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
-
-	for _, ap := range auctionClearingMap {
-		row := []string{
-			types.DenomMap[ap.AmountPurchased.Denom],
-			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
-			types.DenomMap[ap.AmountPaid.Denom],
-			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPaid.Denom].ToDec())).String(),
-			ap.InitialLot.String(),
-			ap.LiquidatedAccount,
-			ap.WinningBidder,
-		}
-		err := w.Write(row)
-		if err != nil {
-			logger.Error(err.Error())
-			os.Exit(1)
-		}
-	}
-
-	// write in-bound transfers to file
-	csvFile, err = os.Create("auction_transfers_20221215_20221217.csv")
-	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
-	defer csvFile.Close()
-
-	w = csv.NewWriter(csvFile)
-	defer w.Flush()
-	err = w.Write([]string{"Sender Address", "Sender Asset", "Sent Amount"})
-	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
-	}
-
-	for sender, amount := range transferMap {
-		for _, coin := range amount {
-			row := []string{
-				sender,
-				types.DenomMap[coin.Denom],
-				coin.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[coin.Denom].ToDec())).String(),
-			}
-			err := w.Write(row)
-			if err != nil {
-				logger.Error(err.Error())
-				os.Exit(1)
-			}
-		}
 	}
 
 	return nil

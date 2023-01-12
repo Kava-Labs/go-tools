@@ -10,7 +10,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/kava-labs/go-tools/auction-audit/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	"golang.org/x/sync/errgroup"
@@ -30,7 +29,7 @@ func GetAuctionEndData(
 	client GrpcClient,
 	start, end int64,
 	bidder sdk.AccAddress,
-) (types.AuctionIDToHeightMap, map[string]sdk.Coins, error) {
+) (types.AuctionIDToHeightMap, error) {
 	// communication setup: heights -> worker pool -> raw ouput -> buffer -> sorted output
 	heights := make(chan int64)
 	rawOutput := make(chan *tmservice.GetBlockByHeightResponse)
@@ -54,14 +53,12 @@ func GetAuctionEndData(
 
 	// auction ID -> block height
 	aucMap := make(types.AuctionIDToHeightMap)
-	// bidder address -> amount
-	transferMap := make(map[string]sdk.Coins)
 
 	for output := range sortedOutput {
 		for _, txBytes := range output.Block.Data.Txs {
 			tx, err := client.Decoder.TxDecoder()(txBytes)
 			if err != nil {
-				return types.AuctionIDToHeightMap{}, map[string]sdk.Coins{}, err
+				return types.AuctionIDToHeightMap{}, err
 			}
 
 			msgs := tx.GetMsgs()
@@ -70,13 +67,6 @@ func GetAuctionEndData(
 				case *auctiontypes.MsgPlaceBid:
 					id := msg.AuctionId
 					aucMap[id] = output.Block.Header.Height
-				case *banktypes.MsgSend:
-					if msg.ToAddress == bidder.String() {
-						// Default empty coins if not found
-						sendAmount := transferMap[msg.FromAddress]
-
-						transferMap[msg.FromAddress] = sendAmount.Add(msg.Amount...)
-					}
 				}
 			}
 		}
@@ -86,7 +76,7 @@ func GetAuctionEndData(
 		}
 	}
 
-	return aucMap, transferMap, nil
+	return aucMap, nil
 }
 
 type auctionPair struct {
