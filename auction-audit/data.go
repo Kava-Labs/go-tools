@@ -11,6 +11,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/kava-labs/go-tools/auction-audit/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/metadata"
@@ -19,9 +20,6 @@ import (
 const (
 	concurrency = 100
 )
-
-// AuctionIDToHeightMap maps auction ID -> block height
-type AuctionIDToHeightMap map[uint64]int64
 
 // func GetInboundTransfers(client GrpcClient, start, end int64) (map[*sdk.AccAddress]sdk.Coins, error) {
 // 	heights := make(chan int64)
@@ -32,7 +30,7 @@ func GetAuctionEndData(
 	client GrpcClient,
 	start, end int64,
 	bidder sdk.AccAddress,
-) (AuctionIDToHeightMap, map[string]sdk.Coins, error) {
+) (types.AuctionIDToHeightMap, map[string]sdk.Coins, error) {
 	// communication setup: heights -> worker pool -> raw ouput -> buffer -> sorted output
 	heights := make(chan int64)
 	rawOutput := make(chan *tmservice.GetBlockByHeightResponse)
@@ -55,7 +53,7 @@ func GetAuctionEndData(
 	go sortBlocks(rawOutput, sortedOutput, start)
 
 	// auction ID -> block height
-	aucMap := make(AuctionIDToHeightMap)
+	aucMap := make(types.AuctionIDToHeightMap)
 	// bidder address -> amount
 	transferMap := make(map[string]sdk.Coins)
 
@@ -63,7 +61,7 @@ func GetAuctionEndData(
 		for _, txBytes := range output.Block.Data.Txs {
 			tx, err := client.Decoder.TxDecoder()(txBytes)
 			if err != nil {
-				return AuctionIDToHeightMap{}, map[string]sdk.Coins{}, err
+				return types.AuctionIDToHeightMap{}, map[string]sdk.Coins{}, err
 			}
 
 			msgs := tx.GetMsgs()
@@ -100,11 +98,11 @@ func GetAuctionClearingData(
 	client GrpcClient,
 	endMap map[uint64]int64,
 	bidder sdk.AccAddress,
-) (map[uint64]auctionProceeds, error) {
+) (types.BaseAuctionProceedsMap, error) {
 	rawOutput := make(chan *auctiontypes.QueryAuctionResponse)
 	pairs := make(chan auctionPair)
 
-	clearingMap := make(map[uint64]auctionProceeds)
+	clearingMap := make(types.BaseAuctionProceedsMap)
 
 	// buffer output and order
 	go func() {
@@ -140,7 +138,7 @@ func GetAuctionClearingData(
 
 				clearingMap[col.GetID()] = ap
 			} else {
-				clearingMap[col.GetID()] = auctionProceeds{
+				clearingMap[col.GetID()] = types.BaseAuctionProceeds{
 					ID:                col.GetID(),
 					AmountPurchased:   col.GetLot(),
 					AmountPaid:        col.GetBid(),
@@ -165,29 +163,29 @@ func GetAuctionClearingData(
 func GetAuctionValueData(
 	ctx context.Context,
 	client GrpcClient,
-	clearingData map[uint64]auctionProceeds,
-) (map[uint64]fullAuctionProceeds, error) {
+	clearingData types.BaseAuctionProceedsMap,
+) (types.AuctionProceedsMap, error) {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(concurrency)
 
-	proceedsChan := make(chan fullAuctionProceeds)
-	dataMap := make(map[uint64]fullAuctionProceeds)
+	proceedsChan := make(chan types.AuctionProceeds)
+	dataMap := make(types.AuctionProceedsMap)
 
 	for _, auctionData := range clearingData {
-		func(auctionData auctionProceeds) {
+		func(auctionData types.BaseAuctionProceeds) {
 			g.Go(func() error {
 				// Coins from cdp or hard deposit 1 block before liquidation
 				preLiquidationAmount, preLiquidationHeight := fetchAuctionSourceAmount(ctx, client, auctionData)
 
 				// Get USD value
-				beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(client, preLiquidationHeight, preLiquidationAmount, Spot)
+				beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(client, preLiquidationHeight, preLiquidationAmount, types.Spot)
 				if err != nil {
 					return err
 				}
 
-				proceedsChan <- fullAuctionProceeds{
-					auctionProceeds: auctionData,
-					UsdValueBefore:  beforeUsdValue,
+				proceedsChan <- types.AuctionProceeds{
+					BaseAuctionProceeds: auctionData,
+					UsdValueBefore:      beforeUsdValue,
 				}
 
 				return nil
@@ -212,7 +210,7 @@ func GetAuctionValueData(
 func fetchAuctionSourceAmount(
 	ctx context.Context,
 	client GrpcClient,
-	auctionProceeds auctionProceeds,
+	auctionProceeds types.BaseAuctionProceeds,
 ) (sdk.Coins, int64) {
 	for {
 		switch auctionProceeds.SourceModule {
@@ -307,7 +305,7 @@ func sortBlocks(
 	sorted chan<- *tmservice.GetBlockByHeightResponse,
 	start int64,
 ) {
-	queue := &BlockHeap{}
+	queue := &types.BlockHeap{}
 	previousHeight := start - 1
 
 	for result := range unsorted {
@@ -328,44 +326,6 @@ func sortBlocks(
 			break
 		}
 	}
-}
-
-type fullAuctionProceeds struct {
-	auctionProceeds
-
-	UsdValueBefore sdk.Dec
-	UsdValueAfter  sdk.Dec
-	PercentLoss    sdk.Dec
-}
-
-type auctionProceeds struct {
-	ID                uint64
-	AmountPurchased   sdk.Coin
-	AmountPaid        sdk.Coin
-	InitialLot        sdk.Coin
-	LiquidatedAccount string
-	WinningBidder     string
-	SourceModule      string
-}
-
-type BlockHeap []*tmservice.GetBlockByHeightResponse
-
-func (h BlockHeap) Len() int { return len(h) }
-func (h BlockHeap) Less(i, j int) bool {
-	return h[i].Block.Header.Height < h[j].Block.Header.Height
-}
-func (h BlockHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-
-func (h *BlockHeap) Push(x interface{}) {
-	*h = append(*h, x.(*tmservice.GetBlockByHeightResponse))
-}
-
-func (h *BlockHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-	return x
 }
 
 // func SearchAuctionEnd(client GrpcClient, ctx context.Context, id ) (auctiontypes.Auction, error) {

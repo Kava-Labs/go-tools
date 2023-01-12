@@ -1,4 +1,4 @@
-package main
+package types
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-var denomMap = map[string]string{
+var DenomMap = map[string]string{
 	"usdx":  "USDX",
 	"bnb":   "BNB",
 	"btcb":  "BTC",
@@ -20,7 +20,7 @@ var denomMap = map[string]string{
 	"ibc/B448C0CA358B958301D328CCDC5D5AD642FC30A6D3AE106FF721DB315F3DDE5C": "UST",
 }
 
-var denomToPriceMarketMap = map[string]string{
+var DenomToPriceMarketMap = map[string]string{
 	"usdx":  "usdx",
 	"bnb":   "bnb",
 	"btcb":  "btc",
@@ -41,8 +41,8 @@ const (
 	Twap30
 )
 
-func getMarketID(denom string, priceType PriceType) (string, error) {
-	market_name, found := denomToPriceMarketMap[denom]
+func GetMarketID(denom string, priceType PriceType) (string, error) {
+	market_name, found := DenomToPriceMarketMap[denom]
 	if !found {
 		return "", fmt.Errorf("could not find market id for denom %s", denom)
 	}
@@ -58,7 +58,7 @@ func getMarketID(denom string, priceType PriceType) (string, error) {
 	return "", fmt.Errorf("invalid priceType")
 }
 
-var conversionMap = map[string]sdk.Int{
+var ConversionMap = map[string]sdk.Int{
 	"usdx":  sdk.NewInt(1000000),
 	"bnb":   sdk.NewInt(100000000),
 	"btcb":  sdk.NewInt(100000000),

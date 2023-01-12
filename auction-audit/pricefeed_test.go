@@ -6,6 +6,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	main "github.com/kava-labs/go-tools/auction-audit"
+	"github.com/kava-labs/go-tools/auction-audit/types"
 	"github.com/kava-labs/kava/app"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +56,7 @@ func TestGetTotalCoinsUsdValueAtHeight(t *testing.T) {
 				grpcClient,
 				tt.giveHeight,
 				tt.giveCoins,
-				main.Spot,
+				types.Spot,
 			)
 			require.NoError(t, err)
 

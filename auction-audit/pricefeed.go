@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/kava-labs/kava/x/pricefeed/types"
+	"github.com/kava-labs/go-tools/auction-audit/types"
+	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 )
 
 // GetPriceAtHeight returns the price of the given market at the given height.
@@ -13,7 +14,7 @@ func GetPriceAtHeight(client GrpcClient, height int64, marketID string) (sdk.Dec
 
 	res, err := client.Pricefeed.Price(
 		ctx,
-		&types.QueryPriceRequest{
+		&pricefeedtypes.QueryPriceRequest{
 			MarketId: marketID,
 		},
 	)
@@ -31,12 +32,12 @@ func GetTotalCoinsUsdValueAtHeight(
 	client GrpcClient,
 	height int64,
 	coins sdk.Coins,
-	priceType PriceType,
+	priceType types.PriceType,
 ) (sdk.Dec, error) {
 	totalUsdValue := sdk.ZeroDec()
 
 	for _, coin := range coins {
-		marketId, err := getMarketID(coin.Denom, priceType)
+		marketId, err := types.GetMarketID(coin.Denom, priceType)
 		if err != nil {
 			return sdk.ZeroDec(), fmt.Errorf("could not find market id for denom %s: %w", coin.Denom, err)
 		}

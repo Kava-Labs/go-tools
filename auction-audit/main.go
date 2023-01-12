@@ -10,6 +10,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/tendermint/tendermint/libs/log"
 
+	"github.com/kava-labs/go-tools/auction-audit/types"
 	"github.com/kava-labs/kava/app"
 )
 
@@ -93,10 +94,10 @@ func tryMain(logger log.Logger) error {
 
 	for _, ap := range fullAuctionDataMap {
 		records = append(records, []string{
-			denomMap[ap.AmountPurchased.Denom],
-			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
-			denomMap[ap.AmountPaid.Denom],
-			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPaid.Denom].ToDec())).String(),
+			types.DenomMap[ap.AmountPurchased.Denom],
+			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
+			types.DenomMap[ap.AmountPaid.Denom],
+			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPaid.Denom].ToDec())).String(),
 			ap.InitialLot.String(),
 			ap.LiquidatedAccount,
 			ap.WinningBidder,
@@ -159,10 +160,10 @@ func tryMain(logger log.Logger) error {
 
 	for _, ap := range auctionClearingMap {
 		row := []string{
-			denomMap[ap.AmountPurchased.Denom],
-			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
-			denomMap[ap.AmountPaid.Denom],
-			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPaid.Denom].ToDec())).String(),
+			types.DenomMap[ap.AmountPurchased.Denom],
+			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
+			types.DenomMap[ap.AmountPaid.Denom],
+			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[ap.AmountPaid.Denom].ToDec())).String(),
 			ap.InitialLot.String(),
 			ap.LiquidatedAccount,
 			ap.WinningBidder,
@@ -194,8 +195,8 @@ func tryMain(logger log.Logger) error {
 		for _, coin := range amount {
 			row := []string{
 				sender,
-				denomMap[coin.Denom],
-				coin.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[coin.Denom].ToDec())).String(),
+				types.DenomMap[coin.Denom],
+				coin.Amount.ToDec().Mul(sdk.OneDec().Quo(types.ConversionMap[coin.Denom].ToDec())).String(),
 			}
 			err := w.Write(row)
 			if err != nil {
