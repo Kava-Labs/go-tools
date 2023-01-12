@@ -29,6 +29,6 @@ func TestGetAuctionSourceHardDeposit(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, 0, height)
+	require.Equal(t, int64(9162), height)
 	require.Equal(t, "kava1dpujcdhzfxykgzahuzzn9ywwdrlga5z2ggud6k", sourceDeposit.Depositor)
 }

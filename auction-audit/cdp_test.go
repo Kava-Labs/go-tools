@@ -23,7 +23,7 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 		encodingConfig.TxConfig,
 	)
 
-	sourceCDP, err := main.GetAuctionSourceCDP(
+	sourceCDP, height, err := main.GetAuctionSourceCDP(
 		context.Background(),
 		grpcClient,
 		16596,
@@ -31,6 +31,7 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("source cdp %v", sourceCDP.Collateral)
 
+	require.Equal(t, uint64(2824779), height)
 	require.Equal(t, uint64(13188), sourceCDP.ID)
 }
 

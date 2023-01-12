@@ -152,12 +152,12 @@ func GetAuctionSourceHARD(
 		},
 	)
 	if err != nil {
-		return hardtypes.DepositResponse{}, 0, err
+		return hardtypes.DepositResponse{}, 0, fmt.Errorf("failed to query tx event: %w", err)
 	}
 
 	pairs, err := getHardAuctionPairs(res.TxResponses)
 	if err != nil {
-		return hardtypes.DepositResponse{}, 0, err
+		return hardtypes.DepositResponse{}, 0, fmt.Errorf("failed to parse hard auction pairs: %w", err)
 	}
 
 	// Find matching address

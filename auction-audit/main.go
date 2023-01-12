@@ -13,9 +13,7 @@ import (
 	"github.com/kava-labs/kava/app"
 )
 
-func main() {
-	// create base logger
-	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+func tryMain(logger log.Logger) error {
 
 	//
 	// bootstrap kava chain config
@@ -33,8 +31,7 @@ func main() {
 	//
 	config, err := LoadConfig(&EnvLoader{})
 	if err != nil {
-		logger.Error(err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	logger.With(
@@ -55,10 +52,9 @@ func main() {
 	defer grpcClient.GrpcClientConn.Close()
 	nodeInfoResponse, err := grpcClient.Tm.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
 	if err != nil {
-		logger.Error("failed to fetch chain id")
-		logger.Error(err.Error())
-		os.Exit(1)
+		return fmt.Errorf("failed to fetch chain id: %w", err)
 	}
+
 	logger.Info(fmt.Sprintf("chain id: %s", nodeInfoResponse.DefaultNodeInfo.Network))
 
 	//
@@ -71,9 +67,7 @@ func main() {
 		config.BidderAddress,
 	)
 	if err != nil {
-		logger.Error("failed to fetch auction end data")
-		logger.Error(err.Error())
-		os.Exit(1)
+		return fmt.Errorf("failed to fetch auction end data: %w", err)
 	}
 	fmt.Printf("Found %d auctions\n", len(auctionIdToHeightMap))
 	fmt.Printf("Auction end data: %v \n", auctionIdToHeightMap)
@@ -87,12 +81,55 @@ func main() {
 		config.BidderAddress,
 	)
 	if err != nil {
-		logger.Error("failed to fetch auction clearing data")
-		logger.Error(err.Error())
-		os.Exit(1)
+		return fmt.Errorf("failed to fetch auction clearing data: %w", err)
 	}
 
 	fullAuctionDataMap, err := GetAuctionValueData(context.Background(), grpcClient, auctionClearingMap)
+	if err != nil {
+		return fmt.Errorf("failed to fetch source collateral data: %w", err)
+	}
+
+	var records [][]string
+
+	for _, ap := range fullAuctionDataMap {
+		records = append(records, []string{
+			denomMap[ap.AmountPurchased.Denom],
+			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
+			denomMap[ap.AmountPaid.Denom],
+			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(conversionMap[ap.AmountPaid.Denom].ToDec())).String(),
+			ap.InitialLot.String(),
+			ap.LiquidatedAccount,
+			ap.WinningBidder,
+			ap.UsdValueBefore.String(),
+			ap.UsdValueAfter.String(),
+			ap.PercentLoss.String(),
+		})
+	}
+
+	outputFile, err := GetFileOutput("auction_summary", config)
+	if err != nil {
+		return fmt.Errorf("failed to get file output: %w", err)
+	}
+
+	err = WriteCsv(
+		outputFile,
+		[]string{
+			"Asset Purchased",
+			"Amount Purchased",
+			"Asset Paid",
+			"Amount Paid",
+			"Initial Lot",
+			"Liquidated Account",
+			"Winning Bidder Account",
+			"USD Value Before Liquidation",
+			"USD Value After Liquidation",
+			"Percent Loss",
+		},
+		records,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to write CSV: %w", err)
+	}
 
 	// Fetch initial assets pre-liquidation, from CDP or HARD
 
@@ -166,5 +203,17 @@ func main() {
 				os.Exit(1)
 			}
 		}
+	}
+
+	return nil
+}
+
+func main() {
+	// create base logger
+	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+
+	if err := tryMain(logger); err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
 	}
 }

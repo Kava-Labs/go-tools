@@ -12,8 +12,7 @@ import (
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
-	cdptypes "github.com/kava-labs/kava/x/cdp/types"
-	hardtypes "github.com/kava-labs/kava/x/hard/types"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -162,102 +161,80 @@ func GetAuctionClearingData(
 	return clearingMap, nil
 }
 
-type auctionValueQueryResponse struct {
-	auctionProceeds
-
-	height   int64
-	response interface{}
-}
-
 // GetAuctionValueData populates a map with before/after auction USD value data
 func GetAuctionValueData(
 	ctx context.Context,
 	client GrpcClient,
 	clearingData map[uint64]auctionProceeds,
 ) (map[uint64]fullAuctionProceeds, error) {
-	responseChan := make(chan auctionValueQueryResponse)
-	requestChan := make(chan auctionProceeds)
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(concurrency)
 
+	proceedsChan := make(chan fullAuctionProceeds)
 	dataMap := make(map[uint64]fullAuctionProceeds)
 
-	// spawn pool of workers
-	for i := 0; i < concurrency; i++ {
-		go fetchAuctionSourceValue(ctx, client, requestChan, responseChan)
+	for _, auctionData := range clearingData {
+		func(auctionData auctionProceeds) {
+			g.Go(func() error {
+				// Coins from cdp or hard deposit 1 block before liquidation
+				preLiquidationAmount, preLiquidationHeight := fetchAuctionSourceAmount(ctx, client, auctionData)
+
+				// Get USD value
+				beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(client, preLiquidationHeight, preLiquidationAmount, Spot)
+				if err != nil {
+					return err
+				}
+
+				proceedsChan <- fullAuctionProceeds{
+					auctionProceeds: auctionData,
+					UsdValueBefore:  beforeUsdValue,
+				}
+
+				return nil
+			})
+		}(auctionData)
 	}
-	// write heights to input channel
-	go func() {
-		for _, data := range clearingData {
-			requestChan <- data
-		}
-	}()
 
-	for auctionRes := range responseChan {
-		preLiquidationAmount := sdk.NewCoins()
-		var preLiquidationHeight int64
+	i := 0
+	for aucProceed := range proceedsChan {
+		dataMap[aucProceed.ID] = aucProceed
 
-		switch deposit := auctionRes.response.(type) {
-		case hardtypes.DepositResponse:
-			preLiquidationAmount = deposit.Amount
-		case *cdptypes.CDPResponse:
-			preLiquidationAmount = sdk.NewCoins(deposit.Collateral)
-		default:
-			return nil, fmt.Errorf("invalid query response type %T", auctionRes.response)
-		}
-
-		// Get USD value
-		beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(client, preLiquidationHeight, preLiquidationAmount, Spot)
-		if err != nil {
-			return nil, err
-		}
-
-		dataMap[auctionRes.ID] = fullAuctionProceeds{
-			auctionProceeds: auctionRes.auctionProceeds,
-			ValueBeforeUsd:  beforeUsdValue,
+		i += 1
+		if i == len(clearingData) {
+			break
 		}
 	}
 
-	return dataMap, nil
+	err := g.Wait()
+	return dataMap, err
 }
 
-func fetchAuctionSourceValue(
+func fetchAuctionSourceAmount(
 	ctx context.Context,
 	client GrpcClient,
-	requestChan chan auctionProceeds,
-	responseChan chan auctionValueQueryResponse,
-) {
-	for req := range requestChan {
-		for {
-			switch req.SourceModule {
-			case "hard":
-				hardDeposit, height, err := GetAuctionSourceHARD(ctx, client, req.ID)
-				if err != nil {
-					// Print and retry
-					fmt.Fprintf(os.Stderr, "Error fetching auction source HARD deposit: %s", err)
-					continue
-				}
-
-				responseChan <- auctionValueQueryResponse{
-					auctionProceeds: req,
-
-					height:   height,
-					response: hardDeposit,
-				}
-			case "cdp":
-				cdpDeposit, height, err := GetAuctionSourceCDP(ctx, client, req.ID)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error fetching auction source CDP deposit: %s", err)
-					continue
-				}
-
-				responseChan <- auctionValueQueryResponse{
-					auctionProceeds: req,
-
-					height:   height,
-					response: cdpDeposit,
-				}
-			default:
-				fmt.Fprintf(os.Stderr, "Unhandled auction source module: %s", req.SourceModule)
+	auctionProceeds auctionProceeds,
+) (sdk.Coins, int64) {
+	for {
+		switch auctionProceeds.SourceModule {
+		case "hard":
+			hardDeposit, height, err := GetAuctionSourceHARD(ctx, client, auctionProceeds.ID)
+			if err != nil {
+				// Print and retry
+				fmt.Fprintf(os.Stderr, "Error fetching auction source HARD deposit: %s", err)
+				continue
 			}
+
+			return hardDeposit.Amount, height
+		case "cdp":
+			cdpDeposit, height, err := GetAuctionSourceCDP(ctx, client, auctionProceeds.ID)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error fetching auction source CDP deposit: %s", err)
+				continue
+			}
+
+			return sdk.NewCoins(cdpDeposit.Collateral), height
+		default:
+			fmt.Fprintf(os.Stderr, "Unhandled auction source module: %s", auctionProceeds.SourceModule)
 		}
 	}
 }
@@ -356,8 +333,8 @@ func sortBlocks(
 type fullAuctionProceeds struct {
 	auctionProceeds
 
-	ValueBeforeUsd sdk.Dec
-	ValueAfterUsd  sdk.Dec
+	UsdValueBefore sdk.Dec
+	UsdValueAfter  sdk.Dec
 	PercentLoss    sdk.Dec
 }
 
