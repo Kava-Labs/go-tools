@@ -19,11 +19,13 @@ func TestGetTotalCoinsUsdValueAtHeight(t *testing.T) {
 
 	encodingConfig := app.MakeEncodingConfig()
 
-	grpcClient := main.NewGrpcClient(
+	grpcClient, err := main.NewGrpcClient(
 		config.GrpcURL,
+		config.RpcURL,
 		encodingConfig.Marshaler,
 		encodingConfig.TxConfig,
 	)
+	require.NoError(t, err)
 
 	tests := []struct {
 		giveCoins         sdk.Coins

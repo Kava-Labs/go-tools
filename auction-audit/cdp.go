@@ -158,6 +158,14 @@ func GetAuctionSourceCDP(
 	client GrpcClient,
 	auctionID uint64,
 ) (cdptypes.CDPResponse, int64, error) {
+	// TODO: Search BeginBlock events for CDP
+	// 1) Block search to find auction_start event and corresponding height
+	// https://rpc.kava.io/block_search?query=%22auction_start.auction_id=16837%22
+	// 2) Block results to query events from height
+	// https://rpc.kava.io/block_results?height=3146803
+
+	// This is not very common for manual liquidations, most liquidations are in
+	// CDP BeginBlocker
 	res, err := client.Tx.GetTxsEvent(
 		ctx,
 		&tx.GetTxsEventRequest{

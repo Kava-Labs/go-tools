@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"fmt"
 	"log"
 	"net/url"
 
@@ -15,6 +16,9 @@ import (
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+
+	tmclient "github.com/tendermint/tendermint/rpc/client"
+	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 )
 
 type GrpcClient struct {
@@ -27,12 +31,15 @@ type GrpcClient struct {
 	CDP            cdptypes.QueryClient
 	Hard           hardtypes.QueryClient
 	Pricefeed      pricefeedtypes.QueryClient
+
+	// rpc client for tendermint rpc
+	Tendermint tmclient.SignClient
 }
 
-func NewGrpcClient(target string, cdc codec.Codec, txConfig sdkClient.TxConfig) GrpcClient {
-	grpcUrl, err := url.Parse(target)
+func connectGrpc(grpcTarget string) (*grpc.ClientConn, error) {
+	grpcUrl, err := url.Parse(grpcTarget)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to parse grpc url: %s", err)
 	}
 
 	var secureOpt grpc.DialOption
@@ -48,7 +55,26 @@ func NewGrpcClient(target string, cdc codec.Codec, txConfig sdkClient.TxConfig) 
 
 	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to dial grpc server: %s", err)
+	}
+
+	return grpcConn, nil
+}
+
+func NewGrpcClient(
+	grpcTarget string,
+	rpcTarget string,
+	cdc codec.Codec,
+	txConfig sdkClient.TxConfig,
+) (GrpcClient, error) {
+	grpcConn, err := connectGrpc(grpcTarget)
+	if err != nil {
+		return GrpcClient{}, err
+	}
+
+	rpcClient, err := rpchttpclient.New(rpcTarget, "/websocket")
+	if err != nil {
+		return GrpcClient{}, err
 	}
 
 	return GrpcClient{
@@ -61,5 +87,7 @@ func NewGrpcClient(target string, cdc codec.Codec, txConfig sdkClient.TxConfig) 
 		CDP:            cdptypes.NewQueryClient(grpcConn),
 		Hard:           hardtypes.NewQueryClient(grpcConn),
 		Pricefeed:      pricefeedtypes.NewQueryClient(grpcConn),
-	}
+
+		Tendermint: rpcClient,
+	}, nil
 }

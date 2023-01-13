@@ -17,11 +17,13 @@ func TestGetAuctionSourceHardDeposit(t *testing.T) {
 
 	encodingConfig := app.MakeEncodingConfig()
 
-	grpcClient := main.NewGrpcClient(
+	grpcClient, err := main.NewGrpcClient(
 		config.GrpcURL,
+		config.RpcURL,
 		encodingConfig.Marshaler,
 		encodingConfig.TxConfig,
 	)
+	require.NoError(t, err)
 
 	sourceDeposit, height, err := main.GetAuctionSourceHARD(
 		context.Background(),

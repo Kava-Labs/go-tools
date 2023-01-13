@@ -19,11 +19,13 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 
 	encodingConfig := app.MakeEncodingConfig()
 
-	grpcClient := main.NewGrpcClient(
+	grpcClient, err := main.NewGrpcClient(
 		config.GrpcURL,
+		config.RpcURL,
 		encodingConfig.Marshaler,
 		encodingConfig.TxConfig,
 	)
+	require.NoError(t, err)
 
 	tests := []struct {
 		giveAuctionID    uint64
@@ -36,6 +38,8 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 			wantCdpID:        13188,
 		},
 		{
+			// Auction that was started in cdp BeginBlocker which cannot be
+			// queried for source cdp via grpc txs
 			giveAuctionID:    16837,
 			wantSourceHeight: 0,
 			wantCdpID:        0,

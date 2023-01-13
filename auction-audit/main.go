@@ -36,6 +36,7 @@ func tryMain(logger log.Logger) error {
 
 	logger.With(
 		"grpcUrl", config.GrpcURL,
+		"rpcUrl", config.RpcURL,
 		"start height", config.StartHeight,
 		"end height", config.EndHeight,
 	).Info("config loaded")
@@ -47,7 +48,16 @@ func tryMain(logger log.Logger) error {
 
 	//
 	// create grpc client and test that it's responding
-	grpcClient := NewGrpcClient(config.GrpcURL, encodingConfig.Marshaler, encodingConfig.TxConfig)
+	grpcClient, err := NewGrpcClient(
+		config.GrpcURL,
+		config.RpcURL,
+		encodingConfig.Marshaler,
+		encodingConfig.TxConfig,
+	)
+	if err != nil {
+		return err
+	}
+
 	defer grpcClient.GrpcClientConn.Close()
 	nodeInfoResponse, err := grpcClient.Tm.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
 	if err != nil {

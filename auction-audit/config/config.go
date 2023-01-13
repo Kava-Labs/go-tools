@@ -10,6 +10,7 @@ import (
 
 const (
 	grpcUrlEnvKey = "GRPC_URL"
+	rpcUrlEnvKey  = "RPC_URL"
 	startEnvKey   = "START_HEIGHT"
 	endEnvKey     = "END_HEIGHT"
 )
@@ -30,6 +31,7 @@ func (l *EnvLoader) Get(key string) string {
 
 type Config struct {
 	GrpcURL string
+	RpcURL  string
 
 	StartHeight int64
 	EndHeight   int64
@@ -46,6 +48,11 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 		return Config{}, fmt.Errorf("%s not set", grpcUrlEnvKey)
 	}
 
+	rpcURL := loader.Get(rpcUrlEnvKey)
+	if rpcURL == "" {
+		return Config{}, fmt.Errorf("%s not set", rpcUrlEnvKey)
+	}
+
 	startHeightStr := loader.Get(startEnvKey)
 	startHeight, err := strconv.ParseInt(startHeightStr, 10, 64)
 	if err != nil {
@@ -60,6 +67,7 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 
 	return Config{
 		GrpcURL:     grpcURL,
+		RpcURL:      rpcURL,
 		StartHeight: startHeight,
 		EndHeight:   endHeight,
 	}, nil
