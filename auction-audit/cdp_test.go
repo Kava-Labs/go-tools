@@ -2,13 +2,13 @@ package main_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	main "github.com/kava-labs/go-tools/auction-audit"
 	"github.com/kava-labs/go-tools/auction-audit/config"
 	"github.com/kava-labs/kava/app"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,11 +28,13 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
+		name             string
 		giveAuctionID    uint64
 		wantSourceHeight int64
 		wantCdpID        uint64
 	}{
 		{
+			name:             "CDP auction via MsgLiquidate",
 			giveAuctionID:    16596,
 			wantSourceHeight: 2824779,
 			wantCdpID:        13188,
@@ -40,14 +42,15 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 		{
 			// Auction that was started in cdp BeginBlocker which cannot be
 			// queried for source cdp via grpc txs
+			name:             "CDP auction via BeginBlocker",
 			giveAuctionID:    16837,
-			wantSourceHeight: 0,
-			wantCdpID:        0,
+			wantSourceHeight: 3146802, // 1 block before auction was started
+			wantCdpID:        23216,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf("auctionID-%d", tt.giveAuctionID), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			sourceCDP, height, err := main.GetAuctionSourceCDP(
 				context.Background(),
 				grpcClient,
@@ -56,8 +59,8 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 			require.NoError(t, err)
 			t.Logf("source cdp %v", sourceCDP.Collateral)
 
-			require.Equal(t, tt.wantSourceHeight, height)
-			require.Equal(t, tt.wantCdpID, sourceCDP.ID)
+			assert.Equal(t, tt.wantSourceHeight, height)
+			assert.Equal(t, tt.wantCdpID, sourceCDP.ID)
 		})
 	}
 

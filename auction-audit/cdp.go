@@ -28,6 +28,13 @@ func (pairs CDPAuctionPairs) FindPairWithAuctionID(auctionID sdk.Int) (CDPAuctio
 	return CDPAuctionPair{}, false
 }
 
+type CDPAuctionPairWitHeight struct {
+	CDPAuctionPair
+	Height int64
+}
+
+type CDPAuctionPairsWitHeight []CDPAuctionPairsWitHeight
+
 type AttributesMap map[string]string
 
 func AttributesToMap(attrs []sdk.Attribute) AttributesMap {
@@ -71,51 +78,103 @@ func getAuctionIDFromAuctionStartEvent(attrs []sdk.Attribute) (sdk.Int, error) {
 	return id, nil
 }
 
-func getCdpAuctionPairFromTxResponse(txResponse *sdk.TxResponse) (CDPAuctionPair, error) {
-	var cdpId sdk.Int
-	var auctionId sdk.Int
+func getCdpAuctionPairFromEvents(
+	height int64,
+	events sdk.StringEvents,
+) (CDPAuctionPairs, error) {
 	cdpIdFound := false
 	auctionIdFound := false
 
-	for _, log := range txResponse.Logs {
-		for _, event := range log.Events {
-			// Only interested in cdp liquidation and auction start events
-			// TODO: Unhandled edge case: there can be multiple of these events
-			// per TxResponse if there are multiple Liquidate messages in the tx.
-			// OR there could be 1 event each but with multiple copies of the
-			// attributes -- only the last one will be returned
-			if event.Type == cdptypes.EventTypeCdpLiquidation {
-				id, err := getCdpIDFromLiquidationEvent(event.Attributes)
-				if err != nil {
-					return CDPAuctionPair{}, err
-				}
+	var pairs CDPAuctionPairs
+	pair := CDPAuctionPair{
+		Height: height,
+	}
 
-				cdpId = id
-				cdpIdFound = true
+	// Assumptions:
+	// 1) Events are **not** flattened
+	// 2) Events are in the order of execution, multiple liquidations
+	//    will have cdp_liquidation and auction_start in order of liquidation.
+	//
+	//    Example:
+	//    - cdp_liquidation             (cdp 1)
+	//    - misc transfers and whatnot
+	//    - auction_start               (cdp 1)
+	//    - other misc events
+	//    - cdp_liquidation             (cdp 2)
+	//    - misc transfers and whatnot
+	//    - auction_start               (cdp 2)
+	for _, event := range events {
+		if event.Type == cdptypes.EventTypeCdpLiquidation {
+			// Invalid situation: Found a second cdp_liquidation without an
+			// auction_start event in between
+			if cdpIdFound {
+				return nil, fmt.Errorf("found cdp_liquidation event without corresponding auction_start event")
 			}
 
-			if event.Type == auctiontypes.EventTypeAuctionStart {
-				id, err := getAuctionIDFromAuctionStartEvent(event.Attributes)
-				if err != nil {
-					return CDPAuctionPair{}, err
-				}
-
-				auctionId = id
-				auctionIdFound = true
+			id, err := getCdpIDFromLiquidationEvent(event.Attributes)
+			if err != nil {
+				return nil, err
 			}
+
+			pair.CdpId = id
+			cdpIdFound = true
+		}
+
+		if event.Type == auctiontypes.EventTypeAuctionStart {
+			// Invalid situation: Found a second auction_start without a
+			// cdp_liquidation event in between
+			if auctionIdFound {
+				return nil, fmt.Errorf("found auction_start event without corresponding cdp_liquidation event")
+			}
+
+			id, err := getAuctionIDFromAuctionStartEvent(event.Attributes)
+			if err != nil {
+				return nil, err
+			}
+
+			pair.AuctionId = id
+			auctionIdFound = true
+		}
+
+		// Found both cdp and auction id, create a pair and reset flags for next pair
+		if cdpIdFound && auctionIdFound {
+			pairs = append(pairs, pair)
+
+			pair = CDPAuctionPair{
+				Height: height,
+			}
+			cdpIdFound = false
+			auctionIdFound = false
 		}
 	}
 
-	if !cdpIdFound || !auctionIdFound {
-		return CDPAuctionPair{},
-			fmt.Errorf("failed to find cdp and/or auction id in tx response: %s", txResponse.TxHash)
+	if len(pairs) == 0 {
+		return nil, fmt.Errorf("could not find cdp and/or auction id in events")
 	}
 
-	return CDPAuctionPair{
-		CdpId:     cdpId,
-		AuctionId: auctionId,
-		Height:    txResponse.Height,
-	}, nil
+	return pairs, nil
+}
+
+func getCdpAuctionPairsFromTxResponse(txResponse *sdk.TxResponse) (CDPAuctionPairs, error) {
+	var pairs CDPAuctionPairs
+
+	for _, log := range txResponse.Logs {
+		// Separate log per message, so this should handle multiple liquidate
+		// messages
+		foundPairs, err := getCdpAuctionPairFromEvents(txResponse.Height, log.Events)
+		if err != nil {
+			continue
+		}
+
+		pairs = append(pairs, foundPairs...)
+	}
+
+	// Add height to pairs
+	for i := range pairs {
+		pairs[i].Height = txResponse.Height
+	}
+
+	return pairs, nil
 }
 
 func GetOriginalAmountPercentSub(
@@ -143,7 +202,7 @@ func GetCDPAtHeight(
 	})
 
 	if err != nil {
-		return cdptypes.CDPResponse{}, err
+		return cdptypes.CDPResponse{}, fmt.Errorf("failed to query Cdps: %w", err)
 	}
 
 	if len(cdpRes.Cdps) == 0 {
@@ -153,17 +212,11 @@ func GetCDPAtHeight(
 	return cdpRes.Cdps[0], nil
 }
 
-func GetAuctionSourceCDP(
+func GetPairsFromTxSearch(
 	ctx context.Context,
 	client GrpcClient,
 	auctionID uint64,
-) (cdptypes.CDPResponse, int64, error) {
-	// TODO: Search BeginBlock events for CDP
-	// 1) Block search to find auction_start event and corresponding height
-	// https://rpc.kava.io/block_search?query=%22auction_start.auction_id=16837%22
-	// 2) Block results to query events from height
-	// https://rpc.kava.io/block_results?height=3146803
-
+) (CDPAuctionPairs, error) {
 	// This is not very common for manual liquidations, most liquidations are in
 	// CDP BeginBlocker
 	res, err := client.Tx.GetTxsEvent(
@@ -180,7 +233,7 @@ func GetAuctionSourceCDP(
 		},
 	)
 	if err != nil {
-		return cdptypes.CDPResponse{}, 0, err
+		return nil, err
 	}
 
 	var pairs CDPAuctionPairs
@@ -188,16 +241,47 @@ func GetAuctionSourceCDP(
 	// Get corresponding CDP from liquidate event
 	for _, tsRes := range res.TxResponses {
 		// There can be multiple liquidations in a single block
-		// TODO: There can be multiple liquidations per TxResponse (multiple msgs in 1 tx)
-		// TODO: How to match them confirming same amount?
-		pair, err := getCdpAuctionPairFromTxResponse(tsRes)
+		foundPairs, err := getCdpAuctionPairsFromTxResponse(tsRes)
 		if err != nil {
 			// There must be a matching event in every TxResponse, as we are
 			// querying for the matching event.
-			return cdptypes.CDPResponse{}, 0, err
+			return nil, fmt.Errorf("failed to find matching cdp_liquidation event: %w", err)
 		}
 
-		pairs = append(pairs, pair)
+		pairs = append(pairs, foundPairs...)
+	}
+
+	return pairs, nil
+}
+
+func GetAuctionSourceCDP(
+	ctx context.Context,
+	client GrpcClient,
+	auctionID uint64,
+) (cdptypes.CDPResponse, int64, error) {
+	// Search BeginBlock events for CDP
+
+	blockEvents, height, err := client.GetBeginBlockEventsFromQuery(
+		ctx,
+		fmt.Sprintf(
+			"auction_start.auction_id=%d",
+			auctionID,
+		))
+
+	var pairs CDPAuctionPairs
+	if err != nil {
+		// Try searching Txs for event instead
+		pairs, err = GetPairsFromTxSearch(ctx, client, auctionID)
+		if err != nil {
+			return cdptypes.CDPResponse{}, 0, fmt.Errorf("failed to get CDP auction pairs from both BeginBlock and TxSearch: %w", err)
+		}
+	} else {
+		// BeginBlock events are all in 1 single large slice, so there can be
+		// multiple of the same events in the slice
+		pairs, err = getCdpAuctionPairFromEvents(height, blockEvents)
+		if err != nil {
+			return cdptypes.CDPResponse{}, 0, fmt.Errorf("failed to get CDP auction pairs from block events: %w", err)
+		}
 	}
 
 	// Get the corresponding CDP ID with the auction ID
