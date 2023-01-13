@@ -36,7 +36,6 @@ func tryMain(logger log.Logger) error {
 
 	logger.With(
 		"grpcUrl", config.GrpcURL,
-		"bidder", config.BidderAddress.String(),
 		"start height", config.StartHeight,
 		"end height", config.EndHeight,
 	).Info("config loaded")
@@ -57,35 +56,44 @@ func tryMain(logger log.Logger) error {
 
 	logger.Info(fmt.Sprintf("chain id: %s", nodeInfoResponse.DefaultNodeInfo.Network))
 
-	//
-	// crawl blocks to find auctions and inbound transfers
-	//
+	// Crawl blocks to find auctions and inbound transfers
+	logger.Info("Fetching auction end data... this may take a while")
 	auctionIdToHeightMap, err := GetAuctionEndData(
+		logger,
 		grpcClient,
 		config.StartHeight,
 		config.EndHeight,
-		config.BidderAddress,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to fetch auction end data: %w", err)
 	}
-	fmt.Printf("Found %d auctions\n", len(auctionIdToHeightMap))
-	fmt.Printf("Auction end data: %v \n", auctionIdToHeightMap)
+	logger.Info("Found auctions", "count", len(auctionIdToHeightMap))
+	logger.Info("Auction end data", "auctionIdToHeightMap", auctionIdToHeightMap)
 
-	//
-	// fetch the final clearing data for auctions that the bidder address won
-	//
+	if len(auctionIdToHeightMap) == 0 {
+		logger.Info("No auctions found, stopping.")
+		return nil
+	}
+
+	// Fetch the final clearing data for auctions that the bidder address won
+	logger.Info("Fetching auction clearing data (auction winners)...")
 	auctionClearingMap, err := GetAuctionClearingData(
+		logger,
 		grpcClient,
 		auctionIdToHeightMap,
-		config.BidderAddress,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to fetch auction clearing data: %w", err)
 	}
 
 	// Add additional information to auction data map including USD value before and after liquidation
-	fullAuctionDataMap, err := GetAuctionValueData(context.Background(), grpcClient, auctionClearingMap)
+	logger.Info("Fetching auction source USD value data...")
+	fullAuctionDataMap, err := GetAuctionValueData(
+		context.Background(),
+		logger,
+		grpcClient,
+		auctionClearingMap,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to fetch source collateral data: %w", err)
 	}
@@ -94,6 +102,11 @@ func tryMain(logger log.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to get file output: %w", err)
 	}
+
+	logger.Info(
+		"Writing output data to csv",
+		"fileName", outputFile.Name(),
+	)
 
 	err = csv.WriteCsv(
 		outputFile,

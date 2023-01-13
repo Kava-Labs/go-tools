@@ -16,7 +16,7 @@ func GetFileName(prefix string, config config.Config) string {
 	)
 }
 
-func GetFileOutput(prefix string, config config.Config) (io.Writer, error) {
+func GetFileOutput(prefix string, config config.Config) (*os.File, error) {
 	fileName := GetFileName(prefix, config)
 	return os.Create(fileName)
 }

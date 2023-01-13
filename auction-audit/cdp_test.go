@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -24,16 +25,38 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 		encodingConfig.TxConfig,
 	)
 
-	sourceCDP, height, err := main.GetAuctionSourceCDP(
-		context.Background(),
-		grpcClient,
-		16596,
-	)
-	require.NoError(t, err)
-	t.Logf("source cdp %v", sourceCDP.Collateral)
+	tests := []struct {
+		giveAuctionID    uint64
+		wantSourceHeight int64
+		wantCdpID        uint64
+	}{
+		{
+			giveAuctionID:    16596,
+			wantSourceHeight: 2824779,
+			wantCdpID:        13188,
+		},
+		{
+			giveAuctionID:    16837,
+			wantSourceHeight: 0,
+			wantCdpID:        0,
+		},
+	}
 
-	require.Equal(t, uint64(2824779), height)
-	require.Equal(t, uint64(13188), sourceCDP.ID)
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("auctionID-%d", tt.giveAuctionID), func(t *testing.T) {
+			sourceCDP, height, err := main.GetAuctionSourceCDP(
+				context.Background(),
+				grpcClient,
+				tt.giveAuctionID,
+			)
+			require.NoError(t, err)
+			t.Logf("source cdp %v", sourceCDP.Collateral)
+
+			require.Equal(t, tt.wantSourceHeight, height)
+			require.Equal(t, tt.wantCdpID, sourceCDP.ID)
+		})
+	}
+
 }
 
 func TestGetOriginalAmountPercentSub(t *testing.T) {

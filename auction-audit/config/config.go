@@ -5,13 +5,11 @@ import (
 	"os"
 	"strconv"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/joho/godotenv"
 )
 
 const (
 	grpcUrlEnvKey = "GRPC_URL"
-	bidderEnvKey  = "BIDDER"
 	startEnvKey   = "START_HEIGHT"
 	endEnvKey     = "END_HEIGHT"
 )
@@ -31,10 +29,10 @@ func (l *EnvLoader) Get(key string) string {
 }
 
 type Config struct {
-	GrpcURL       string
-	BidderAddress sdk.AccAddress
-	StartHeight   int64
-	EndHeight     int64
+	GrpcURL string
+
+	StartHeight int64
+	EndHeight   int64
 }
 
 func LoadConfig(loader ConfigLoader) (Config, error) {
@@ -46,15 +44,6 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	grpcURL := loader.Get(grpcUrlEnvKey)
 	if grpcURL == "" {
 		return Config{}, fmt.Errorf("%s not set", grpcUrlEnvKey)
-	}
-
-	bidderStr := loader.Get(bidderEnvKey)
-	if bidderStr == "" {
-		return Config{}, fmt.Errorf("%s not set", bidderEnvKey)
-	}
-	acc, err := sdk.AccAddressFromBech32(bidderStr)
-	if err != nil {
-		return Config{}, err
 	}
 
 	startHeightStr := loader.Get(startEnvKey)
@@ -70,9 +59,8 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	}
 
 	return Config{
-		GrpcURL:       grpcURL,
-		BidderAddress: acc,
-		StartHeight:   startHeight,
-		EndHeight:     endHeight,
+		GrpcURL:     grpcURL,
+		StartHeight: startHeight,
+		EndHeight:   endHeight,
 	}, nil
 }

@@ -4,8 +4,12 @@ import (
 	"container/heap"
 	"context"
 	"fmt"
-	"os"
+	"math"
 	"strconv"
+	"time"
+
+	"github.com/schollz/progressbar/v3"
+	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -17,7 +21,7 @@ import (
 )
 
 const (
-	concurrency = 100
+	concurrency = 2
 )
 
 // func GetInboundTransfers(client GrpcClient, start, end int64) (map[*sdk.AccAddress]sdk.Coins, error) {
@@ -26,9 +30,9 @@ const (
 // }
 
 func GetAuctionEndData(
+	logger log.Logger,
 	client GrpcClient,
 	start, end int64,
-	bidder sdk.AccAddress,
 ) (types.AuctionIDToHeightMap, error) {
 	// communication setup: heights -> worker pool -> raw ouput -> buffer -> sorted output
 	heights := make(chan int64)
@@ -40,7 +44,7 @@ func GetAuctionEndData(
 	}()
 	// spawn pool of workers
 	for i := 0; i < concurrency; i++ {
-		go fetchBlock(client, heights, rawOutput)
+		go fetchBlock(logger, client, heights, rawOutput)
 	}
 	// write heights to input channel
 	go func() {
@@ -54,19 +58,22 @@ func GetAuctionEndData(
 	// auction ID -> block height
 	aucMap := make(types.AuctionIDToHeightMap)
 
+	bar := progressbar.Default(end - start)
 	for output := range sortedOutput {
+		bar.Add(1)
+		bar.Describe(fmt.Sprintf("Processing block %d", output.Block.Header.Height))
+
 		for _, txBytes := range output.Block.Data.Txs {
 			tx, err := client.Decoder.TxDecoder()(txBytes)
 			if err != nil {
-				return types.AuctionIDToHeightMap{}, err
+				return types.AuctionIDToHeightMap{}, fmt.Errorf("failed to decode block tx bytes: %w", err)
 			}
 
 			msgs := tx.GetMsgs()
 			for _, msg := range msgs {
 				switch msg := msg.(type) {
 				case *auctiontypes.MsgPlaceBid:
-					id := msg.AuctionId
-					aucMap[id] = output.Block.Header.Height
+					aucMap[msg.AuctionId] = output.Block.Header.Height
 				}
 			}
 		}
@@ -75,6 +82,7 @@ func GetAuctionEndData(
 			break
 		}
 	}
+	bar.Finish()
 
 	return aucMap, nil
 }
@@ -85,10 +93,16 @@ type auctionPair struct {
 }
 
 func GetAuctionClearingData(
+	logger log.Logger,
 	client GrpcClient,
 	endMap map[uint64]int64,
-	bidder sdk.AccAddress,
 ) (types.BaseAuctionProceedsMap, error) {
+	// Return if empty, otherwise the loop over rawOutput will hang forever:
+	// rawOutput will never have any values to read, so the loop will never start.
+	if len(endMap) == 0 {
+		return types.BaseAuctionProceedsMap{}, nil
+	}
+
 	rawOutput := make(chan *auctiontypes.QueryAuctionResponse)
 	pairs := make(chan auctionPair)
 
@@ -99,7 +113,7 @@ func GetAuctionClearingData(
 	}()
 	// spawn pool of workers
 	for i := 0; i < concurrency; i++ {
-		go fetchAuction(client, pairs, rawOutput)
+		go fetchAuction(logger, client, pairs, rawOutput)
 	}
 	// write heights to input channel
 	go func() {
@@ -112,8 +126,6 @@ func GetAuctionClearingData(
 	for res := range rawOutput {
 		var auc auctiontypes.Auction
 		client.cdc.UnpackAny(res.Auction, &auc)
-
-		// TODO: Get prices after auction ends
 
 		col, ok := auc.(*auctiontypes.CollateralAuction)
 		if ok {
@@ -138,8 +150,8 @@ func GetAuctionClearingData(
 					SourceModule:      auc.GetInitiator(),
 				}
 			}
-
 		}
+
 		if i == len(endMap) {
 			break
 		}
@@ -152,9 +164,16 @@ func GetAuctionClearingData(
 // GetAuctionValueData populates a map with before/after auction USD value data
 func GetAuctionValueData(
 	ctx context.Context,
+	logger log.Logger,
 	client GrpcClient,
 	clearingData types.BaseAuctionProceedsMap,
 ) (types.AuctionProceedsMap, error) {
+	// Return if empty, otherwise the loop over rawOutput will hang forever:
+	// rawOutput will never have any values to read, so the loop will never start.
+	if len(clearingData) == 0 {
+		return types.AuctionProceedsMap{}, nil
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(concurrency)
 
@@ -165,7 +184,7 @@ func GetAuctionValueData(
 		func(auctionData types.BaseAuctionProceeds) {
 			g.Go(func() error {
 				// Coins from cdp or hard deposit 1 block before liquidation
-				preLiquidationAmount, preLiquidationHeight := fetchAuctionSourceAmount(ctx, client, auctionData)
+				preLiquidationAmount, preLiquidationHeight := fetchAuctionSourceAmount(ctx, logger, client, auctionData)
 
 				// Get USD value
 				beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(client, preLiquidationHeight, preLiquidationAmount, types.Spot)
@@ -187,6 +206,13 @@ func GetAuctionValueData(
 	for aucProceed := range proceedsChan {
 		dataMap[aucProceed.ID] = aucProceed
 
+		logger.Debug(
+			"processed full auction proceed",
+			"i", i,
+			"auctionID", aucProceed.ID,
+			"value", aucProceed.UsdValueBefore.String(),
+		)
+
 		i += 1
 		if i == len(clearingData) {
 			break
@@ -199,6 +225,7 @@ func GetAuctionValueData(
 
 func fetchAuctionSourceAmount(
 	ctx context.Context,
+	logger log.Logger,
 	client GrpcClient,
 	auctionProceeds types.BaseAuctionProceeds,
 ) (sdk.Coins, int64) {
@@ -208,21 +235,21 @@ func fetchAuctionSourceAmount(
 			hardDeposit, height, err := GetAuctionSourceHARD(ctx, client, auctionProceeds.ID)
 			if err != nil {
 				// Print and retry
-				fmt.Fprintf(os.Stderr, "Error fetching auction source HARD deposit: %s", err)
+				logger.Error("Error fetching auction source HARD deposit", "err", err)
 				continue
 			}
 
 			return hardDeposit.Amount, height
-		case "cdp":
+		case "cdp", "liquidator":
 			cdpDeposit, height, err := GetAuctionSourceCDP(ctx, client, auctionProceeds.ID)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error fetching auction source CDP deposit: %s", err)
+				logger.Error("Error fetching auction source CDP deposit", "err", err)
 				continue
 			}
 
 			return sdk.NewCoins(cdpDeposit.Collateral), height
 		default:
-			fmt.Fprintf(os.Stderr, "Unhandled auction source module: %s", auctionProceeds.SourceModule)
+			panic(fmt.Sprintf("Unhandled auction source module: %s", auctionProceeds.SourceModule))
 		}
 	}
 }
@@ -254,8 +281,15 @@ func ctxAtHeight(height int64) context.Context {
 }
 
 // fetchBlock never gives up and keeps trying until it gets the block
-func fetchBlock(client GrpcClient, heights <-chan int64, blockResults chan<- *tmservice.GetBlockByHeightResponse) {
+func fetchBlock(
+	logger log.Logger,
+	client GrpcClient,
+	heights <-chan int64,
+	blockResults chan<- *tmservice.GetBlockByHeightResponse,
+) {
 	for height := range heights {
+		failedAttempts := 0
+
 		for {
 			result, err := client.Tm.GetBlockByHeight(
 				context.Background(),
@@ -265,6 +299,16 @@ func fetchBlock(client GrpcClient, heights <-chan int64, blockResults chan<- *tm
 			)
 
 			if err != nil {
+				sleepSeconds := math.Pow(2, float64(failedAttempts))
+				logger.Error(
+					"Error fetching block, retrying...",
+					"height", height,
+					"error", err,
+					"delaySeconds", sleepSeconds,
+				)
+
+				time.Sleep(time.Duration(sleepSeconds) * time.Second)
+				failedAttempts += 1
 				continue
 			}
 
@@ -275,14 +319,26 @@ func fetchBlock(client GrpcClient, heights <-chan int64, blockResults chan<- *tm
 }
 
 // fetchAuction peels pairs off then queries them in an endless loop
-func fetchAuction(client GrpcClient, pairs <-chan auctionPair, results chan<- *auctiontypes.QueryAuctionResponse) {
+func fetchAuction(
+	logger log.Logger,
+	client GrpcClient,
+	pairs <-chan auctionPair,
+	results chan<- *auctiontypes.QueryAuctionResponse,
+) {
 	for pair := range pairs {
 		ctx := ctxAtHeight(pair.height)
 		for {
-			res, err := client.Auction.Auction(ctx, &auctiontypes.QueryAuctionRequest{AuctionId: pair.id})
+			res, err := client.Auction.Auction(ctx, &auctiontypes.QueryAuctionRequest{
+				AuctionId: pair.id,
+			})
 			if err != nil {
+				logger.Error(
+					"Error fetching auction, retrying...",
+					"auctionID", pair.id, "height", pair.height, "error", err,
+				)
 				continue
 			}
+
 			results <- res
 			break
 		}
