@@ -92,10 +92,15 @@ type auctionPair struct {
 	height int64
 }
 
+type auctionResponse struct {
+	EndHeight int64
+	Auction   auctiontypes.Auction
+}
+
 func GetAuctionClearingData(
 	logger log.Logger,
 	client GrpcClient,
-	endMap map[uint64]int64,
+	endMap types.AuctionIDToHeightMap,
 ) (types.BaseAuctionProceedsMap, error) {
 	// Return if empty, otherwise the loop over rawOutput will hang forever:
 	// rawOutput will never have any values to read, so the loop will never start.
@@ -103,7 +108,7 @@ func GetAuctionClearingData(
 		return types.BaseAuctionProceedsMap{}, nil
 	}
 
-	rawOutput := make(chan *auctiontypes.QueryAuctionResponse)
+	rawOutput := make(chan auctionResponse)
 	pairs := make(chan auctionPair)
 
 	clearingMap := make(types.BaseAuctionProceedsMap)
@@ -124,10 +129,7 @@ func GetAuctionClearingData(
 
 	i := 1
 	for res := range rawOutput {
-		var auc auctiontypes.Auction
-		client.cdc.UnpackAny(res.Auction, &auc)
-
-		col, ok := auc.(*auctiontypes.CollateralAuction)
+		col, ok := res.Auction.(*auctiontypes.CollateralAuction)
 		if ok {
 			ap, found := clearingMap[col.GetID()]
 
@@ -142,12 +144,13 @@ func GetAuctionClearingData(
 			} else {
 				clearingMap[col.GetID()] = types.BaseAuctionProceeds{
 					ID:                col.GetID(),
+					EndHeight:         res.EndHeight,
 					AmountPurchased:   col.GetLot(),
 					AmountPaid:        col.GetBid(),
 					InitialLot:        sdk.NewCoin(col.GetLot().Denom, col.GetLotReturns().Weights[0]),
 					LiquidatedAccount: col.GetLotReturns().Addresses[0].String(),
 					WinningBidder:     col.GetBidder().String(),
-					SourceModule:      auc.GetInitiator(),
+					SourceModule:      col.GetInitiator(),
 				}
 			}
 		}
@@ -186,8 +189,26 @@ func GetAuctionValueData(
 				// Coins from cdp or hard deposit 1 block before liquidation
 				preLiquidationAmount, preLiquidationHeight := fetchAuctionSourceAmount(ctx, logger, client, auctionData)
 
-				// Get USD value
-				beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(client, preLiquidationHeight, preLiquidationAmount, types.Spot)
+				// Get total USD value before liquidation
+				beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(
+					client,
+					preLiquidationHeight,
+					preLiquidationAmount,
+					types.PriceType_Spot,
+				)
+				if err != nil {
+					return err
+				}
+
+				amountReturned := auctionData.InitialLot.Sub(auctionData.AmountPurchased)
+
+				// Get total USD value after liquidation
+				afterUsdValue, err := GetTotalCoinsUsdValueAtHeight(
+					client,
+					auctionData.EndHeight,
+					sdk.NewCoins(amountReturned),
+					types.PriceType_Twap30,
+				)
 				if err != nil {
 					return err
 				}
@@ -195,6 +216,8 @@ func GetAuctionValueData(
 				proceedsChan <- types.AuctionProceeds{
 					BaseAuctionProceeds: auctionData,
 					UsdValueBefore:      beforeUsdValue,
+					UsdValueAfter:       afterUsdValue,
+					PercentLoss:         sdk.ZeroDec(),
 				}
 
 				return nil
@@ -323,7 +346,7 @@ func fetchAuction(
 	logger log.Logger,
 	client GrpcClient,
 	pairs <-chan auctionPair,
-	results chan<- *auctiontypes.QueryAuctionResponse,
+	results chan<- auctionResponse,
 ) {
 	for pair := range pairs {
 		ctx := ctxAtHeight(pair.height)
@@ -339,7 +362,15 @@ func fetchAuction(
 				continue
 			}
 
-			results <- res
+			var auc auctiontypes.Auction
+			if err := client.cdc.UnpackAny(res.Auction, &auc); err != nil {
+				panic(fmt.Sprintf("Error unpacking auction, %s", err))
+			}
+
+			results <- auctionResponse{
+				Auction:   auc,
+				EndHeight: pair.height,
+			}
 			break
 		}
 	}

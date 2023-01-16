@@ -19,6 +19,7 @@ type AuctionProceeds struct {
 // BaseAuctionProceeds defines basic information about a single auction
 type BaseAuctionProceeds struct {
 	ID                uint64
+	EndHeight         int64
 	AmountPurchased   sdk.Coin
 	AmountPaid        sdk.Coin
 	InitialLot        sdk.Coin

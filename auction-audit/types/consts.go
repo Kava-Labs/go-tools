@@ -37,8 +37,8 @@ var DenomToPriceMarketMap = map[string]string{
 type PriceType int
 
 const (
-	Spot PriceType = iota + 1
-	Twap30
+	PriceType_Spot PriceType = iota + 1
+	PriceType_Twap30
 )
 
 func GetMarketID(denom string, priceType PriceType) (string, error) {
@@ -47,11 +47,11 @@ func GetMarketID(denom string, priceType PriceType) (string, error) {
 		return "", fmt.Errorf("could not find market id for denom %s", denom)
 	}
 
-	if priceType == Spot {
+	if priceType == PriceType_Spot {
 		return fmt.Sprintf("%s:usd", market_name), nil
 	}
 
-	if priceType == Twap30 {
+	if priceType == PriceType_Twap30 {
 		return fmt.Sprintf("%s:usd:30", market_name), nil
 	}
 

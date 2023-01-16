@@ -59,7 +59,7 @@ func TestGetTotalCoinsUsdValueAtHeight(t *testing.T) {
 				grpcClient,
 				tt.giveHeight,
 				tt.giveCoins,
-				types.Spot,
+				types.PriceType_Spot,
 			)
 			require.NoError(t, err)
 

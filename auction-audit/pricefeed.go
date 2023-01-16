@@ -47,7 +47,8 @@ func GetTotalCoinsUsdValueAtHeight(
 			return sdk.ZeroDec(), fmt.Errorf("failed to get price for %s at height %d", marketId, height)
 		}
 
-		coinValue := coin.Amount.ToDec().Mul(price)
+		conversionFactor := types.ConversionMap[coin.Denom]
+		coinValue := coin.Amount.ToDec().Quo(conversionFactor.ToDec()).Mul(price)
 		totalUsdValue = totalUsdValue.Add(coinValue)
 	}
 

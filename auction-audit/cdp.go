@@ -40,6 +40,10 @@ type AttributesMap map[string]string
 func AttributesToMap(attrs []sdk.Attribute) AttributesMap {
 	m := make(map[string]string)
 	for _, attr := range attrs {
+		if _, found := m[attr.Key]; found {
+			panic(fmt.Sprintf("duplicate attribute key %s, this may be due to flattened events", attr.Key))
+		}
+
 		m[attr.Key] = attr.Value
 	}
 
