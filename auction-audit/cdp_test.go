@@ -31,13 +31,13 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 		name             string
 		giveAuctionID    uint64
 		wantSourceHeight int64
-		wantCdpID        uint64
+		wantAmount       sdk.Coin
 	}{
 		{
 			name:             "CDP auction via MsgLiquidate",
 			giveAuctionID:    16596,
 			wantSourceHeight: 2824779,
-			wantCdpID:        13188,
+			wantAmount:       sdk.NewCoin("usdx", sdk.NewInt(1000000)),
 		},
 		{
 			// Auction that was started in cdp BeginBlocker which cannot be
@@ -45,22 +45,21 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 			name:             "CDP auction via BeginBlocker",
 			giveAuctionID:    16837,
 			wantSourceHeight: 3146802, // 1 block before auction was started
-			wantCdpID:        23216,
+			wantAmount:       sdk.NewCoin("usdx", sdk.NewInt(1000000)),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sourceCDP, height, err := main.GetAuctionSourceCDP(
+			amount, height, err := main.GetAuctionSourceCDP(
 				context.Background(),
 				grpcClient,
 				tt.giveAuctionID,
 			)
 			require.NoError(t, err)
-			t.Logf("source cdp %v", sourceCDP.Collateral)
 
 			assert.Equal(t, tt.wantSourceHeight, height)
-			assert.Equal(t, tt.wantCdpID, sourceCDP.ID)
+			assert.Equal(t, tt.wantAmount, amount)
 		})
 	}
 

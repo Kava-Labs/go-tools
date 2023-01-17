@@ -21,7 +21,9 @@ import (
 )
 
 const (
-	concurrency = 2
+	concurrency        = 8
+	hourSeconds        = 3600
+	approxBlockSeconds = 6
 )
 
 // func GetInboundTransfers(client GrpcClient, start, end int64) (map[*sdk.AccAddress]sdk.Coins, error) {
@@ -127,8 +129,13 @@ func GetAuctionClearingData(
 		}
 	}()
 
+	bar := progressbar.Default(int64(len(endMap)))
+
 	i := 1
 	for res := range rawOutput {
+		bar.Add(1)
+		bar.Describe(fmt.Sprintf("Processing auction %d", res.Auction.GetID()))
+
 		col, ok := res.Auction.(*auctiontypes.CollateralAuction)
 		if ok {
 			ap, found := clearingMap[col.GetID()]
@@ -136,7 +143,6 @@ func GetAuctionClearingData(
 			if found {
 				ap.AmountPurchased = ap.AmountPurchased.Add(col.GetLot())
 				ap.AmountPaid = ap.AmountPaid.Add(col.GetBid())
-				ap.InitialLot = sdk.NewCoin(col.GetLot().Denom, col.GetLotReturns().Weights[0])
 				ap.LiquidatedAccount = col.GetLotReturns().Addresses[0].String()
 				ap.WinningBidder = col.GetBidder().String()
 
@@ -147,7 +153,6 @@ func GetAuctionClearingData(
 					EndHeight:         res.EndHeight,
 					AmountPurchased:   col.GetLot(),
 					AmountPaid:        col.GetBid(),
-					InitialLot:        sdk.NewCoin(col.GetLot().Denom, col.GetLotReturns().Weights[0]),
 					LiquidatedAccount: col.GetLotReturns().Addresses[0].String(),
 					WinningBidder:     col.GetBidder().String(),
 					SourceModule:      col.GetInitiator(),
@@ -160,6 +165,7 @@ func GetAuctionClearingData(
 		}
 		i++
 	}
+	bar.Finish()
 
 	return clearingMap, nil
 }
@@ -183,58 +189,84 @@ func GetAuctionValueData(
 	proceedsChan := make(chan types.AuctionProceeds)
 	dataMap := make(types.AuctionProceedsMap)
 
-	for _, auctionData := range clearingData {
-		func(auctionData types.BaseAuctionProceeds) {
-			g.Go(func() error {
-				// Coins from cdp or hard deposit 1 block before liquidation
-				preLiquidationAmount, preLiquidationHeight := fetchAuctionSourceAmount(ctx, logger, client, auctionData)
+	// Run worker jobs in background so that the consumer proceedsChan can
+	// read from the channel as soon as the first worker job is done.
+	go func() {
+		bar := progressbar.Default(int64(len(clearingData)))
+		for _, auctionData := range clearingData {
+			func(auctionData types.BaseAuctionProceeds) {
+				g.Go(func() error {
+					bar.Add(1)
+					bar.Describe(fmt.Sprintf("Adding USD value data to auction %d", auctionData.ID))
 
-				// Get total USD value before liquidation
-				beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(
-					client,
-					preLiquidationHeight,
-					preLiquidationAmount,
-					types.PriceType_Spot,
-				)
-				if err != nil {
-					return err
-				}
+					// Liquidation initial lot and height of liquidation
+					initialLot, preLiquidationHeight := fetchLiquidationData(ctx, logger, client, auctionData)
 
-				amountReturned := auctionData.InitialLot.Sub(auctionData.AmountPurchased)
+					// Get total USD value before liquidation
+					beforeUsdValue, err := GetTotalCoinsUsdValueAtHeight(
+						client,
+						preLiquidationHeight,
+						sdk.NewCoins(initialLot),
+						types.PriceType_Spot,
+					)
+					if err != nil {
+						return err
+					}
 
-				// Get total USD value after liquidation
-				afterUsdValue, err := GetTotalCoinsUsdValueAtHeight(
-					client,
-					auctionData.EndHeight,
-					sdk.NewCoins(amountReturned),
-					types.PriceType_Twap30,
-				)
-				if err != nil {
-					return err
-				}
+					if initialLot.Amount.LT(auctionData.AmountPurchased.Amount) {
+						return fmt.Errorf(
+							"auction %d: amount purchased (%s) is greater than initial lot (%s)",
+							auctionData.ID, auctionData.AmountPurchased, initialLot,
+						)
+					}
 
-				proceedsChan <- types.AuctionProceeds{
-					BaseAuctionProceeds: auctionData,
-					UsdValueBefore:      beforeUsdValue,
-					UsdValueAfter:       afterUsdValue,
-					PercentLoss:         sdk.ZeroDec(),
-				}
+					amountReturned := initialLot.Sub(auctionData.AmountPurchased)
 
-				return nil
-			})
-		}(auctionData)
-	}
+					// Get total USD value after liquidation
+					blocksIn1Hour := float64(hourSeconds) / float64(approxBlockSeconds)
+					height4HoursAfter := auctionData.EndHeight + int64(4*blocksIn1Hour)
+
+					afterUsdValue, err := GetTotalCoinsUsdValueAtHeight(
+						client,
+						height4HoursAfter,
+						sdk.NewCoins(amountReturned),
+						types.PriceType_Spot,
+					)
+					if err != nil {
+						return err
+					}
+
+					// (Before - After) / Before
+					percentLossAmount := sdk.NewDecFromInt(initialLot.Amount).
+						Sub(sdk.NewDecFromInt(amountReturned.Amount)).
+						Quo(sdk.NewDecFromInt(initialLot.Amount))
+
+					// (Before - After) / Before
+					percentLossUsdValue := beforeUsdValue.
+						Sub(afterUsdValue).
+						Quo(beforeUsdValue)
+
+					proceedsChan <- types.AuctionProceeds{
+						BaseAuctionProceeds: auctionData,
+						InitialLot:          initialLot,
+						USDValueBefore:      beforeUsdValue,
+						USDValueAfter:       afterUsdValue,
+						AmountReturned:      amountReturned,
+						PercentLossAmount:   percentLossAmount,
+						PercentLossUSDValue: percentLossUsdValue,
+					}
+
+					return nil
+				})
+			}(auctionData)
+		}
+
+		bar.Finish()
+	}()
 
 	i := 0
 	for aucProceed := range proceedsChan {
 		dataMap[aucProceed.ID] = aucProceed
-
-		logger.Debug(
-			"processed full auction proceed",
-			"i", i,
-			"auctionID", aucProceed.ID,
-			"value", aucProceed.UsdValueBefore.String(),
-		)
 
 		i += 1
 		if i == len(clearingData) {
@@ -246,31 +278,31 @@ func GetAuctionValueData(
 	return dataMap, err
 }
 
-func fetchAuctionSourceAmount(
+func fetchLiquidationData(
 	ctx context.Context,
 	logger log.Logger,
 	client GrpcClient,
 	auctionProceeds types.BaseAuctionProceeds,
-) (sdk.Coins, int64) {
+) (sdk.Coin, int64) {
 	for {
 		switch auctionProceeds.SourceModule {
 		case "hard":
-			hardDeposit, height, err := GetAuctionSourceHARD(ctx, client, auctionProceeds.ID)
+			amount, height, err := GetAuctionSourceHARD(ctx, client, auctionProceeds.ID)
 			if err != nil {
 				// Print and retry
 				logger.Error("Error fetching auction source HARD deposit", "err", err)
 				continue
 			}
 
-			return hardDeposit.Amount, height
+			return amount, height
 		case "cdp", "liquidator":
-			cdpDeposit, height, err := GetAuctionSourceCDP(ctx, client, auctionProceeds.ID)
+			amount, height, err := GetAuctionSourceCDP(ctx, client, auctionProceeds.ID)
 			if err != nil {
 				logger.Error("Error fetching auction source CDP deposit", "err", err)
 				continue
 			}
 
-			return sdk.NewCoins(cdpDeposit.Collateral), height
+			return amount, height
 		default:
 			panic(fmt.Sprintf("Unhandled auction source module: %s", auctionProceeds.SourceModule))
 		}
@@ -338,6 +370,8 @@ func fetchBlock(
 			blockResults <- result
 			break
 		}
+
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -373,6 +407,8 @@ func fetchAuction(
 			}
 			break
 		}
+
+		time.Sleep(1 * time.Second)
 	}
 }
 

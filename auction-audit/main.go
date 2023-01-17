@@ -78,7 +78,6 @@ func tryMain(logger log.Logger) error {
 		return fmt.Errorf("failed to fetch auction end data: %w", err)
 	}
 	logger.Info("Found auctions", "count", len(auctionIdToHeightMap))
-	logger.Info("Auction end data", "auctionIdToHeightMap", auctionIdToHeightMap)
 
 	if len(auctionIdToHeightMap) == 0 {
 		logger.Info("No auctions found, stopping.")
@@ -121,6 +120,8 @@ func tryMain(logger log.Logger) error {
 	err = csv.WriteCsv(
 		outputFile,
 		[]string{
+			"Auction ID",
+			"End Height",
 			"Asset Purchased",
 			"Amount Purchased",
 			"Asset Paid",
@@ -130,7 +131,9 @@ func tryMain(logger log.Logger) error {
 			"Winning Bidder Account",
 			"USD Value Before Liquidation",
 			"USD Value After Liquidation",
-			"Percent Loss",
+			"Amount Returned",
+			"Percent Loss (quantity)",
+			"Percent Loss (USD value)",
 		},
 		fullAuctionDataMap,
 	)

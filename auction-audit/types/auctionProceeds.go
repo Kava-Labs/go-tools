@@ -1,6 +1,10 @@
 package types
 
 import (
+	"fmt"
+	"sort"
+	"strconv"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -11,9 +15,12 @@ type AuctionIDToHeightMap map[uint64]int64
 type AuctionProceeds struct {
 	BaseAuctionProceeds
 
-	UsdValueBefore sdk.Dec
-	UsdValueAfter  sdk.Dec
-	PercentLoss    sdk.Dec
+	InitialLot          sdk.Coin
+	USDValueBefore      sdk.Dec
+	USDValueAfter       sdk.Dec
+	AmountReturned      sdk.Coin
+	PercentLossAmount   sdk.Dec
+	PercentLossUSDValue sdk.Dec
 }
 
 // BaseAuctionProceeds defines basic information about a single auction
@@ -22,7 +29,6 @@ type BaseAuctionProceeds struct {
 	EndHeight         int64
 	AmountPurchased   sdk.Coin
 	AmountPaid        sdk.Coin
-	InitialLot        sdk.Coin
 	LiquidatedAccount string
 	WinningBidder     string
 	SourceModule      string
@@ -40,18 +46,44 @@ func (ap AuctionProceedsMap) ToRecords() [][]string {
 
 	for _, ap := range ap {
 		records = append(records, []string{
+			fmt.Sprintf("%d", ap.ID),
+			fmt.Sprintf("%d", ap.EndHeight),
 			DenomMap[ap.AmountPurchased.Denom],
-			ap.AmountPurchased.Amount.ToDec().Mul(sdk.OneDec().Quo(ConversionMap[ap.AmountPurchased.Denom].ToDec())).String(),
+			ap.AmountPurchased.Amount.ToDec().
+				Quo(ConversionMap[ap.AmountPurchased.Denom].ToDec()).
+				String(),
 			DenomMap[ap.AmountPaid.Denom],
-			ap.AmountPaid.Amount.ToDec().Mul(sdk.OneDec().Quo(ConversionMap[ap.AmountPaid.Denom].ToDec())).String(),
-			ap.InitialLot.String(),
+			ap.AmountPaid.Amount.ToDec().
+				Quo(ConversionMap[ap.AmountPaid.Denom].ToDec()).
+				String(),
+			ap.InitialLot.Amount.ToDec().
+				Quo(ConversionMap[ap.InitialLot.Denom].ToDec()).
+				String(),
 			ap.LiquidatedAccount,
 			ap.WinningBidder,
-			ap.UsdValueBefore.String(),
-			ap.UsdValueAfter.String(),
-			ap.PercentLoss.String(),
+			ap.USDValueBefore.String(),
+			ap.USDValueAfter.String(),
+			ap.AmountReturned.Amount.ToDec().
+				Quo(ConversionMap[ap.AmountReturned.Denom].ToDec()).
+				String(),
+			ap.PercentLossAmount.String(),
+			ap.PercentLossUSDValue.String(),
 		})
 	}
 
+	// Sort output by auction ID
+	sort.Slice(records, func(i, j int) bool {
+		return MustStrToInt(records[i][0]) < MustStrToInt(records[j][0])
+	})
+
 	return records
+}
+
+func MustStrToInt(str string) int64 {
+	i, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	return i
 }
