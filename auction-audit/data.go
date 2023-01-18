@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	concurrency        = 8
+	concurrency        = 2
 	hourSeconds        = 3600
 	approxBlockSeconds = 6
 )
@@ -38,8 +38,8 @@ func GetAuctionEndData(
 ) (types.AuctionIDToHeightMap, error) {
 	// communication setup: heights -> worker pool -> raw ouput -> buffer -> sorted output
 	heights := make(chan int64)
-	rawOutput := make(chan *tmservice.GetBlockByHeightResponse)
-	sortedOutput := make(chan *tmservice.GetBlockByHeightResponse)
+	rawOutput := make(chan types.BlockData)
+	sortedOutput := make(chan types.BlockData)
 
 	// buffer output and order
 	go func() {
@@ -65,7 +65,12 @@ func GetAuctionEndData(
 		bar.Add(1)
 		bar.Describe(fmt.Sprintf("Processing block %d", output.Block.Header.Height))
 
-		for _, txBytes := range output.Block.Data.Txs {
+		for i, txBytes := range output.Block.Data.Txs {
+			if output.BlockResult.TxsResults[i].Code != 0 {
+				// Skip failed txs, TxResults have the same index as Txs
+				continue
+			}
+
 			tx, err := client.Decoder.TxDecoder()(txBytes)
 			if err != nil {
 				return types.AuctionIDToHeightMap{}, fmt.Errorf("failed to decode block tx bytes: %w", err)
@@ -133,6 +138,11 @@ func GetAuctionClearingData(
 
 	i := 1
 	for res := range rawOutput {
+		if res.Auction == nil {
+			logger.Error("auction response was nil", "endHeight", res.EndHeight, "id", i)
+			continue
+		}
+
 		bar.Add(1)
 		bar.Describe(fmt.Sprintf("Processing auction %d", res.Auction.GetID()))
 
@@ -341,25 +351,31 @@ func fetchBlock(
 	logger log.Logger,
 	client GrpcClient,
 	heights <-chan int64,
-	blockResults chan<- *tmservice.GetBlockByHeightResponse,
+	blockResults chan<- types.BlockData,
 ) {
 	for height := range heights {
 		failedAttempts := 0
 
 		for {
-			result, err := client.Tm.GetBlockByHeight(
+			block, err1 := client.Tm.GetBlockByHeight(
 				context.Background(),
 				&tmservice.GetBlockByHeightRequest{
 					Height: height,
 				},
 			)
 
-			if err != nil {
+			blockResult, err2 := client.Tendermint.BlockResults(
+				context.Background(),
+				&height,
+			)
+
+			if err1 != nil {
 				sleepSeconds := math.Pow(2, float64(failedAttempts))
 				logger.Error(
 					"Error fetching block, retrying...",
 					"height", height,
-					"error", err,
+					"GetBlockByHeight error", err1,
+					"BlockResults error", err2,
 					"delaySeconds", sleepSeconds,
 				)
 
@@ -368,7 +384,10 @@ func fetchBlock(
 				continue
 			}
 
-			blockResults <- result
+			blockResults <- types.BlockData{
+				Block:       block.Block,
+				BlockResult: blockResult,
+			}
 			break
 		}
 	}
@@ -382,6 +401,8 @@ func fetchAuction(
 	results chan<- auctionResponse,
 ) {
 	for pair := range pairs {
+		nilCount := 0
+
 		ctx := ctxAtHeight(pair.height)
 		for {
 			res, err := client.Auction.Auction(ctx, &auctiontypes.QueryAuctionRequest{
@@ -400,6 +421,23 @@ func fetchAuction(
 				panic(fmt.Sprintf("Error unpacking auction, %s", err))
 			}
 
+			if auc == nil {
+				nilCount += 1
+				if nilCount > 5 {
+					panic(fmt.Sprintf("Auction %d was nil 5 times in a row", pair.id))
+				}
+
+				sleepSeconds := math.Pow(2, float64(nilCount))
+				logger.Error(
+					"Auction is nil, retrying...",
+					"auctionID", pair.id,
+					"height", pair.height,
+					"delaySeconds", sleepSeconds,
+				)
+				time.Sleep(time.Duration(sleepSeconds) * time.Second)
+				continue
+			}
+
 			results <- auctionResponse{
 				Auction:   auc,
 				EndHeight: pair.height,
@@ -411,8 +449,8 @@ func fetchAuction(
 
 // buffers and ouputs sorted blocks using a heap
 func sortBlocks(
-	unsorted <-chan *tmservice.GetBlockByHeightResponse,
-	sorted chan<- *tmservice.GetBlockByHeightResponse,
+	unsorted <-chan types.BlockData,
+	sorted chan<- types.BlockData,
 	start int64,
 ) {
 	queue := &types.BlockHeap{}
@@ -425,7 +463,7 @@ func sortBlocks(
 			minHeight := (*queue)[0].Block.Header.Height
 
 			if minHeight == previousHeight+1 {
-				result := heap.Pop(queue).(*tmservice.GetBlockByHeightResponse)
+				result := heap.Pop(queue).(types.BlockData)
 
 				sorted <- result
 
