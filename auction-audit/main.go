@@ -122,6 +122,7 @@ func tryMain(logger log.Logger) error {
 		[]string{
 			"Auction ID",
 			"End Height",
+			"Source Module",
 			"Asset Purchased",
 			"Amount Purchased",
 			"Asset Paid",

@@ -48,6 +48,7 @@ func (ap AuctionProceedsMap) ToRecords() [][]string {
 		records = append(records, []string{
 			fmt.Sprintf("%d", ap.ID),
 			fmt.Sprintf("%d", ap.EndHeight),
+			ap.SourceModule,
 			DenomMap[ap.AmountPurchased.Denom],
 			ap.AmountPurchased.Amount.ToDec().
 				Quo(ConversionMap[ap.AmountPurchased.Denom].ToDec()).
