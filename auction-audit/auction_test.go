@@ -53,6 +53,12 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 			wantSourceHeight: 2773444,
 			wantAmount:       sdk.NewCoin("xrpb", sdk.NewInt(246056832094)),
 		},
+		{
+			name:             "CDP auction 2 via BeginBlocker",
+			giveAuctionID:    15265,
+			wantSourceHeight: 2773444,
+			wantAmount:       sdk.NewCoin("xrpb", sdk.NewInt(246056832094)),
+		},
 	}
 
 	for _, tt := range tests {
