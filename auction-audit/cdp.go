@@ -21,7 +21,7 @@ func GetOriginalAmountPercentSub(
 		Mul(sdk.NewDec(100))
 }
 
-func GetAuctionSourceCDP(
+func GetAuctionStartLotCDP(
 	ctx context.Context,
 	client GrpcClient,
 	auctionID uint64,
@@ -33,14 +33,18 @@ func GetAuctionSourceCDP(
 			"auction_start.auction_id=%d",
 			auctionID,
 		))
-	if err != nil {
-		// Check if auction started in BeginBlocker
+
+	// No error: auction started in BeginBlocker
+	if err == nil {
+		// Check if auction started in BeginBlocker, continue if not found
 		lot, found := GetAuctionStartLotFromEvents(blockEvents, auctionID)
 		if !found {
-			return sdk.Coin{}, 0, fmt.Errorf("could not find auction start event for auction %d", auctionID)
+			return sdk.Coin{}, 0, fmt.Errorf("failed to get CDP auction start from BeginBlock: %s", err)
 		}
 
-		return lot, height - 1, nil
+		// This should exist at this point, beginblock query will return an error
+		// if the event for the specified auction was not found
+		return lot, height, nil
 	}
 
 	// Try searching for liquidate message in Txs

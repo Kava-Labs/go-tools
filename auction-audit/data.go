@@ -296,7 +296,8 @@ func fetchLiquidationData(
 
 			return amount, height
 		case "cdp", "liquidator":
-			amount, height, err := GetAuctionSourceCDP(ctx, client, auctionProceeds.ID)
+			// This is separate since CDP liquidations are mostly in BeginBlocker
+			amount, height, err := GetAuctionStartLotCDP(ctx, client, auctionProceeds.ID)
 			if err != nil {
 				logger.Error("Error fetching auction source CDP deposit", "err", err)
 				continue
@@ -370,8 +371,6 @@ func fetchBlock(
 			blockResults <- result
 			break
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -407,8 +406,6 @@ func fetchAuction(
 			}
 			break
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 

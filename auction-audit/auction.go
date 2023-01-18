@@ -82,7 +82,7 @@ func GetAuctionStartLotTxResponses(
 	}
 
 	if len(res.TxResponses) == 0 {
-		return sdk.Coin{}, 0, fmt.Errorf("no txs with kava.hard.v1beta1.MsgLiquidate found for auction ID %d", auctionID)
+		return sdk.Coin{}, 0, fmt.Errorf("no txs with auction_start found for auction ID %d", auctionID)
 	}
 
 	for _, res := range res.TxResponses {

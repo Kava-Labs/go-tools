@@ -36,22 +36,28 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 		{
 			name:             "CDP auction via MsgLiquidate",
 			giveAuctionID:    16596,
-			wantSourceHeight: 2824779,
-			wantAmount:       sdk.NewCoin("usdx", sdk.NewInt(1000000)),
+			wantSourceHeight: 2824780,
+			wantAmount:       sdk.NewCoin("busd", sdk.NewInt(1099890000)),
 		},
 		{
 			// Auction that was started in cdp BeginBlocker which cannot be
 			// queried for source cdp via grpc txs
 			name:             "CDP auction via BeginBlocker",
 			giveAuctionID:    16837,
-			wantSourceHeight: 3146802, // 1 block before auction was started
-			wantAmount:       sdk.NewCoin("usdx", sdk.NewInt(1000000)),
+			wantSourceHeight: 3146803,
+			wantAmount:       sdk.NewCoin("xrpb", sdk.NewInt(475595214356)),
+		},
+		{
+			name:             "CDP auction 2 via BeginBlocker",
+			giveAuctionID:    16017,
+			wantSourceHeight: 2773444,
+			wantAmount:       sdk.NewCoin("xrpb", sdk.NewInt(246056832094)),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			amount, height, err := main.GetAuctionSourceCDP(
+			amount, height, err := main.GetAuctionStartLotCDP(
 				context.Background(),
 				grpcClient,
 				tt.giveAuctionID,
