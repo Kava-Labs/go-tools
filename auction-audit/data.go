@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/heap"
 	"context"
 	"fmt"
 	"math"
@@ -11,7 +10,6 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/tendermint/tendermint/libs/log"
 
-	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	"github.com/kava-labs/go-tools/auction-audit/types"
@@ -290,13 +288,25 @@ func fetchLiquidationData(
 	client GrpcClient,
 	auctionProceeds types.BaseAuctionProceeds,
 ) (sdk.Coin, int64) {
+	failedAttempts := 0
+
 	for {
 		switch auctionProceeds.SourceModule {
 		case "hard":
 			amount, height, err := GetAuctionSourceHARD(ctx, client, auctionProceeds.ID)
 			if err != nil {
 				// Print and retry
-				logger.Error("Error fetching auction source HARD deposit", "err", err)
+				sleepDuration := getBackoffDuration(failedAttempts)
+				logger.Error(
+					"Error fetching auction source HARD deposit",
+					"auction ID", auctionProceeds.ID,
+					"err", err,
+					"delaySeconds", sleepDuration.String(),
+				)
+
+				time.Sleep(sleepDuration)
+				failedAttempts += 1
+
 				continue
 			}
 
@@ -305,7 +315,16 @@ func fetchLiquidationData(
 			// This is separate since CDP liquidations are mostly in BeginBlocker
 			amount, height, err := GetAuctionStartLotCDP(ctx, client, auctionProceeds.ID)
 			if err != nil {
-				logger.Error("Error fetching auction source CDP deposit", "err", err)
+				sleepDuration := getBackoffDuration(failedAttempts)
+				logger.Error(
+					"Error fetching auction source CDP deposit",
+					"auction ID", auctionProceeds.ID,
+					"err", err,
+					"delaySeconds", sleepDuration.String(),
+				)
+
+				time.Sleep(sleepDuration)
+				failedAttempts += 1
 				continue
 			}
 
@@ -342,53 +361,6 @@ func ctxAtHeight(height int64) context.Context {
 	return metadata.AppendToOutgoingContext(context.Background(), grpctypes.GRPCBlockHeightHeader, heightStr)
 }
 
-// fetchBlock never gives up and keeps trying until it gets the block
-func fetchBlock(
-	logger log.Logger,
-	client GrpcClient,
-	heights <-chan int64,
-	blockResults chan<- types.BlockData,
-) {
-	for height := range heights {
-		failedAttempts := 0
-
-		for {
-			block, err1 := client.Tm.GetBlockByHeight(
-				context.Background(),
-				&tmservice.GetBlockByHeightRequest{
-					Height: height,
-				},
-			)
-
-			blockResult, err2 := client.Tendermint.BlockResults(
-				context.Background(),
-				&height,
-			)
-
-			if err1 != nil || err2 != nil {
-				sleepSeconds := math.Pow(2, float64(failedAttempts))
-				logger.Error(
-					"Error fetching block, retrying...",
-					"height", height,
-					"GetBlockByHeight error", err1,
-					"BlockResults error", err2,
-					"delaySeconds", sleepSeconds,
-				)
-
-				time.Sleep(time.Duration(sleepSeconds) * time.Second)
-				failedAttempts += 1
-				continue
-			}
-
-			blockResults <- types.BlockData{
-				Block:       block.Block,
-				BlockResult: blockResult,
-			}
-			break
-		}
-	}
-}
-
 // fetchAuction peels pairs off then queries them in an endless loop
 func fetchAuction(
 	logger log.Logger,
@@ -397,7 +369,7 @@ func fetchAuction(
 	results chan<- auctionResponse,
 ) {
 	for pair := range pairs {
-		nilCount := 0
+		failedAttempts := 0
 
 		ctx := ctxAtHeight(pair.height)
 		for {
@@ -405,10 +377,16 @@ func fetchAuction(
 				AuctionId: pair.id,
 			})
 			if err != nil {
+				sleepDuration := getBackoffDuration(failedAttempts)
 				logger.Error(
 					"Error fetching auction, retrying...",
-					"auctionID", pair.id, "height", pair.height, "error", err,
+					"auctionID", pair.id, "height",
+					pair.height, "error", err,
+					"delay", sleepDuration.String(),
 				)
+
+				failedAttempts += 1
+				time.Sleep(sleepDuration)
 				continue
 			}
 
@@ -418,20 +396,10 @@ func fetchAuction(
 			}
 
 			if auc == nil {
-				nilCount += 1
-				if nilCount > 5 {
-					panic(fmt.Sprintf("Auction %d was nil 5 times in a row", pair.id))
-				}
-
-				sleepSeconds := math.Pow(2, float64(nilCount))
-				logger.Error(
-					"Auction is nil, retrying...",
-					"auctionID", pair.id,
-					"height", pair.height,
-					"delaySeconds", sleepSeconds,
-				)
-				time.Sleep(time.Duration(sleepSeconds) * time.Second)
-				continue
+				panic(fmt.Sprintf(
+					"Auction %d was nil at height %d, meaning it was not found",
+					pair.id, pair.height,
+				))
 			}
 
 			results <- auctionResponse{
@@ -443,33 +411,8 @@ func fetchAuction(
 	}
 }
 
-// buffers and ouputs sorted blocks using a heap
-func sortBlocks(
-	unsorted <-chan types.BlockData,
-	sorted chan<- types.BlockData,
-	start int64,
-) {
-	queue := &types.BlockHeap{}
-	previousHeight := start - 1
-
-	for result := range unsorted {
-		heap.Push(queue, result)
-
-		for queue.Len() > 0 {
-			minHeight := (*queue)[0].Block.Header.Height
-
-			if minHeight == previousHeight+1 {
-				result := heap.Pop(queue).(types.BlockData)
-
-				sorted <- result
-
-				previousHeight = result.Block.Header.Height
-				continue
-			}
-
-			break
-		}
-	}
+func getBackoffDuration(attempt int) time.Duration {
+	return time.Duration(math.Pow(2, float64(attempt))) * time.Second
 }
 
 // func SearchAuctionEnd(client GrpcClient, ctx context.Context, id ) (auctiontypes.Auction, error) {
