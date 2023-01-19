@@ -36,60 +36,56 @@ func GetAuctionEndData(
 	client GrpcClient,
 	start, end int64,
 ) (types.AuctionIDToHeightMap, error) {
-	// communication setup: heights -> worker pool -> raw ouput -> buffer -> sorted output
-	heights := make(chan int64)
-	rawOutput := make(chan types.BlockData)
-	sortedOutput := make(chan types.BlockData)
+	// Get all auctions that ended between start and end
+	auctionResultTxs, err := GetAuctionBidEvents(logger, client, start, end)
 
-	// buffer output and order
-	go func() {
-	}()
-	// spawn pool of workers
-	for i := 0; i < concurrency; i++ {
-		go fetchBlock(logger, client, heights, rawOutput)
+	if err != nil {
+		return nil, err
 	}
-	// write heights to input channel
-	go func() {
-		for height := start; height <= end; height++ {
-			heights <- height
-		}
-	}()
-	// run routine for collecting & sorting blocks
-	go sortBlocks(rawOutput, sortedOutput, start)
 
 	// auction ID -> block height
 	aucMap := make(types.AuctionIDToHeightMap)
 
-	bar := progressbar.Default(end - start)
-	for output := range sortedOutput {
-		bar.Add(1)
-		bar.Describe(fmt.Sprintf("Processing block %d", output.Block.Header.Height))
+	for _, txRes := range auctionResultTxs {
+		// Query may include blocks after end height
+		if txRes.Height > end {
+			break
+		}
 
-		for i, txBytes := range output.Block.Data.Txs {
-			if output.BlockResult.TxsResults[i].Code != 0 {
-				// Skip failed txs, TxResults have the same index as Txs
+		// Skip failed txs
+		if txRes.TxResult.Code != 0 {
+			continue
+		}
+
+		strEvents := sdk.StringifyEvents(txRes.TxResult.Events)
+
+		// All events in a message
+	msg:
+		for _, event := range strEvents {
+			if event.Type != auctiontypes.EventTypeAuctionBid {
 				continue
 			}
 
-			tx, err := client.Decoder.TxDecoder()(txBytes)
-			if err != nil {
-				return types.AuctionIDToHeightMap{}, fmt.Errorf("failed to decode block tx bytes: %w", err)
-			}
+			// Look for auction ID
+			for _, attr := range event.Attributes {
+				if attr.Key == auctiontypes.AttributeKeyAuctionID {
+					auctionID, err := strconv.ParseUint(string(attr.Value), 10, 64)
+					if err != nil {
+						return nil, err
+					}
 
-			msgs := tx.GetMsgs()
-			for _, msg := range msgs {
-				switch msg := msg.(type) {
-				case *auctiontypes.MsgPlaceBid:
-					aucMap[msg.AuctionId] = output.Block.Header.Height
+					prevHeight, found := aucMap[auctionID]
+					// Saved height is older than this tx
+					if found && prevHeight > txRes.Height {
+						// Move to next msg, current tx might have other bids for other auctions
+						continue msg
+					}
+
+					aucMap[auctionID] = txRes.Height
 				}
 			}
 		}
-
-		if output.Block.Header.Height == end {
-			break
-		}
 	}
-	bar.Finish()
 
 	return aucMap, nil
 }
@@ -369,7 +365,7 @@ func fetchBlock(
 				&height,
 			)
 
-			if err1 != nil {
+			if err1 != nil || err2 != nil {
 				sleepSeconds := math.Pow(2, float64(failedAttempts))
 				logger.Error(
 					"Error fetching block, retrying...",

@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -10,7 +11,30 @@ import (
 	"github.com/kava-labs/kava/app"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tendermint/tendermint/libs/log"
 )
+
+func TestGetAuctionEndDataOpt(t *testing.T) {
+	app.SetSDKConfig()
+	config, err := config.LoadConfig(&config.EnvLoader{})
+	require.NoError(t, err)
+
+	encodingConfig := app.MakeEncodingConfig()
+
+	grpcClient, err := main.NewGrpcClient(
+		config.GrpcURL,
+		config.RpcURL,
+		encodingConfig.Marshaler,
+		encodingConfig.TxConfig,
+	)
+	require.NoError(t, err)
+
+	endData, err := main.GetAuctionEndData(log.NewTMLogger(log.NewSyncWriter(os.Stdout)), grpcClient, 2772000, 2787000)
+	require.NoError(t, err)
+
+	t.Logf("endData: %v", endData)
+	t.Logf("len(endData): %v", len(endData))
+}
 
 func TestGetAuctionSourceCDP(t *testing.T) {
 	app.SetSDKConfig()

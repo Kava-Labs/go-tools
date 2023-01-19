@@ -77,6 +77,7 @@ func tryMain(logger log.Logger) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch auction end data: %w", err)
 	}
+
 	logger.Info("Found auctions", "count", len(auctionIdToHeightMap))
 
 	if len(auctionIdToHeightMap) == 0 {
