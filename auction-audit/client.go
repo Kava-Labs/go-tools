@@ -65,22 +65,22 @@ func (c Client) GetBeginBlockEventsFromQuery(
 }
 
 func (c Client) QueryBlock(ctx context.Context, query string) ([]*coretypes.ResultBlock, error) {
-	page := 1
-	perPage := 100
+	//page := 1
+	//perPage := 100
 
-	res, err := c.Tendermint.BlockSearch(
-		ctx,
-		query,
-		&page,
-		&perPage,
-		"desc",
-	)
+	//res, err := c.Tendermint.BlockSearch(
+	//	ctx,
+	//	query,
+	//	&page,
+	//	&perPage,
+	//	"desc",
+	//)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed BlockSearch: %w", err)
-	}
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed BlockSearch: %w", err)
+	//}
 
-	return res.Blocks, nil
+	return []*coretypes.ResultBlock{}, nil
 }
 
 func (c Client) GetBeginBlockEvents(ctx context.Context, height int64) (sdk.StringEvents, error) {
