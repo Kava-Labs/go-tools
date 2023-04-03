@@ -7,6 +7,7 @@ import (
 
 	"github.com/tendermint/tendermint/libs/log"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-tools/auction-audit/config"
 	"github.com/kava-labs/go-tools/auction-audit/csv"
 	"github.com/kava-labs/kava/app"
@@ -21,7 +22,10 @@ func tryMain(logger log.Logger) error {
 	//
 	// required before loading config
 	//
-	app.SetSDKConfig()
+	kavaConfig := sdk.GetConfig()
+	app.SetBech32AddressPrefixes(kavaConfig)
+	app.SetBip44CoinType(kavaConfig)
+	kavaConfig.Seal()
 
 	//
 	// Load config
@@ -43,8 +47,7 @@ func tryMain(logger log.Logger) error {
 	// create codec for messages
 	//
 	// cdc := kava.MakeCodec()
-	encodingConfig := app.MakeEncodingConfig()
-	cdc := encodingConfig.Amino
+	cdc := app.MakeCodec()
 
 	// create client
 	client, err := NewClient(

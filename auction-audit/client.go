@@ -22,14 +22,14 @@ type TmQuerier interface {
 }
 
 type Client struct {
-	cdc *codec.LegacyAmino
+	cdc *codec.Codec
 	// rpc client for tendermint rpc
 	Tendermint TmQuerier
 }
 
 func NewClient(
 	rpcTarget string,
-	cdc *codec.LegacyAmino,
+	cdc *codec.Codec,
 ) (Client, error) {
 	rpcClient, err := rpchttpclient.New(rpcTarget, "/websocket")
 	if err != nil {
@@ -85,7 +85,6 @@ func (c Client) QueryBlock(ctx context.Context, query string) ([]*coretypes.Resu
 
 func (c Client) GetBeginBlockEvents(ctx context.Context, height int64) (sdk.StringEvents, error) {
 	res, err := c.Tendermint.BlockResults(
-		ctx,
 		&height,
 	)
 
@@ -155,7 +154,7 @@ func (c Client) abciQuery(
 	height int64) ([]byte, error) {
 	opts := rpcclient.ABCIQueryOptions{Height: height, Prove: false}
 
-	result, err := c.Tendermint.ABCIQueryWithOptions(context.Background(), path, data, opts)
+	result, err := c.Tendermint.ABCIQueryWithOptions(path, data, opts)
 	if err != nil {
 		return []byte{}, err
 	}

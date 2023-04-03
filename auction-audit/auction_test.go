@@ -19,11 +19,9 @@ func TestGetAuctionEndDataOpt(t *testing.T) {
 	config, err := config.LoadConfig(&config.EnvLoader{})
 	require.NoError(t, err)
 
-	encodingConfig := app.MakeEncodingConfig()
-
 	client, err := main.NewClient(
 		config.RpcURL,
-		encodingConfig.Amino,
+		app.MakeCodec(),
 	)
 	require.NoError(t, err)
 
@@ -39,11 +37,9 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 	config, err := config.LoadConfig(&config.EnvLoader{})
 	require.NoError(t, err)
 
-	encodingConfig := app.MakeEncodingConfig()
-
 	client, err := main.NewClient(
 		config.RpcURL,
-		encodingConfig.Amino,
+		app.MakeCodec(),
 	)
 	require.NoError(t, err)
 
@@ -61,7 +57,7 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 		},
 		{
 			// Auction that was started in cdp BeginBlocker which cannot be
-			// queried for source cdp via grpc txs
+			// queried for source cdp via rpc txs
 			name:             "CDP auction via BeginBlocker",
 			giveAuctionID:    16837,
 			wantSourceHeight: 3146803,

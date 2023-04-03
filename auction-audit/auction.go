@@ -51,11 +51,10 @@ pages:
 		// 10 attempts to query each page
 		for i := 0; i < 10; i++ {
 			res, err := client.Tendermint.TxSearch(
-				context.Background(),
 				query,
 				false, // prove false, as true will require the node to fetch each block
-				&page,
-				&limit,
+				page,
+				limit,
 				"asc",
 			)
 			if err != nil {
@@ -136,7 +135,7 @@ func GetAuctionStartLotFromEvents(
 			// Only return the lot if the auction_id matches.
 			// Assumption: lot attribute will always come after auction_id.
 			if attrs.Key == auctiontypes.AttributeKeyLot && isMatch {
-				lot, err := sdk.ParseCoinNormalized(attrs.Value)
+				lot, err := sdk.ParseCoin(attrs.Value)
 				if err != nil {
 					continue
 				}
@@ -160,14 +159,13 @@ func GetAuctionStartLotTxResponses(
 	limit := 100
 
 	res, err := client.Tendermint.TxSearch(
-		context.Background(),
 		fmt.Sprintf(
 			"auction_start.auction_id=%d",
 			auctionID,
 		),
 		false, // prove false, as true will require the node to fetch each block
-		&page,
-		&limit,
+		page,
+		limit,
 		"asc",
 	)
 	if err != nil {

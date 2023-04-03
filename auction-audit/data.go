@@ -11,11 +11,9 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
 	"github.com/kava-labs/go-tools/auction-audit/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc/metadata"
 )
 
 const (
@@ -355,11 +353,6 @@ func fetchLiquidationData(
 // 		return res, nil
 // 	}
 // }
-
-func ctxAtHeight(height int64) context.Context {
-	heightStr := strconv.FormatInt(height, 10)
-	return metadata.AppendToOutgoingContext(context.Background(), grpctypes.GRPCBlockHeightHeader, heightStr)
-}
 
 // fetchAuction peels pairs off then queries them in an endless loop
 func fetchAuction(
