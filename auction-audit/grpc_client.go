@@ -22,7 +22,6 @@ import (
 
 type GrpcClient struct {
 	cdc            codec.Codec
-	Decoder        sdkClient.TxConfig
 	GrpcClientConn *grpc.ClientConn
 	Auction        auctiontypes.QueryClient
 	Pricefeed      pricefeedtypes.QueryClient
@@ -74,7 +73,6 @@ func NewGrpcClient(
 
 	return GrpcClient{
 		cdc:            cdc,
-		Decoder:        txConfig,
 		GrpcClientConn: grpcConn,
 		Auction:        auctiontypes.NewQueryClient(grpcConn),
 		Pricefeed:      pricefeedtypes.NewQueryClient(grpcConn),
