@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/url"
 
-	sdkClient "github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
@@ -20,7 +19,7 @@ import (
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
-type GrpcClient struct {
+type Client struct {
 	cdc            codec.Codec
 	GrpcClientConn *grpc.ClientConn
 	Auction        auctiontypes.QueryClient
@@ -55,23 +54,22 @@ func connectGrpc(grpcTarget string) (*grpc.ClientConn, error) {
 	return grpcConn, nil
 }
 
-func NewGrpcClient(
+func NewClient(
 	grpcTarget string,
 	rpcTarget string,
 	cdc codec.Codec,
-	txConfig sdkClient.TxConfig,
-) (GrpcClient, error) {
+) (Client, error) {
 	grpcConn, err := connectGrpc(grpcTarget)
 	if err != nil {
-		return GrpcClient{}, err
+		return Client{}, err
 	}
 
 	rpcClient, err := rpchttpclient.New(rpcTarget, "/websocket")
 	if err != nil {
-		return GrpcClient{}, err
+		return Client{}, err
 	}
 
-	return GrpcClient{
+	return Client{
 		cdc:            cdc,
 		GrpcClientConn: grpcConn,
 		Auction:        auctiontypes.NewQueryClient(grpcConn),
@@ -81,7 +79,7 @@ func NewGrpcClient(
 	}, nil
 }
 
-func (c GrpcClient) GetBeginBlockEventsFromQuery(
+func (c Client) GetBeginBlockEventsFromQuery(
 	ctx context.Context,
 	query string,
 ) (sdk.StringEvents, int64, error) {
@@ -103,7 +101,7 @@ func (c GrpcClient) GetBeginBlockEventsFromQuery(
 	return events, blocks[0].Block.Height, err
 }
 
-func (c GrpcClient) QueryBlock(ctx context.Context, query string) ([]*coretypes.ResultBlock, error) {
+func (c Client) QueryBlock(ctx context.Context, query string) ([]*coretypes.ResultBlock, error) {
 	page := 1
 	perPage := 100
 
@@ -122,7 +120,7 @@ func (c GrpcClient) QueryBlock(ctx context.Context, query string) ([]*coretypes.
 	return res.Blocks, nil
 }
 
-func (c GrpcClient) GetBeginBlockEvents(ctx context.Context, height int64) (sdk.StringEvents, error) {
+func (c Client) GetBeginBlockEvents(ctx context.Context, height int64) (sdk.StringEvents, error) {
 	res, err := c.Tendermint.BlockResults(
 		ctx,
 		&height,

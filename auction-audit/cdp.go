@@ -23,7 +23,7 @@ func GetOriginalAmountPercentSub(
 
 func GetAuctionStartLotCDP(
 	ctx context.Context,
-	client GrpcClient,
+	client Client,
 	auctionID uint64,
 ) (sdk.Coin, int64, error) {
 	// Search BeginBlock events for CDP

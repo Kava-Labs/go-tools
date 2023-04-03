@@ -24,14 +24,14 @@ const (
 	approxBlockSeconds = 6
 )
 
-// func GetInboundTransfers(client GrpcClient, start, end int64) (map[*sdk.AccAddress]sdk.Coins, error) {
+// func GetInboundTransfers(client Client, start, end int64) (map[*sdk.AccAddress]sdk.Coins, error) {
 // 	heights := make(chan int64)
 // 	rawOutput := make(chan)
 // }
 
 func GetAuctionEndData(
 	logger log.Logger,
-	client GrpcClient,
+	client Client,
 	start, end int64,
 ) (types.AuctionIDToHeightMap, error) {
 	// Get all auctions that ended between start and end
@@ -100,7 +100,7 @@ type auctionResponse struct {
 
 func GetAuctionClearingData(
 	logger log.Logger,
-	client GrpcClient,
+	client Client,
 	endMap types.AuctionIDToHeightMap,
 ) (types.BaseAuctionProceedsMap, error) {
 	// Return if empty, otherwise the loop over rawOutput will hang forever:
@@ -178,7 +178,7 @@ func GetAuctionClearingData(
 func GetAuctionValueData(
 	ctx context.Context,
 	logger log.Logger,
-	client GrpcClient,
+	client Client,
 	clearingData types.BaseAuctionProceedsMap,
 ) (types.AuctionProceedsMap, error) {
 	// Return if empty, otherwise the loop over rawOutput will hang forever:
@@ -285,7 +285,7 @@ func GetAuctionValueData(
 func fetchLiquidationData(
 	ctx context.Context,
 	logger log.Logger,
-	client GrpcClient,
+	client Client,
 	auctionProceeds types.BaseAuctionProceeds,
 ) (sdk.Coin, int64) {
 	failedAttempts := 0
@@ -335,7 +335,7 @@ func fetchLiquidationData(
 	}
 }
 
-// func GetAuctionAtHeight(client GrpcClient, id uint64, height int64) (auctiontypes.Auction, error) {
+// func GetAuctionAtHeight(client Client, id uint64, height int64) (auctiontypes.Auction, error) {
 // 	ctx := ctxAtHeight(height)
 // 	res, err := fetchAuction(client, ctx, &auctiontypes.QueryAuctionRequest{AuctionId: id})
 // 	if err != nil {
@@ -346,7 +346,7 @@ func fetchLiquidationData(
 // 	return auc, nil
 // }
 
-// func fetchAuction(client GrpcClient, ctx context.Context, req *auctiontypes.QueryAuctionRequest) (*auctiontypes.QueryAuctionResponse, error) {
+// func fetchAuction(client Client, ctx context.Context, req *auctiontypes.QueryAuctionRequest) (*auctiontypes.QueryAuctionResponse, error) {
 // 	for {
 // 		res, err := client.Auction.Auction(ctx, req)
 // 		if err != nil {
@@ -364,7 +364,7 @@ func ctxAtHeight(height int64) context.Context {
 // fetchAuction peels pairs off then queries them in an endless loop
 func fetchAuction(
 	logger log.Logger,
-	client GrpcClient,
+	client Client,
 	pairs <-chan auctionPair,
 	results chan<- auctionResponse,
 ) {
@@ -415,6 +415,6 @@ func getBackoffDuration(attempt int) time.Duration {
 	return time.Duration(math.Pow(2, float64(attempt))) * time.Second
 }
 
-// func SearchAuctionEnd(client GrpcClient, ctx context.Context, id ) (auctiontypes.Auction, error) {
+// func SearchAuctionEnd(client Client, ctx context.Context, id ) (auctiontypes.Auction, error) {
 
 // }

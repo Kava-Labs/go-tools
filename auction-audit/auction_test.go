@@ -21,15 +21,14 @@ func TestGetAuctionEndDataOpt(t *testing.T) {
 
 	encodingConfig := app.MakeEncodingConfig()
 
-	grpcClient, err := main.NewGrpcClient(
+	client, err := main.NewClient(
 		config.GrpcURL,
 		config.RpcURL,
 		encodingConfig.Marshaler,
-		encodingConfig.TxConfig,
 	)
 	require.NoError(t, err)
 
-	endData, err := main.GetAuctionEndData(log.NewTMLogger(log.NewSyncWriter(os.Stdout)), grpcClient, 2772000, 2787000)
+	endData, err := main.GetAuctionEndData(log.NewTMLogger(log.NewSyncWriter(os.Stdout)), client, 2772000, 2787000)
 	require.NoError(t, err)
 
 	t.Logf("endData: %v", endData)
@@ -43,11 +42,10 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 
 	encodingConfig := app.MakeEncodingConfig()
 
-	grpcClient, err := main.NewGrpcClient(
+	client, err := main.NewClient(
 		config.GrpcURL,
 		config.RpcURL,
 		encodingConfig.Marshaler,
-		encodingConfig.TxConfig,
 	)
 	require.NoError(t, err)
 
@@ -89,7 +87,7 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			amount, height, err := main.GetAuctionStartLotCDP(
 				context.Background(),
-				grpcClient,
+				client,
 				tt.giveAuctionID,
 			)
 			require.NoError(t, err)

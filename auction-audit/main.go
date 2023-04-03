@@ -47,11 +47,10 @@ func tryMain(logger log.Logger) error {
 
 	//
 	// create grpc client and test that it's responding
-	grpcClient, err := NewGrpcClient(
+	grpcClient, err := NewClient(
 		config.GrpcURL,
 		config.RpcURL,
 		encodingConfig.Marshaler,
-		encodingConfig.TxConfig,
 	)
 	if err != nil {
 		return err

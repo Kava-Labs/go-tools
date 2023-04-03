@@ -21,7 +21,7 @@ type AuctionStartEventsData []AuctionStartEventData
 
 func GetAuctionBidEvents(
 	logger log.Logger,
-	client GrpcClient,
+	client Client,
 	start, end int64,
 ) ([]*coretypes.ResultTx, error) {
 	queryEvents := []string{
@@ -50,8 +50,6 @@ pages:
 
 		// 10 attempts to query each page
 		for i := 0; i < 10; i++ {
-			// grpc query also has additional block requests which slow down the request
-			// so we use tendermint rpc instead
 			res, err := client.Tendermint.TxSearch(
 				context.Background(),
 				query,
@@ -155,7 +153,7 @@ func GetAuctionStartLotFromEvents(
 // event for the corresponding auction_id.
 func GetAuctionStartLotTxResponses(
 	ctx context.Context,
-	client GrpcClient,
+	client Client,
 	auctionID uint64,
 ) (sdk.Coin, int64, error) {
 	page := 1

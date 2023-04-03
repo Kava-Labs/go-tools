@@ -19,11 +19,10 @@ func TestGetTotalCoinsUsdValueAtHeight(t *testing.T) {
 
 	encodingConfig := app.MakeEncodingConfig()
 
-	grpcClient, err := main.NewGrpcClient(
+	client, err := main.NewClient(
 		config.GrpcURL,
 		config.RpcURL,
 		encodingConfig.Marshaler,
-		encodingConfig.TxConfig,
 	)
 	require.NoError(t, err)
 
@@ -56,7 +55,7 @@ func TestGetTotalCoinsUsdValueAtHeight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s at height %d", tt.giveCoins, tt.giveHeight), func(t *testing.T) {
 			usdValue, err := main.GetTotalCoinsUsdValueAtHeight(
-				grpcClient,
+				client,
 				tt.giveHeight,
 				tt.giveCoins,
 				types.PriceType_Spot,

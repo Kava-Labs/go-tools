@@ -9,7 +9,7 @@ import (
 )
 
 // GetPriceAtHeight returns the price of the given market at the given height.
-func GetPriceAtHeight(client GrpcClient, height int64, marketID string) (sdk.Dec, error) {
+func GetPriceAtHeight(client Client, height int64, marketID string) (sdk.Dec, error) {
 	ctx := ctxAtHeight(height)
 
 	res, err := client.Pricefeed.Price(
@@ -29,7 +29,7 @@ func GetPriceAtHeight(client GrpcClient, height int64, marketID string) (sdk.Dec
 // GetTotalCoinsUsdValueAtHeight returns the total price of a slice of coins in
 // USD at the given height.
 func GetTotalCoinsUsdValueAtHeight(
-	client GrpcClient,
+	client Client,
 	height int64,
 	coins sdk.Coins,
 	priceType types.PriceType,
