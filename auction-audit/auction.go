@@ -25,7 +25,7 @@ func GetAuctionBidEvents(
 	start, end int64,
 ) ([]*coretypes.ResultTx, error) {
 	queryEvents := []string{
-		"message.action='/kava.auction.v1beta1.MsgPlaceBid'",
+		"message.action='place_bid'",
 		fmt.Sprintf(
 			"tx.height >= %d",
 			start,
@@ -77,6 +77,11 @@ pages:
 
 			// None in response, done
 			if len(res.Txs) == 0 {
+				break pages
+			}
+
+			// TODO: need to catch last page error since this won't work with exact modded pages
+			if len(res.Txs) < 100 {
 				break pages
 			}
 
