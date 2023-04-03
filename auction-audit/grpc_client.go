@@ -8,10 +8,8 @@ import (
 	"net/url"
 
 	sdkClient "github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 	"google.golang.org/grpc"
@@ -26,9 +24,7 @@ type GrpcClient struct {
 	cdc            codec.Codec
 	Decoder        sdkClient.TxConfig
 	GrpcClientConn *grpc.ClientConn
-	Tm             tmservice.ServiceClient
 	Auction        auctiontypes.QueryClient
-	Tx             txtypes.ServiceClient
 	Pricefeed      pricefeedtypes.QueryClient
 
 	// rpc client for tendermint rpc
@@ -80,9 +76,7 @@ func NewGrpcClient(
 		cdc:            cdc,
 		Decoder:        txConfig,
 		GrpcClientConn: grpcConn,
-		Tm:             tmservice.NewServiceClient(grpcConn),
 		Auction:        auctiontypes.NewQueryClient(grpcConn),
-		Tx:             txtypes.NewServiceClient(grpcConn),
 		Pricefeed:      pricefeedtypes.NewQueryClient(grpcConn),
 
 		Tendermint: rpcClient,

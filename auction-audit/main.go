@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/kava-labs/go-tools/auction-audit/config"
@@ -59,12 +58,6 @@ func tryMain(logger log.Logger) error {
 	}
 
 	defer grpcClient.GrpcClientConn.Close()
-	nodeInfoResponse, err := grpcClient.Tm.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
-	if err != nil {
-		return fmt.Errorf("failed to fetch chain id: %w", err)
-	}
-
-	logger.Info(fmt.Sprintf("chain id: %s", nodeInfoResponse.DefaultNodeInfo.Network))
 
 	// Crawl blocks to find auctions and inbound transfers
 	logger.Info("Fetching auction end data... this may take a while")

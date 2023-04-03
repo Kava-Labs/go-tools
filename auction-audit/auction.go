@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/tx"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	"github.com/tendermint/tendermint/libs/log"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -159,29 +158,32 @@ func GetAuctionStartLotTxResponses(
 	client GrpcClient,
 	auctionID uint64,
 ) (sdk.Coin, int64, error) {
-	res, err := client.Tx.GetTxsEvent(
-		ctx,
-		&tx.GetTxsEventRequest{
-			Events: []string{
-				fmt.Sprintf(
-					"auction_start.auction_id=%d",
-					auctionID,
-				),
-			},
-		},
+	page := 1
+	limit := 100
+
+	res, err := client.Tendermint.TxSearch(
+		context.Background(),
+		fmt.Sprintf(
+			"auction_start.auction_id=%d",
+			auctionID,
+		),
+		false, // prove false, as true will require the node to fetch each block
+		&page,
+		&limit,
+		"asc",
 	)
 	if err != nil {
 		return sdk.Coin{}, 0, fmt.Errorf("failed to query tx event: %w", err)
 	}
 
-	if len(res.TxResponses) == 0 {
+	if len(res.Txs) == 0 {
 		return sdk.Coin{}, 0, fmt.Errorf("no txs with auction_start found for auction ID %d", auctionID)
 	}
 
-	for _, res := range res.TxResponses {
-		start, found := GetAuctionStartLotFromEvents(sdk.StringifyEvents(res.Events), auctionID)
+	for _, txRes := range res.Txs {
+		start, found := GetAuctionStartLotFromEvents(sdk.StringifyEvents(txRes.TxResult.Events), auctionID)
 		if found {
-			return start, res.Height, nil
+			return start, txRes.Height, nil
 		}
 	}
 
