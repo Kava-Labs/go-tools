@@ -138,7 +138,7 @@ func GetAuctionClearingData(
 		bar.Add(1)
 		bar.Describe(fmt.Sprintf("Processing auction %d", res.Auction.GetID()))
 
-		col, ok := res.Auction.(*auctiontypes.CollateralAuction)
+		col, ok := res.Auction.(auctiontypes.CollateralAuction)
 		if ok {
 			ap, found := clearingMap[col.GetID()]
 
