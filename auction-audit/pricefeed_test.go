@@ -20,9 +20,8 @@ func TestGetTotalCoinsUsdValueAtHeight(t *testing.T) {
 	encodingConfig := app.MakeEncodingConfig()
 
 	client, err := main.NewClient(
-		config.GrpcURL,
 		config.RpcURL,
-		encodingConfig.Marshaler,
+		encodingConfig.Amino,
 	)
 	require.NoError(t, err)
 

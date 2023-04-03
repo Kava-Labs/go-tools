@@ -371,11 +371,10 @@ func fetchAuction(
 	for pair := range pairs {
 		failedAttempts := 0
 
-		ctx := ctxAtHeight(pair.height)
 		for {
-			res, err := client.Auction.Auction(ctx, &auctiontypes.QueryAuctionRequest{
-				AuctionId: pair.id,
-			})
+			auc, err := client.GetAuction(pair.height, pair.id)
+
+			// TODO: handle ErrAuctionNotFound
 			if err != nil {
 				sleepDuration := getBackoffDuration(failedAttempts)
 				logger.Error(
@@ -388,11 +387,6 @@ func fetchAuction(
 				failedAttempts += 1
 				time.Sleep(sleepDuration)
 				continue
-			}
-
-			var auc auctiontypes.Auction
-			if err := client.cdc.UnpackAny(res.Auction, &auc); err != nil {
-				panic(fmt.Sprintf("Error unpacking auction, %s", err))
 			}
 
 			if auc == nil {

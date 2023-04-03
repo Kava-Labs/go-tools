@@ -34,7 +34,6 @@ func tryMain(logger log.Logger) error {
 	}
 
 	logger.With(
-		"grpcUrl", config.GrpcURL,
 		"rpcUrl", config.RpcURL,
 		"start height", config.StartHeight,
 		"end height", config.EndHeight,
@@ -43,26 +42,24 @@ func tryMain(logger log.Logger) error {
 	//
 	// create codec for messages
 	//
+	// cdc := kava.MakeCodec()
 	encodingConfig := app.MakeEncodingConfig()
+	cdc := encodingConfig.Amino
 
-	//
-	// create grpc client and test that it's responding
-	grpcClient, err := NewClient(
-		config.GrpcURL,
+	// create client
+	client, err := NewClient(
 		config.RpcURL,
-		encodingConfig.Marshaler,
+		cdc,
 	)
 	if err != nil {
 		return err
 	}
 
-	defer grpcClient.GrpcClientConn.Close()
-
 	// Crawl blocks to find auctions and inbound transfers
 	logger.Info("Fetching auction end data... this may take a while")
 	auctionIdToHeightMap, err := GetAuctionEndData(
 		logger,
-		grpcClient,
+		client,
 		config.StartHeight,
 		config.EndHeight,
 	)
@@ -81,7 +78,7 @@ func tryMain(logger log.Logger) error {
 	logger.Info("Fetching auction clearing data (auction winners)...")
 	auctionClearingMap, err := GetAuctionClearingData(
 		logger,
-		grpcClient,
+		client,
 		auctionIdToHeightMap,
 	)
 	if err != nil {
@@ -93,7 +90,7 @@ func tryMain(logger log.Logger) error {
 	fullAuctionDataMap, err := GetAuctionValueData(
 		context.Background(),
 		logger,
-		grpcClient,
+		client,
 		auctionClearingMap,
 	)
 	if err != nil {

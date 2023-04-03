@@ -9,10 +9,9 @@ import (
 )
 
 const (
-	grpcUrlEnvKey = "GRPC_URL"
-	rpcUrlEnvKey  = "RPC_URL"
-	startEnvKey   = "START_HEIGHT"
-	endEnvKey     = "END_HEIGHT"
+	rpcUrlEnvKey = "RPC_URL"
+	startEnvKey  = "START_HEIGHT"
+	endEnvKey    = "END_HEIGHT"
 )
 
 // ConfigLoader provides an interface for
@@ -30,8 +29,7 @@ func (l *EnvLoader) Get(key string) string {
 }
 
 type Config struct {
-	GrpcURL string
-	RpcURL  string
+	RpcURL string
 
 	StartHeight int64
 	EndHeight   int64
@@ -41,11 +39,6 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Printf(".env not found, attempting to proceed with available env variables\n")
-	}
-
-	grpcURL := loader.Get(grpcUrlEnvKey)
-	if grpcURL == "" {
-		return Config{}, fmt.Errorf("%s not set", grpcUrlEnvKey)
 	}
 
 	rpcURL := loader.Get(rpcUrlEnvKey)
@@ -66,7 +59,6 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	}
 
 	return Config{
-		GrpcURL:     grpcURL,
 		RpcURL:      rpcURL,
 		StartHeight: startHeight,
 		EndHeight:   endHeight,

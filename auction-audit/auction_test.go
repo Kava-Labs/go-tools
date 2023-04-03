@@ -22,9 +22,8 @@ func TestGetAuctionEndDataOpt(t *testing.T) {
 	encodingConfig := app.MakeEncodingConfig()
 
 	client, err := main.NewClient(
-		config.GrpcURL,
 		config.RpcURL,
-		encodingConfig.Marshaler,
+		encodingConfig.Amino,
 	)
 	require.NoError(t, err)
 
@@ -43,9 +42,8 @@ func TestGetAuctionSourceCDP(t *testing.T) {
 	encodingConfig := app.MakeEncodingConfig()
 
 	client, err := main.NewClient(
-		config.GrpcURL,
 		config.RpcURL,
-		encodingConfig.Marshaler,
+		encodingConfig.Amino,
 	)
 	require.NoError(t, err)
 

@@ -2,79 +2,42 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
+	"errors"
 	"fmt"
-	"log"
-	"net/url"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-
+	"github.com/tendermint/tendermint/libs/bytes"
+	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	tmclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 	coretypes "github.com/tendermint/tendermint/rpc/core/types"
 )
 
-type Client struct {
-	cdc            codec.Codec
-	GrpcClientConn *grpc.ClientConn
-	Auction        auctiontypes.QueryClient
-	Pricefeed      pricefeedtypes.QueryClient
-
-	// rpc client for tendermint rpc
-	Tendermint tmclient.SignClient
+type TmQuerier interface {
+	tmclient.SignClient
+	tmclient.ABCIClient
 }
 
-func connectGrpc(grpcTarget string) (*grpc.ClientConn, error) {
-	grpcUrl, err := url.Parse(grpcTarget)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse grpc url: %s", err)
-	}
-
-	var secureOpt grpc.DialOption
-	switch grpcUrl.Scheme {
-	case "http":
-		secureOpt = grpc.WithInsecure()
-	case "https":
-		creds := credentials.NewTLS(&tls.Config{})
-		secureOpt = grpc.WithTransportCredentials(creds)
-	default:
-		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
-	}
-
-	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial grpc server: %s", err)
-	}
-
-	return grpcConn, nil
+type Client struct {
+	cdc *codec.LegacyAmino
+	// rpc client for tendermint rpc
+	Tendermint TmQuerier
 }
 
 func NewClient(
-	grpcTarget string,
 	rpcTarget string,
-	cdc codec.Codec,
+	cdc *codec.LegacyAmino,
 ) (Client, error) {
-	grpcConn, err := connectGrpc(grpcTarget)
-	if err != nil {
-		return Client{}, err
-	}
-
 	rpcClient, err := rpchttpclient.New(rpcTarget, "/websocket")
 	if err != nil {
 		return Client{}, err
 	}
 
 	return Client{
-		cdc:            cdc,
-		GrpcClientConn: grpcConn,
-		Auction:        auctiontypes.NewQueryClient(grpcConn),
-		Pricefeed:      pricefeedtypes.NewQueryClient(grpcConn),
-
+		cdc:        cdc,
 		Tendermint: rpcClient,
 	}, nil
 }
@@ -138,4 +101,76 @@ func (c Client) GetBeginBlockEvents(ctx context.Context, height int64) (sdk.Stri
 	}
 
 	return strEvents, nil
+}
+
+// GetPriceAtHeight returns the price of the given market at the given height.
+func (c Client) GetPriceAtHeight(height int64, marketID string) (sdk.Dec, error) {
+	bz, err := c.cdc.MarshalJSON(pricefeedtypes.NewQueryWithMarketIDParams(marketID))
+	if err != nil {
+		return sdk.ZeroDec(), err
+	}
+
+	path := fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrice)
+
+	data, err := c.abciQuery(path, bz, height)
+	if err != nil {
+		return sdk.ZeroDec(), err
+	}
+
+	var currentPrice pricefeedtypes.CurrentPrice
+	err = c.cdc.UnmarshalJSON(data, &currentPrice)
+	if err != nil {
+		return sdk.ZeroDec(), err
+	}
+
+	return currentPrice.Price, nil
+}
+
+// GetAuction returns the price of the given market at the given height.
+func (c Client) GetAuction(height int64, auctionID uint64) (auctiontypes.Auction, error) {
+	bz, err := c.cdc.MarshalJSON(auctiontypes.NewQueryAuctionParams(auctionID))
+	if err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("custom/%s/%s", auctiontypes.QuerierRoute, auctiontypes.QueryGetAuction)
+
+	data, err := c.abciQuery(path, bz, height)
+	if err != nil {
+		return nil, err
+	}
+
+	var auction auctiontypes.Auction
+	err = c.cdc.UnmarshalJSON(data, &auction)
+	if err != nil {
+		return nil, err
+	}
+
+	return auction, nil
+}
+
+func (c Client) abciQuery(
+	path string,
+	data bytes.HexBytes,
+	height int64) ([]byte, error) {
+	opts := rpcclient.ABCIQueryOptions{Height: height, Prove: false}
+
+	result, err := c.Tendermint.ABCIQueryWithOptions(context.Background(), path, data, opts)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	resp := result.Response
+	if !resp.IsOK() {
+		return []byte{}, errors.New(resp.Log)
+	}
+
+	// TODO: why do we check length here?
+	value := result.Response.GetValue()
+	// TODO: untested logic case
+	if len(value) == 0 {
+		return []byte{}, nil
+	}
+
+	return value, nil
 }
