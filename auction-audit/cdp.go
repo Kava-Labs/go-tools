@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -27,23 +28,18 @@ func GetAuctionStartLotCDP(
 	auctionID uint64,
 ) (sdk.Coin, int64, error) {
 	// Search BeginBlock events for CDP
-	blockEvents, height, err := client.GetBeginBlockEventsFromQuery(
-		ctx,
-		fmt.Sprintf(
-			"auction_start.auction_id=%d",
-			auctionID,
-		))
-
-	// No error: auction started in BeginBlocker
-	if err == nil {
-		// Check if auction started in BeginBlocker, continue if not found
-		lot, found := GetAuctionStartLotFromEvents(blockEvents, auctionID)
-		if !found {
-			return sdk.Coin{}, 0, fmt.Errorf("failed to get CDP auction start from BeginBlock: %s", err)
+	data, found := auctionStartIndex[auctionID]
+	if found {
+		height, err := strconv.ParseInt(data["height"], 10, 64)
+		if err != nil {
+			return sdk.Coin{}, 0, err
 		}
 
-		// This should exist at this point, beginblock query will return an error
-		// if the event for the specified auction was not found
+		lot, err := sdk.ParseCoin(data["lot"])
+		if err != nil {
+			return sdk.Coin{}, 0, err
+		}
+
 		return lot, height, nil
 	}
 
