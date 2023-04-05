@@ -228,6 +228,11 @@ func GetAuctionValueData(
 					blocksIn1Hour := float64(hourSeconds) / float64(approxBlockSeconds)
 					height4HoursAfter := auctionData.EndHeight + int64(4*blocksIn1Hour)
 
+					// NOTE: fix for auctions within 4 hours of last block
+					if height4HoursAfter > 1803249 {
+						height4HoursAfter = 1803249
+					}
+
 					afterUsdValue, err := GetTotalCoinsUsdValueAtHeight(
 						client,
 						height4HoursAfter,
