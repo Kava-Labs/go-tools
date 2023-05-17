@@ -28,7 +28,7 @@ const (
 	ClaimTxDefaultGas = 200_000
 
 	// TxConfirmationTimeout is the longest time to wait for a tx confirmation before giving up
-	TxConfirmationTimeout      = 60 * 60 * time.Second
+	TxConfirmationTimeout      = 3 * 60 * time.Second
 	TxConfirmationPollInterval = 2 * time.Second
 )
 
@@ -87,7 +87,7 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 
 	swap, err := client.GetSwapByID(swapID)
 	if err != nil {
-		return "", "", NewErrorRetryable(err)
+		return "", "", NewErrorRetryable(fmt.Errorf("failed to fetch swap %v", err))
 	}
 	// return the swap recipient to add to logs to help in debugging
 	recipient := swap.Recipient
@@ -119,7 +119,7 @@ func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.
 
 	sequence, accountNumber, err := getAccountNumbers(client, fromAddr)
 	if err != nil {
-		return "", recipient, NewErrorFailed(err)
+		return "", recipient, NewErrorRetryable(fmt.Errorf("failed to fetch account number %v", err))
 	}
 
 	signerData := authsigning.SignerData{
