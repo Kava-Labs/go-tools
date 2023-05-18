@@ -28,7 +28,7 @@ const (
 	ClaimTxDefaultGas = 200_000
 
 	// TxConfirmationTimeout is the longest time to wait for a tx confirmation before giving up
-	TxConfirmationTimeout      = 3 * 60 * time.Second
+	TxConfirmationTimeout      = 60 * 60 * time.Second
 	TxConfirmationPollInterval = 2 * time.Second
 )
 
