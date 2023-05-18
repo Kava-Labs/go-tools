@@ -6,7 +6,6 @@ import (
 	"github.com/kava-labs/kava/app"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
 
 	"github.com/kava-labs/go-tools/claimer/claimer"
 	"github.com/kava-labs/go-tools/claimer/config"
@@ -14,16 +13,12 @@ import (
 )
 
 func main() {
-	configPath := pflag.String("config", config.DefaultConfigPath, "path to config file")
-	pflag.Parse()
-
-	app.SetSDKConfig()
-
-	// Load config
-	cfg, err := config.LoadConfig(*configPath)
+	cfg, err := config.LoadConfigFromEnvs("CLAIMER_")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	app.SetSDKConfig()
 
 	log.SetLevel(log.DebugLevel)
 

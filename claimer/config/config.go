@@ -2,70 +2,69 @@ package config
 
 import (
 	"fmt"
-
-	kjson "github.com/knadh/koanf/parsers/json"
-	"github.com/knadh/koanf/providers/file"
-	"github.com/knadh/koanf/v2"
+	"os"
+	"strings"
 )
-
-const DefaultConfigPath = "./config/config.json"
 
 // Config defines chain connections and mnemonics
 type Config struct {
-	Kava         KavaConfig         `koanf:"kava_config"`
-	BinanceChain BinanceChainConfig `koanf:"binance_chain_config"`
+	Kava         KavaConfig
+	BinanceChain BinanceChainConfig
 }
 
 // KavaConfig defines information required for Kava blockchain interaction
 type KavaConfig struct {
-	ChainID   string   `koanf:"chain_id"`
-	Endpoint  string   `koanf:"endpoint"`
-	Mnemonics []string `koanf:"mnemonics"`
+	ChainID   string
+	Endpoint  string
+	Mnemonics []string
 }
 
 // BinanceChainConfig defines information required for Binance Chain interaction
 type BinanceChainConfig struct {
-	ChainID  string `koanf:"chain_id"`
-	Endpoint string `koanf:"endpoint"`
-	Mnemonic string `koanf:"mnemonic"`
+	ChainID  string
+	Endpoint string
+	Mnemonic string
 }
 
-// LoadConfig loads and validates a configuration file, returning the Config struct if valid
-func LoadConfig(filePath string) (Config, error) {
-	var k = koanf.New(".")
-
-	if err := k.Load(file.Provider(filePath), kjson.Parser()); err != nil {
-		return Config{}, fmt.Errorf("error loading config: %w", err)
-	}
-
+// LoadConfigFromEnvs reads env vars with the provided prefix and parses them into a Config
+func LoadConfigFromEnvs(prefix string) (Config, error) {
 	var config Config
-	k.Unmarshal(".", &config)
 
-	if err := config.validate(); err != nil {
-		return Config{}, err
+	env, found := os.LookupEnv(prefix + "KAVA_CHAIN_ID")
+	if !found {
+		return Config{}, fmt.Errorf("env %sKAVA_CHAIN_ID is empty", prefix)
 	}
+	config.Kava.ChainID = env
+
+	env, found = os.LookupEnv(prefix + "KAVA_ENDPOINT")
+	if !found {
+		return Config{}, fmt.Errorf("env %sKAVA_ENDPOINT is empty", prefix)
+	}
+	config.Kava.Endpoint = env
+
+	env, found = os.LookupEnv(prefix + "KAVA_MNEMONICS")
+	if !found {
+		return Config{}, fmt.Errorf("env %sKAVA_MNEMONICS is empty", prefix)
+	}
+	config.Kava.Mnemonics = strings.Split(env, ",")
+
+	env, found = os.LookupEnv(prefix + "BINANCE_CHAIN_ID")
+	if !found {
+		return Config{}, fmt.Errorf("env %sBINANCE_CHAIN_ID is empty", prefix)
+	}
+	config.BinanceChain.ChainID = env
+
+	env, found = os.LookupEnv(prefix + "BINANCE_ENDPOINT")
+	if !found {
+		return Config{}, fmt.Errorf("env %sBINANCE_ENDPOINT is empty", prefix)
+	}
+	config.BinanceChain.Endpoint = env
+
+	env, found = os.LookupEnv(prefix + "BINANCE_MNEMONIC")
+	if !found {
+		return Config{}, fmt.Errorf("env %sBINANCE_MNEMONIC is empty", prefix)
+	}
+	config.BinanceChain.Mnemonic = env
 
 	return config, nil
-}
-
-func (c *Config) validate() error {
-	if c.Kava.ChainID == "" {
-		return fmt.Errorf("required field Kava.ChainID is empty")
-	}
-	if c.Kava.Endpoint == "" {
-		return fmt.Errorf("required field Kava.Endpoint is empty")
-	}
-	if len(c.Kava.Mnemonics) == 0 {
-		return fmt.Errorf("required field Kava.Mnemonics is empty")
-	}
-	if c.BinanceChain.Endpoint == "" {
-		return fmt.Errorf("required field BinanceChain.Endpoint is empty")
-	}
-	if c.BinanceChain.Mnemonic == "" {
-		return fmt.Errorf("required field BinanceChain.Mnemonic is empty")
-	}
-	if c.BinanceChain.ChainID == "" {
-		return fmt.Errorf("required field BinanceChain.ChainID is empty")
-	}
-	return nil
 }
