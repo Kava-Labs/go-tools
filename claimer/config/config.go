@@ -1,105 +1,70 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
-
-	log "github.com/sirupsen/logrus"
+	"strings"
 )
-
-const DefaultConfigPath = "./config/config.json"
 
 // Config defines chain connections and mnemonics
 type Config struct {
-	Kava         KavaConfig         `toml:"kava_config" json:"kava_config"`
-	BinanceChain BinanceChainConfig `toml:"binance_chain_config" json:"binance_chain_config"`
+	Kava         KavaConfig
+	BinanceChain BinanceChainConfig
 }
 
 // KavaConfig defines information required for Kava blockchain interaction
 type KavaConfig struct {
-	ChainID   string   `toml:"chain_id" json:"chain_id"`
-	Endpoint  string   `toml:"endpoint" json:"endpoint"`
-	Mnemonics []string `toml:"mnemonics" json:"mnemonics"`
+	ChainID   string
+	Endpoint  string
+	Mnemonics []string
 }
 
 // BinanceChainConfig defines information required for Binance Chain interaction
 type BinanceChainConfig struct {
-	ChainID  string `toml:"chain_id" json:"chain_id"`
-	Endpoint string `toml:"endpoint" json:"endpoint"`
-	Mnemonic string `toml:"mnemonic" json:"mnemonic"`
+	ChainID  string
+	Endpoint string
+	Mnemonic string
 }
 
-// NewConfig initializes a new config
-func NewConfig() *Config {
-	return &Config{
-		Kava:         KavaConfig{},
-		BinanceChain: BinanceChainConfig{},
-	}
-}
-
-// GetConfig loads and validates a configuration file, returning the Config struct if valid
-func GetConfig(filePath string) (*Config, error) {
+// LoadConfigFromEnvs reads env vars with the provided prefix and parses them into a Config
+func LoadConfigFromEnvs(prefix string) (Config, error) {
 	var config Config
 
-	err := loadConfig(filePath, &config)
-	if err != nil {
-		return nil, err
+	env, found := os.LookupEnv(prefix + "KAVA_CHAIN_ID")
+	if !found {
+		return Config{}, fmt.Errorf("env %sKAVA_CHAIN_ID is empty", prefix)
 	}
+	config.Kava.ChainID = env
 
-	err = config.validate()
-	if err != nil {
-		return nil, err
+	env, found = os.LookupEnv(prefix + "KAVA_ENDPOINT")
+	if !found {
+		return Config{}, fmt.Errorf("env %sKAVA_ENDPOINT is empty", prefix)
 	}
+	config.Kava.Endpoint = env
 
-	return &config, nil
-}
+	env, found = os.LookupEnv(prefix + "KAVA_MNEMONICS")
+	if !found {
+		return Config{}, fmt.Errorf("env %sKAVA_MNEMONICS is empty", prefix)
+	}
+	config.Kava.Mnemonics = strings.Split(env, ",")
 
-func loadConfig(file string, config *Config) error {
-	ext := filepath.Ext(file)
-	if ext != ".json" {
-		return fmt.Errorf("config file extention must be .json")
+	env, found = os.LookupEnv(prefix + "BINANCE_CHAIN_ID")
+	if !found {
+		return Config{}, fmt.Errorf("env %sBINANCE_CHAIN_ID is empty", prefix)
 	}
+	config.BinanceChain.ChainID = env
 
-	fp, err := filepath.Abs(file)
-	if err != nil {
-		return err
+	env, found = os.LookupEnv(prefix + "BINANCE_ENDPOINT")
+	if !found {
+		return Config{}, fmt.Errorf("env %sBINANCE_ENDPOINT is empty", prefix)
 	}
+	config.BinanceChain.Endpoint = env
 
-	fpClean := filepath.Clean(fp)
-	log.Infof("Loading configuration path %s", fpClean)
+	env, found = os.LookupEnv(prefix + "BINANCE_MNEMONIC")
+	if !found {
+		return Config{}, fmt.Errorf("env %sBINANCE_MNEMONIC is empty", prefix)
+	}
+	config.BinanceChain.Mnemonic = env
 
-	f, err := os.Open(fpClean)
-	if err != nil {
-		return err
-	}
-
-	if err = json.NewDecoder(f).Decode(&config); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *Config) validate() error {
-	if c.Kava.ChainID == "" {
-		return fmt.Errorf("required field Kava.ChainID is empty")
-	}
-	if c.Kava.Endpoint == "" {
-		return fmt.Errorf("required field Kava.Endpoint is empty")
-	}
-	if len(c.Kava.Mnemonics) == 0 {
-		return fmt.Errorf("required field Kava.Mnemonics is empty")
-	}
-	if c.BinanceChain.Endpoint == "" {
-		return fmt.Errorf("required field BinanceChain.Endpoint is empty")
-	}
-	if c.BinanceChain.Mnemonic == "" {
-		return fmt.Errorf("required field BinanceChain.Mnemonic is empty")
-	}
-	if c.BinanceChain.ChainID == "" {
-		return fmt.Errorf("required field BinanceChain.ChainID is empty")
-	}
-	return nil
+	return config, nil
 }

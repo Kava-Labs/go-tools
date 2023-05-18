@@ -8,7 +8,7 @@ DOCKER_REPOSITORY_URL:=$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(I
 
 .PHONY: install
 install:
-	go install ./
+	go install
 
 .PHONY: test-integration
 test-integration:

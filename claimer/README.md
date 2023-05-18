@@ -8,11 +8,11 @@ Update the configuration file located at config/config.json with your account mn
 
 Several mnemonics are recommended for Kava, while only one mnemonic is required for Binance Chain. This is because additional load balancing is required to ensure that each Kava claim transaction is correctly submitted to the blockchain.
 
-Claimer requires a connection to Kava's RPC server.
+Claimer requires a connection to Kava's GRPC server.
 
 ```bash
 # for local testing, start the blockchain
-kvd start
+kava start
 ```
 
 Install and start the Claimer bot
@@ -26,10 +26,10 @@ $GOPATH/bin/claimer
 You should see a message similar to:
 
 ```bash
-# INFO[0000] Loading configuration path ~/go/src/github.com/kava-labs/go-tools/claimer/config/config.json
-# I[2020-08-03|12:40:26.000] Starting WSEvents                            impl=WSEvents
-# I[2020-08-03|12:40:26.000] Starting WSClient                            impl="WSClient{kava3.data.kava.io:26657 (/websocket
-# INFO[0000] Starting server...
+> INFO[0000] Loading configuration path ~/go/src/github.com/kava-labs/go-tools/claimer/config/config.json
+> I[2020-08-03|12:40:26.000] Starting WSEvents                            impl=WSEvents
+> I[2020-08-03|12:40:26.000] Starting WSClient                            impl="WSClient{kava3.data.kava.io:26657 (/websocket
+> INFO[0000] Starting server...
 ```
 
 Claimer is now ready to receive claim requests.
@@ -46,13 +46,14 @@ Claim requests have three required parameters:
 
 Putting it all together, we can build a valid HTTP POST claim request:
 
-`http://localhost:8080/claim?target-chain=kava&swap-id=C1EF52C8762BEC5BE6AA53970019D799E7BD4EBBB1D2BD2D7EF471978088729C&random-number=FC5CD40E6DC8EC5E9A0F70D914D76072D5AE9091619B108D3BFE1E356BD22EA8`
+`http://localhost:8080/claim?target-chain=kava&swap-id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c&random-number=9b955e36ac165c6b8ab69b9af5cd042a37c5fddb85129a80cc2138b6e22ef940`
 
-The server should log a message acknowledging the request and attempt to process it.
+The server will log a message acknowledging the request and attempt to process it.
 
 ```bash
-INFO[0090] Received claim request for C1EF52C8762BEC5BE6AA53970019D799E7BD4EBBB1D2BD2D7EF471978088729C on kava
-INFO[0090] Claim tx sent to Kava: 781B8C6FCDD6BC7F03D86B6C6C217C3407D10482863E15557EDC3D37EF58195A
+> level=info msg="claim request received" request_id=b69c1636-258b-440d-b9a3-b3e47c385c1f url="/claim?target-chain=kava&swap-id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c&random-number=9b955e36ac165c6b8ab69b9af5cd042a37c5fddb85129a80cc2138b6e22ef940"
+> level=info msg="claim request submitted to queue for processing" request_id=b69c1636-258b-440d-b9a3-b3e47c385c1f swap_id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c target_chain=kava
+> level=info msg="claim request begin processing" request_id=b69c1636-258b-440d-b9a3-b3e47c385c1f swap_id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c target_chain=kava
 ```
 
 After successfully processing a claim request on Kava, the bot waits until the tx is included in a block before releasing the claimer worker to prevent sequence errors.
@@ -60,10 +61,26 @@ After successfully processing a claim request on Kava, the bot waits until the t
 If the initial relay process is unsuccessful, the bot will retry the claim several times. The bot will log each attempt.
 
 ```bash
-INFO[0300] Received claim request for 618526297d4deb153f8218ad245e76d16bb2d1130e89ea3c6521130ac1b8019a on binance 
-INFO[0310] retrying: swap 618526297d4deb153f8218ad245e76d16bb2d1130e89ea3c6521130ac1b8019a not found in state 
-INFO[0320] retrying: swap 618526297d4deb153f8218ad245e76d16bb2d1130e89ea3c6521130ac1b8019a not found in state 
-INFO[0330] retrying: swap 618526297d4deb153f8218ad245e76d16bb2d1130e89ea3c6521130ac1b8019a not found in state 
-INFO[0341] retrying: swap 618526297d4deb153f8218ad245e76d16bb2d1130e89ea3c6521130ac1b8019a not found in state 
-ERRO[0341] timed out after 5 attempts, last error: swap 618526297d4deb153f8218ad245e76d16bb2d1130e89ea3c6521130ac1b8019a not found in state
+> level=debug msg="claim retrying" error="swap 4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c not found in state" recipient= request_id=b69c1636-258b-440d-b9a3-b3e47c385c1f swap_id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c target_chain=kava
+> level=debug msg="claim retrying" error="rpc error: code = Unavailable desc = Bad Gateway: HTTP status code 502; transport: received the unexpected content-type \"text/html\"" recipient= request_id=b69c1636-258b-440d-b9a3-b3e47c385c1f swap_id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c target_chain=kava
+```
+
+then log success
+
+```bash
+> level=info msg="claim confirmed" recipient=kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc request_id=b69c1636-258b-440d-b9a3-b3e47c385c1f swap_id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c target_chain=kava tx_hash=F937A1142E6B47F9A5546680E369A515433271757B83A89069619FB3C004E0AD
+```
+
+or failure
+
+```bash
+> level=error msg="claim failed" error="rpc error: code = Unavailable desc = Bad Gateway: HTTP status code 502; transport: received the unexpected content-type \"text/html\"" recipient=kava173w2zz287s36ewnnkf4mjansnthnnsz7rtrxqc request_id=b69c1636-258b-440d-b9a3-b3e47c385c1f swap_id=4c8bd80e18d386777c2e507a0579307a54b910a6828d75375ac4bd2eae86c31c target_chain=kava
+```
+
+# Development
+
+To run e2e tests, ensure docker is running, then
+
+```bash
+make test-integration
 ```
