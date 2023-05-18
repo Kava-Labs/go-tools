@@ -20,14 +20,14 @@ func main() {
 	app.SetSDKConfig()
 
 	// Load config
-	cfg, err := config.GetConfig(*configPath)
+	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.SetLevel(log.DebugLevel)
 
-	dispatcher := claimer.NewDispatcher(*cfg)
+	dispatcher := claimer.NewDispatcher(cfg)
 	ctx := context.Background()
 	go dispatcher.Start(ctx)
 

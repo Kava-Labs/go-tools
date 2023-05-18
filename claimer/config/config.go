@@ -1,85 +1,51 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 
-	log "github.com/sirupsen/logrus"
+	kjson "github.com/knadh/koanf/parsers/json"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/v2"
 )
 
 const DefaultConfigPath = "./config/config.json"
 
 // Config defines chain connections and mnemonics
 type Config struct {
-	Kava         KavaConfig         `toml:"kava_config" json:"kava_config"`
-	BinanceChain BinanceChainConfig `toml:"binance_chain_config" json:"binance_chain_config"`
+	Kava         KavaConfig         `koanf:"kava_config"`
+	BinanceChain BinanceChainConfig `koanf:"binance_chain_config"`
 }
 
 // KavaConfig defines information required for Kava blockchain interaction
 type KavaConfig struct {
-	ChainID   string   `toml:"chain_id" json:"chain_id"`
-	Endpoint  string   `toml:"endpoint" json:"endpoint"`
-	Mnemonics []string `toml:"mnemonics" json:"mnemonics"`
+	ChainID   string   `koanf:"chain_id"`
+	Endpoint  string   `koanf:"endpoint"`
+	Mnemonics []string `koanf:"mnemonics"`
 }
 
 // BinanceChainConfig defines information required for Binance Chain interaction
 type BinanceChainConfig struct {
-	ChainID  string `toml:"chain_id" json:"chain_id"`
-	Endpoint string `toml:"endpoint" json:"endpoint"`
-	Mnemonic string `toml:"mnemonic" json:"mnemonic"`
+	ChainID  string `koanf:"chain_id"`
+	Endpoint string `koanf:"endpoint"`
+	Mnemonic string `koanf:"mnemonic"`
 }
 
-// NewConfig initializes a new config
-func NewConfig() *Config {
-	return &Config{
-		Kava:         KavaConfig{},
-		BinanceChain: BinanceChainConfig{},
+// LoadConfig loads and validates a configuration file, returning the Config struct if valid
+func LoadConfig(filePath string) (Config, error) {
+	var k = koanf.New(".")
+
+	if err := k.Load(file.Provider(filePath), kjson.Parser()); err != nil {
+		return Config{}, fmt.Errorf("error loading config: %w", err)
 	}
-}
 
-// GetConfig loads and validates a configuration file, returning the Config struct if valid
-func GetConfig(filePath string) (*Config, error) {
 	var config Config
+	k.Unmarshal(".", &config)
 
-	err := loadConfig(filePath, &config)
-	if err != nil {
-		return nil, err
+	if err := config.validate(); err != nil {
+		return Config{}, err
 	}
 
-	err = config.validate()
-	if err != nil {
-		return nil, err
-	}
-
-	return &config, nil
-}
-
-func loadConfig(file string, config *Config) error {
-	ext := filepath.Ext(file)
-	if ext != ".json" {
-		return fmt.Errorf("config file extention must be .json")
-	}
-
-	fp, err := filepath.Abs(file)
-	if err != nil {
-		return err
-	}
-
-	fpClean := filepath.Clean(fp)
-	log.Infof("Loading configuration path %s", fpClean)
-
-	f, err := os.Open(fpClean)
-	if err != nil {
-		return err
-	}
-
-	if err = json.NewDecoder(f).Decode(&config); err != nil {
-		return err
-	}
-
-	return nil
+	return config, nil
 }
 
 func (c *Config) validate() error {
