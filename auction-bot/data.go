@@ -25,7 +25,6 @@ type AuctionData struct {
 	Assets       map[string]AssetInfo
 	Auctions     []auctiontypes.Auction
 	BidIncrement sdk.Dec
-	BidMargin    sdk.Dec
 }
 
 func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
