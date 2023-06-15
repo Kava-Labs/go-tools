@@ -7,11 +7,13 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/kava/app"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
 // c is a helper function to create sdk.Coin
 var c = sdk.NewInt64Coin
+var logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 func TestMain(m *testing.M) {
 	// Set kava bech32 prefix
@@ -67,7 +69,7 @@ func TestGetBids(t *testing.T) {
 			testAddr, err := sdk.AccAddressFromBech32("kava10eup8kvq26z8ekjj9rkplr2lwwynskftqc4ytv")
 			require.NoError(t, err)
 
-			actualBids := GetBids(&tc.auctionData, testAddr, tc.margin)
+			actualBids := GetBids(logger, &tc.auctionData, testAddr, tc.margin)
 
 			// add in expected bidder address here to keep test cases simple
 			for i := 0; i < len(tc.expectedBids); i++ {
@@ -166,6 +168,7 @@ func TestCalculateProposedLot(t *testing.T) {
 			var testID uint64
 
 			actualLot, ok := calculateProposedLot(
+				logger,
 				tc.lot,
 				tc.maxBid,
 				assetInfos[tc.lot.Denom],

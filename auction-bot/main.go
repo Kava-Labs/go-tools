@@ -138,6 +138,7 @@ func main() {
 				Msgf("failed to get auction data, retrying")
 
 			priceErrors += 1
+			logger.Debug().Err(err).Msg("failed to fetch auction data")
 			time.Sleep(time.Second * 5)
 			continue
 		}
