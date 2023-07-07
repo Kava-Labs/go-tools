@@ -9,12 +9,12 @@ import (
 
 	"github.com/kava-labs/go-tools/signing"
 	"github.com/kava-labs/kava/app"
+	"github.com/rs/zerolog"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/tendermint/tendermint/libs/log"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 
 func main() {
 	// create base logger
-	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+	logger := zerolog.New(os.Stdout)
 
 	//
 	// bootstrap kava chain config
@@ -44,15 +44,16 @@ func main() {
 	//
 	config, err := LoadConfig(&EnvLoader{})
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Fatal().Err(err).Send()
 		os.Exit(1)
 	}
 
-	logger.With(
-		"grpcUrl", config.KavaGrpcUrl,
-		"bidInterval", config.KavaBidInterval.String(),
-		"profitMargin", config.ProfitMargin.String(),
-	).Info("config loaded")
+	logger.
+		Info().
+		Str("grpcUrl", config.KavaGrpcUrl).
+		Dur("bidInterval", config.KavaBidInterval).
+		Str("profitMargin", config.ProfitMargin.String()).
+		Msg("config loaded")
 
 	//
 	// create codec for messages
@@ -63,7 +64,7 @@ func main() {
 	// create rpc client for fetching data
 	// required for bidding
 	//
-	logger.Info("creating grpc client")
+	logger.Info().Msg("creating grpc client")
 
 	grpcClient := NewGrpcClient(config.KavaGrpcUrl, encodingConfig.Marshaler)
 	defer grpcClient.GrpcClientConn.Close()
@@ -74,20 +75,21 @@ func main() {
 	hdPath := hd.CreateHDPath(app.Bip44CoinType, 0, 0)
 	privKeyBytes, err := hd.Secp256k1.Derive()(config.KavaKeeperMnemonic, "", hdPath.String())
 	if err != nil {
-		logger.Error("failed to derive key")
-		logger.Error(err.Error())
-		os.Exit(1)
+		logger.Fatal().
+			Err(err).
+			Msg("failed to derive key")
 	}
 	// wrap with cosmos secp256k1 private key struct
 	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
-	logger.Info(fmt.Sprintf("signing address: %s", sdk.AccAddress(privKey.PubKey().Address()).String()))
+	logger.Info().
+		Str("signing address", sdk.AccAddress(privKey.PubKey().Address()).String()).
+		Send()
 
 	nodeInfoResponse, err := grpcClient.Tm.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
 	if err != nil {
-		logger.Error("failed to fetch chain id")
-		logger.Error(err.Error())
-		os.Exit(1)
+		logger.Fatal().Err(err).Msg("failed to fetch chain id")
 	}
+
 	signer := signing.NewSigner(
 		nodeInfoResponse.DefaultNodeInfo.Network,
 		encodingConfig,
@@ -95,6 +97,7 @@ func main() {
 		grpcClient.Tx,
 		privKey,
 		100,
+		logger,
 	)
 
 	// channels to communicate with signer
@@ -103,9 +106,7 @@ func main() {
 	// signer starts it's own go routines and returns
 	responses, err := signer.Run(requests)
 	if err != nil {
-		logger.Error("failed to start signer")
-		logger.Error(err.Error())
-		os.Exit(1)
+		logger.Fatal().Err(err).Msg("failed to start signer")
 	}
 
 	// log responses, if responses are not read, requests will block
@@ -130,32 +131,40 @@ func main() {
 	for {
 		data, err := GetAuctionData(grpcClient, encodingConfig.Marshaler)
 		if err != nil {
+			logger.Error().
+				Err(err).
+				Int("priceErrors", priceErrors).
+				Msgf("failed to get auction data")
+
 			priceErrors += 1
 			continue
 		}
-		logger.Info(fmt.Sprintf("fetched prices after %d attempt(s)\n", priceErrors+1))
+		logger.Info().Msgf("fetched prices after %d attempt(s)\n", priceErrors+1)
 		priceErrors = 0
 
 		latestHeight, err := grpcClient.LatestHeight()
-
 		if err != nil {
 			continue
 		}
 
-		logger.Info(fmt.Sprintf("latest height: %d", latestHeight))
-		logger.Info(fmt.Sprintf("checking %d auctions", len(data.Auctions)))
+		logger.Info().Msgf("latest height: %d", latestHeight)
+		logger.Info().Msgf("checking %d auctions", len(data.Auctions))
 
-		auctionBids := GetBids(data, sdk.AccAddress(privKey.PubKey().Address()), config.ProfitMargin)
+		auctionBids := GetBids(
+			logger,
+			data,
+			sdk.AccAddress(privKey.PubKey().Address()),
+			config.ProfitMargin,
+		)
 
 		msgs := CreateBidMsgs(sdk.AccAddress(privKey.PubKey().Address()), auctionBids)
-		logger.Info(fmt.Sprintf("creating %d bids", len(msgs)))
+		logger.Info().Msgf("creating %d bids", len(msgs))
 
 		totalBids := sdk.Coins{}
 		for _, bid := range msgs {
 			totalBids = totalBids.Add(bid.Amount)
-
 		}
-		logger.Info(fmt.Sprintf("total for bids %s", totalBids))
+		logger.Info().Msgf("total for bids %s", totalBids)
 
 		auctionDups := make(map[uint64]int64)
 		for _, bid := range msgs {
@@ -164,7 +173,7 @@ func main() {
 
 		for auctionID, numDups := range auctionDups {
 			if numDups > 1 {
-				logger.Info(fmt.Sprintf("auction id %d dups %d", auctionID, numDups))
+				logger.Info().Msgf("auction id %d dups %d", auctionID, numDups)
 			}
 		}
 
@@ -180,7 +189,7 @@ func main() {
 		numMsgs := len(msgs)
 
 		for i, msg := range msgs {
-			logger.Info(fmt.Sprintf("%v", msg))
+			logger.Debug().Interface("bid msg", msg).Send()
 			// collect msgs
 			msgCopy := msg
 			msgBatch = append(msgBatch, &msgCopy)

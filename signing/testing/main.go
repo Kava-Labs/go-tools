@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/kava-labs/go-tools/signing"
+	"github.com/rs/zerolog"
 
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
@@ -53,6 +54,8 @@ func main() {
 	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
 	accAddr := sdk.AccAddress(privKey.PubKey().Address())
 
+	logger := zerolog.New(os.Stderr)
+
 	signer := signing.NewSigner(
 		nodeInfoResponse.DefaultNodeInfo.Network,
 		encodingConfig,
@@ -60,6 +63,7 @@ func main() {
 		txClient,
 		privKey,
 		inflightLimit,
+		logger,
 	)
 	requests := make(chan signing.MsgRequest)
 	responses, err := signer.Run(requests)

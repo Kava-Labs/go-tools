@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"fmt"
 	"log"
 	"net/url"
 
@@ -74,7 +74,7 @@ func NewGrpcClient(target string, cdc codec.Codec) GrpcClient {
 func (c *GrpcClient) LatestHeight() (int64, error) {
 	latestBlock, err := c.Tm.GetLatestBlock(context.Background(), &tmservice.GetLatestBlockRequest{})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to fetch latest block: %w", err)
 	}
 
 	return latestBlock.Block.Header.Height, nil
@@ -83,7 +83,7 @@ func (c *GrpcClient) LatestHeight() (int64, error) {
 func (c *GrpcClient) ChainID() (string, error) {
 	latestBlock, err := c.Tm.GetLatestBlock(context.Background(), &tmservice.GetLatestBlockRequest{})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to fetch latest block: %w", err)
 	}
 
 	return latestBlock.Block.Header.ChainID, nil
@@ -94,13 +94,13 @@ func (c *GrpcClient) Account(addr string) (authtypes.AccountI, error) {
 		Address: addr,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch account: %w", err)
 	}
 
 	var acc authtypes.AccountI
 	err = c.cdc.UnpackAny(res.Account, &acc)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unpack account: %w", err)
 	}
 
 	return acc, nil
@@ -114,7 +114,7 @@ func (c *GrpcClient) BaseAccount(addr string) (authtypes.BaseAccount, error) {
 
 	bAcc, ok := acc.(*authtypes.BaseAccount)
 	if !ok {
-		return authtypes.BaseAccount{}, errors.New("not a base account")
+		return authtypes.BaseAccount{}, fmt.Errorf("%s not a base account", addr)
 	}
 
 	return *bAcc, nil
@@ -133,13 +133,13 @@ func (c *GrpcClient) AllAuctions(ctx context.Context) ([]auctiontypes.Auction, e
 			},
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to fetch auctions: %w", err)
 		}
 
 		for _, anyAuction := range auctionsRes.Auctions {
 			var auction auctiontypes.Auction
 			if err = c.cdc.UnpackAny(anyAuction, &auction); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to unpack auction: %w", err)
 			}
 
 			auctions = append(auctions, auction)
