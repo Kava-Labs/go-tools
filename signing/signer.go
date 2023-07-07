@@ -15,6 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/rs/zerolog"
 	tmmempool "github.com/tendermint/tendermint/mempool"
 )
 
@@ -54,6 +55,7 @@ type Signer struct {
 	txClient        txtypes.ServiceClient
 	privKey         cryptotypes.PrivKey
 	inflightTxLimit uint64
+	logger          zerolog.Logger
 }
 
 func NewSigner(
@@ -62,7 +64,9 @@ func NewSigner(
 	authClient authtypes.QueryClient,
 	txClient txtypes.ServiceClient,
 	privKey cryptotypes.PrivKey,
-	inflightTxLimit uint64) *Signer {
+	inflightTxLimit uint64,
+	logger zerolog.Logger,
+) *Signer {
 
 	return &Signer{
 		chainID:         chainID,
@@ -71,6 +75,7 @@ func NewSigner(
 		txClient:        txClient,
 		privKey:         privKey,
 		inflightTxLimit: inflightTxLimit,
+		logger:          logger,
 	}
 }
 
@@ -79,20 +84,34 @@ func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
 
 	go func() {
 		for {
+			accAddr := GetAccAddress(s.privKey)
+
 			request := authtypes.QueryAccountRequest{
-				Address: GetAccAddress(s.privKey).String(),
+				Address: accAddr.String(),
 			}
 			response, err := s.authClient.Account(context.Background(), &request)
+			if err != nil {
+				s.logger.Error().
+					Str("address", accAddr.String()).
+					Err(err).
+					Msg("failed to query signing account, trying again in 10s")
 
-			if err == nil {
-				var account authtypes.AccountI
-
-				err = s.encodingConfig.InterfaceRegistry.UnpackAny(response.Account, &account)
-				if err == nil {
-					accountState <- account
-				}
+				time.Sleep(10 * time.Second)
+				continue
 			}
 
+			var account authtypes.AccountI
+			if err = s.encodingConfig.InterfaceRegistry.UnpackAny(response.Account, &account); err != nil {
+				s.logger.Error().
+					Str("address", accAddr.String()).
+					Err(err).
+					Msg("failed to unpack signing account, trying again in 10s")
+
+				time.Sleep(10 * time.Second)
+				continue
+			}
+
+			accountState <- account
 			time.Sleep(1 * time.Second)
 		}
 	}()
@@ -252,6 +271,13 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 
 					// could not sign and encode the currentRequest
 					if response.Err != nil {
+						s.logger.
+							Error().
+							Err(err).
+							Uint64("sequence", broadcastTxSeq).
+							Interface("tx", txBuilder.GetTx()).
+							Msg("failed to sign and encode tx")
+
 						// clear invalid request, since this is non-recoverable
 						currentRequest = nil
 
@@ -284,6 +310,12 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 
 				// determine action to take when err (and no response)
 				if err != nil {
+					s.logger.Error().
+						Err(err).
+						Uint64("sequence", broadcastTxSeq).
+						Interface("tx", response.Tx).
+						Msg("failed to broadcast tx")
+
 					if tmmempool.IsPreCheckError(err) {
 						// ErrPreCheck - not recoverable
 						response.Err = err
@@ -341,6 +373,12 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 					// go to next request
 					broadcastTxSeq++
 				case txFailed:
+					s.logger.Error().
+						Err(response.Err).
+						Uint64("sequence", broadcastTxSeq).
+						Interface("tx", response.Tx).
+						Msg("tx failed")
+
 					// do not store the request as inflight (it's not in the mempool)
 					inflight[broadcastTxSeq%s.inflightTxLimit] = nil
 
