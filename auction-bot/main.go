@@ -17,16 +17,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-const (
-	kavaGrpcUrlEnvKey = "KAVA_GRPC_URL"
-	mnemonicEnvKey    = "KEEPER_MNEMONIC"
-	profitMarginKey   = "BID_MARGIN"
-	bidIntervalKey    = "BID_INTERVAL"
-)
-
 func main() {
 	// create base logger
-	logger := zerolog.New(os.Stdout)
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	//
 	// bootstrap kava chain config
@@ -100,6 +93,14 @@ func main() {
 		logger,
 	)
 
+	startHealthCheckService(
+		context.Background(),
+		logger,
+		config,
+		grpcClient,
+		signer,
+	)
+
 	// channels to communicate with signer
 	requests := make(chan signing.MsgRequest)
 
@@ -134,11 +135,13 @@ func main() {
 			logger.Error().
 				Err(err).
 				Int("priceErrors", priceErrors).
-				Msgf("failed to get auction data")
+				Msgf("failed to get auction data, retrying")
 
 			priceErrors += 1
+			time.Sleep(time.Second * 5)
 			continue
 		}
+
 		logger.Info().Msgf("fetched prices after %d attempt(s)\n", priceErrors+1)
 		priceErrors = 0
 
@@ -164,7 +167,7 @@ func main() {
 		for _, bid := range msgs {
 			totalBids = totalBids.Add(bid.Amount)
 		}
-		logger.Info().Msgf("total for bids %s", totalBids)
+		logger.Info().Msgf("total for bids: %s", totalBids)
 
 		auctionDups := make(map[uint64]int64)
 		for _, bid := range msgs {
