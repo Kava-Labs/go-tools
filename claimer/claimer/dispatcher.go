@@ -28,16 +28,16 @@ type Dispatcher struct {
 	BnbClient  *brpc.HTTP
 }
 
-func NewDispatcher(cfg config.Config) Dispatcher {
+func NewDispatcher(cfg config.Config) *Dispatcher {
 	jobQueue := make(chan types.ClaimJob, JobQueueSize)
 
-	return Dispatcher{
+	return &Dispatcher{
 		config:   cfg,
 		jobQueue: jobQueue,
 	}
 }
 
-func (d Dispatcher) Start(ctx context.Context) {
+func (d *Dispatcher) Start(ctx context.Context) {
 	// Setup Mnemonics
 	kavaKeys := make(chan cryptotypes.PrivKey, len(d.config.Kava.Mnemonics))
 	for _, kavaMnemonic := range d.config.Kava.Mnemonics {
@@ -101,4 +101,4 @@ func (d Dispatcher) Start(ctx context.Context) {
 	}
 }
 
-func (d Dispatcher) JobQueue() chan types.ClaimJob { return d.jobQueue }
+func (d *Dispatcher) JobQueue() chan types.ClaimJob { return d.jobQueue }

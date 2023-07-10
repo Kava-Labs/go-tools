@@ -13,7 +13,7 @@ import (
 func healthCheckHandler(
 	ctx context.Context,
 	logger *logrus.Logger,
-	dispatcher claimer.Dispatcher,
+	dispatcher *claimer.Dispatcher,
 ) http.HandlerFunc {
 	// Create a new Checker.
 	checker := health.NewChecker(
