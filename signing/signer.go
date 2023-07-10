@@ -56,6 +56,7 @@ type Signer struct {
 	privKey         cryptotypes.PrivKey
 	inflightTxLimit uint64
 	logger          zerolog.Logger
+	accStatus       error
 }
 
 func NewSigner(
@@ -76,7 +77,13 @@ func NewSigner(
 		privKey:         privKey,
 		inflightTxLimit: inflightTxLimit,
 		logger:          logger,
+		accStatus:       nil,
 	}
+}
+
+// GetAccountError returns the error encountered when querying the signing account
+func (s *Signer) GetAccountError() error {
+	return s.accStatus
 }
 
 func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
@@ -91,6 +98,8 @@ func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
 			}
 			response, err := s.authClient.Account(context.Background(), &request)
 			if err != nil {
+				s.accStatus = err
+
 				s.logger.Error().
 					Str("address", accAddr.String()).
 					Err(err).
@@ -102,6 +111,8 @@ func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
 
 			var account authtypes.AccountI
 			if err = s.encodingConfig.InterfaceRegistry.UnpackAny(response.Account, &account); err != nil {
+				s.accStatus = err
+
 				s.logger.Error().
 					Str("address", accAddr.String()).
 					Err(err).
@@ -111,6 +122,7 @@ func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
 				continue
 			}
 
+			s.accStatus = nil
 			accountState <- account
 			time.Sleep(1 * time.Second)
 		}

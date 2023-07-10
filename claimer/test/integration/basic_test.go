@@ -140,7 +140,7 @@ func startApp(cfg config.Config) func() {
 	dispatcher := claimer.NewDispatcher(cfg)
 	go dispatcher.Start(ctx)
 
-	s := server.NewServer(dispatcher.JobQueue())
+	s := server.NewServer(dispatcher)
 	go s.Start()
 
 	shutdown := func() {

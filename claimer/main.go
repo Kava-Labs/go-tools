@@ -26,7 +26,7 @@ func main() {
 	ctx := context.Background()
 	go dispatcher.Start(ctx)
 
-	s := server.NewServer(dispatcher.JobQueue())
+	s := server.NewServer(dispatcher)
 	log.Info("Starting server...")
 	if err := s.Start(); err != nil {
 		log.Fatal(err)
