@@ -18,7 +18,7 @@ import (
 	bep3types "github.com/kava-labs/kava/x/bep3/types"
 
 	"github.com/kava-labs/go-tools/claimer/config"
-	"github.com/kava-labs/go-tools/claimer/server"
+	"github.com/kava-labs/go-tools/claimer/types"
 	"github.com/kava-labs/go-tools/signing"
 )
 
@@ -37,7 +37,7 @@ var (
 	DefaultGasPrice sdk.DecCoin = sdk.NewDecCoinFromDec("ukava", sdk.MustNewDecFromStr("0.25"))
 )
 
-func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) (string, string, error) {
+func claimOnBinanceChain(bnbHTTP brpc.Client, claim types.ClaimJob) (string, string, error) {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return "", "", NewErrorFailed(err)
@@ -79,7 +79,7 @@ func claimOnBinanceChain(bnbHTTP brpc.Client, claim server.ClaimJob) (string, st
 	return res.Hash.String(), recipient, nil
 }
 
-func claimOnKava(config config.KavaConfig, client KavaChainClient, claim server.ClaimJob, privKey cryptotypes.PrivKey) (string, string, error) {
+func claimOnKava(config config.KavaConfig, client KavaChainClient, claim types.ClaimJob, privKey cryptotypes.PrivKey) (string, string, error) {
 	swapID, err := hex.DecodeString(claim.SwapID)
 	if err != nil {
 		return "", "", NewErrorFailed(err)
