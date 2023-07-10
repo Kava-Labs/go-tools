@@ -10,6 +10,14 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+const (
+	kavaGrpcUrlEnvKey       = "KAVA_GRPC_URL"
+	mnemonicEnvKey          = "KEEPER_MNEMONIC"
+	profitMarginKey         = "BID_MARGIN"
+	bidIntervalKey          = "BID_INTERVAL"
+	heathCheckListenAddrKey = "HEALTH_CHECK_LISTEN_ADDR"
+)
+
 // ConfigLoader provides an interface for
 // loading config values from a provided key
 type ConfigLoader interface {
@@ -18,10 +26,11 @@ type ConfigLoader interface {
 
 // Config provides application configuration
 type Config struct {
-	KavaGrpcUrl        string
-	KavaBidInterval    time.Duration
-	KavaKeeperMnemonic string
-	ProfitMargin       sdk.Dec
+	KavaGrpcUrl          string
+	KavaBidInterval      time.Duration
+	KavaKeeperMnemonic   string
+	ProfitMargin         sdk.Dec
+	HeathCheckListenAddr string
 }
 
 // LoadConfig loads key values from a ConfigLoader
@@ -53,11 +62,17 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 		keeperBidInterval = time.Duration(10 * time.Minute)
 	}
 
+	healthCheckListenAddr := loader.Get(heathCheckListenAddrKey)
+	if healthCheckListenAddr == "" {
+		healthCheckListenAddr = ":8080"
+	}
+
 	return Config{
-		KavaGrpcUrl:        grpcURL,
-		KavaBidInterval:    keeperBidInterval,
-		KavaKeeperMnemonic: keeperMnemonic,
-		ProfitMargin:       marginDec,
+		KavaGrpcUrl:          grpcURL,
+		KavaBidInterval:      keeperBidInterval,
+		KavaKeeperMnemonic:   keeperMnemonic,
+		ProfitMargin:         marginDec,
+		HeathCheckListenAddr: healthCheckListenAddr,
 	}, nil
 }
 
