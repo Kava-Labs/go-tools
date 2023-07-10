@@ -16,12 +16,12 @@ import (
 
 // Server that accepts HTTP POST claim requests on '/claim' and passes them to the Claims channel
 type Server struct {
-	Dispatcher claimer.Dispatcher
+	Dispatcher *claimer.Dispatcher
 	httpServer *http.Server
 }
 
 // NewServer instantiates a new instance of Server
-func NewServer(dispatcher claimer.Dispatcher) *Server {
+func NewServer(dispatcher *claimer.Dispatcher) *Server {
 	return &Server{
 		Dispatcher: dispatcher,
 	}
@@ -83,7 +83,7 @@ func (s *Server) claim(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`{"message": "claim request received, attempting to process..."}`)))
+	w.Write([]byte(`{"message": "claim request received, attempting to process..."}`))
 
 	claimJob := types.NewClaimJob(requestID, targetChain, swapID, randomNumber)
 	s.Dispatcher.JobQueue() <- claimJob
@@ -92,7 +92,7 @@ func (s *Server) claim(w http.ResponseWriter, r *http.Request) {
 		"request_id":   requestID,
 		"swap_id":      swapID,
 		"target_chain": targetChain,
-	}).Info(fmt.Sprintf("claim request submitted to queue for processing"))
+	}).Info("claim request submitted to queue for processing")
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
