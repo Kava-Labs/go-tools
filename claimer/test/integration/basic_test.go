@@ -135,6 +135,32 @@ func TestClaimSwapBnb(t *testing.T) {
 	require.Equalf(t, bnbtypes.Completed, status, "expected swap status '%s', actual '%s'", bnbtypes.Completed, status)
 }
 
+func TestHealthCheck(t *testing.T) {
+	addrs := addresses.GetAddresses()
+	cfg := config.Config{
+		Kava: config.KavaConfig{
+			ChainID:   kavaChainID,
+			Endpoint:  addresses.KavaGrpcURL,
+			Mnemonics: kavaUserMenmonics(addrs)[2:],
+		},
+		BinanceChain: config.BinanceChainConfig{
+			ChainID:  binanceChainID,
+			Endpoint: addresses.BnbNodeURL,
+			Mnemonic: bnbUserMenmonics(addrs)[0],
+		},
+	}
+	shutdownFunc := startApp(cfg)
+	defer shutdownFunc()
+
+	// give time for the server to start and health check to pass
+	// healthcheck delays on start by 3 seconds
+	time.Sleep(10 * time.Second)
+
+	resp, err := http.Get("http://localhost:8080/health")
+	require.NoError(t, err)
+	require.Equal(t, 200, resp.StatusCode)
+}
+
 func startApp(cfg config.Config) func() {
 	ctx, cancel := context.WithCancel(context.Background())
 	dispatcher := claimer.NewDispatcher(cfg)
