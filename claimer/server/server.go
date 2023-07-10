@@ -31,7 +31,6 @@ func NewServer(dispatcher *claimer.Dispatcher) *Server {
 func (s *Server) Start() error {
 	r := mux.NewRouter()
 	r.HandleFunc("/claim", s.claim).Methods(http.MethodPost)
-	r.HandleFunc("/status", s.status)
 	r.HandleFunc("/", s.notFound)
 
 	healthChecker := healthCheckHandler(
@@ -99,10 +98,4 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
 	w.Write([]byte(`{"message": "page not found"}`))
-}
-
-func (s *Server) status(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status": "healthy"}`))
 }
