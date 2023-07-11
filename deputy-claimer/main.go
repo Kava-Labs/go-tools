@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"log"
+	"os"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/common/types"
 	"github.com/kava-labs/kava/app"
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
@@ -64,6 +65,7 @@ func loadConfig() (Config, error) {
 }
 
 func main() {
+	logger := zerolog.New(os.Stdout).With().Timestamp().Caller().Logger()
 
 	// Set global address prefixes
 	kavaConfig := sdk.GetConfig()
@@ -72,7 +74,7 @@ func main() {
 
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Msg("could not load config")
 	}
 
 	kavaClaimer := claim.NewKavaClaimer(
@@ -89,6 +91,13 @@ func main() {
 	)
 
 	ctx := context.Background()
+	startHealthCheckService(
+		ctx,
+		logger,
+		cfg,
+		kavaClaimer,
+	)
+
 	kavaClaimer.Start(ctx)
 	bnbClaimer.Start(ctx)
 

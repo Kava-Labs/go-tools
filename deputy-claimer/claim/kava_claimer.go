@@ -56,8 +56,8 @@ func (r KavaClaimError) Error() string {
 type KavaClaimer struct {
 	encodingConfig  params.EncodingConfig
 	cdc             codec.Codec
-	kavaClient      KavaChainClient
-	bnbClient       BnbChainClient
+	KavaClient      KavaChainClient
+	BnbClient       BnbChainClient
 	mnemonics       []string
 	deputyAddresses DeputyAddresses
 }
@@ -73,8 +73,8 @@ func NewKavaClaimer(
 	return KavaClaimer{
 		encodingConfig:  encodingConfig,
 		cdc:             encodingConfig.Marshaler,
-		kavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig),
-		bnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
+		KavaClient:      NewGrpcKavaClient(kavaGrpcURL, encodingConfig),
+		BnbClient:       NewRpcBNBClient(bnbRPCURL, depAddrs.AllBnb()),
 		mnemonics:       mnemonics,
 		deputyAddresses: depAddrs,
 	}
@@ -100,7 +100,7 @@ func (kc KavaClaimer) Start(ctx context.Context) {
 }
 
 func (kc KavaClaimer) fetchAndClaimSwaps() error {
-	claimableSwaps, err := getClaimableKavaSwaps(kc.kavaClient, kc.bnbClient, kc.deputyAddresses)
+	claimableSwaps, err := getClaimableKavaSwaps(kc.KavaClient, kc.BnbClient, kc.deputyAddresses)
 	if err != nil {
 		return fmt.Errorf("could not fetch claimable swaps: %w", err)
 	}
@@ -120,13 +120,13 @@ func (kc KavaClaimer) fetchAndClaimSwaps() error {
 			log.Printf("sending claim for kava swap id %s", swap.swapID)
 			defer func() { mnemonics <- mnemonic }()
 
-			txHash, err := constructAndSendClaim(kc.kavaClient, kc.encodingConfig, mnemonic, swap.swapID, swap.randomNumber)
+			txHash, err := constructAndSendClaim(kc.KavaClient, kc.encodingConfig, mnemonic, swap.swapID, swap.randomNumber)
 			if err != nil {
 				errs <- KavaClaimError{Swap: swap, Err: fmt.Errorf("could not submit claim: %w", err)}
 				return
 			}
 			err = Wait(kavaTxTimeout, func() (bool, error) {
-				res, err := kc.kavaClient.GetTxConfirmation(txHash)
+				res, err := kc.KavaClient.GetTxConfirmation(txHash)
 				if err != nil {
 					return false, nil
 				}
