@@ -1,9 +1,9 @@
-FROM golang:1.15.6-buster as build-env
+FROM golang:1.20-bookworm as build-env
 
 ADD . /src
 RUN cd /src/deputy-claimer && go build -o /main
 
-FROM debian:buster
+FROM debian:bookworm
 
 RUN apt-get update \
       && apt-get install -y ca-certificates \
