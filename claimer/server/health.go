@@ -34,6 +34,12 @@ func healthCheckHandler(
 				return err
 			},
 		}),
+		health.WithPeriodicCheck(60*time.Second, 3*time.Second, health.Check{
+			Name: "dispatcher error",
+			Check: func(ctx context.Context) error {
+				return dispatcher.CurrentError
+			},
+		}),
 		// Runs when health status changes
 		health.WithStatusListener(func(ctx context.Context, state health.CheckerState) {
 			logger.

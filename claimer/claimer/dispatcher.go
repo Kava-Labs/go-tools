@@ -22,18 +22,22 @@ import (
 var JobQueueSize = 1000
 
 type Dispatcher struct {
-	config     config.Config
-	jobQueue   chan types.ClaimJob
-	KavaClient grpcKavaClient
-	BnbClient  *brpc.HTTP
+	config       config.Config
+	jobQueue     chan types.ClaimJob
+	KavaClient   grpcKavaClient
+	BnbClient    *brpc.HTTP
+	failuresChan chan error
+	CurrentError error
 }
 
 func NewDispatcher(cfg config.Config) *Dispatcher {
 	jobQueue := make(chan types.ClaimJob, JobQueueSize)
+	errorsQueue := make(chan error, 100)
 
 	return &Dispatcher{
-		config:   cfg,
-		jobQueue: jobQueue,
+		config:       cfg,
+		jobQueue:     jobQueue,
+		failuresChan: errorsQueue,
 	}
 }
 
@@ -65,6 +69,14 @@ func (d *Dispatcher) Start(ctx context.Context) {
 	}
 	d.BnbClient.SetKeyManager(bnbKeyManager)
 
+	// Continuously update the CurrentError with the latest errors from the
+	// failuresChan. This will be nil when claims are successful.
+	go func() {
+		for err := range d.failuresChan {
+			d.CurrentError = err
+		}
+	}()
+
 	// Run Workers
 	for {
 		select {
@@ -85,16 +97,26 @@ func (d *Dispatcher) Start(ctx context.Context) {
 				go func() {
 					// release the mnemonic when done
 					defer func() { kavaKeys <- key }()
-					Retry(30, 20*time.Second, logger, func() (string, string, error) {
-						return claimOnKava(d.config.Kava, d.KavaClient, claim, key)
-					})
+					Retry(
+						30,
+						20*time.Second,
+						logger,
+						d.failuresChan,
+						func() (string, string, error) {
+							return claimOnKava(d.config.Kava, d.KavaClient, claim, key)
+						})
 				}()
 			case types.TargetBinance, types.TargetBinanceChain:
 				// TODO make binance safe for concurrent requests
 				go func() {
-					Retry(30, 20*time.Second, logger, func() (string, string, error) {
-						return claimOnBinanceChain(d.BnbClient, claim)
-					})
+					Retry(
+						30,
+						20*time.Second,
+						logger,
+						d.failuresChan,
+						func() (string, string, error) {
+							return claimOnBinanceChain(d.BnbClient, claim)
+						})
 				}()
 			}
 		}

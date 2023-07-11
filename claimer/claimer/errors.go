@@ -43,7 +43,13 @@ func (er ErrorRetryable) Error() string {
 }
 
 // Retry retries the given function for n attempts, sleeping x seconds between attempts.
-func Retry(attempts int, sleep time.Duration, logger log.FieldLogger, f func() (string, string, error)) {
+func Retry(
+	attempts int,
+	sleep time.Duration,
+	logger log.FieldLogger,
+	failureChan chan<- error,
+	f func() (string, string, error),
+) {
 	for i := 0; ; i++ {
 		txHash, recipient, err := f()
 		if err == nil {
@@ -51,6 +57,9 @@ func Retry(attempts int, sleep time.Duration, logger log.FieldLogger, f func() (
 				"recipient": recipient,
 				"tx_hash":   txHash,
 			}).Info("claim confirmed")
+
+			// Clear the failure channel
+			failureChan <- nil
 			return
 		}
 
@@ -63,10 +72,13 @@ func Retry(attempts int, sleep time.Duration, logger log.FieldLogger, f func() (
 		}
 
 		if errors.As(err, &ErrorFailed{}) {
+			failureChan <- err
+
 			logger.WithFields(log.Fields{
 				"recipient": recipient,
 				"error":     err.Error(),
 			}).Error("claim failed")
+
 			return
 		}
 
