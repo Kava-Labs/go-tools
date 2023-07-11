@@ -6,6 +6,7 @@ import (
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
 	bnbtypes "github.com/kava-labs/binance-chain-go-sdk/types"
+	ctypes "github.com/kava-labs/tendermint/rpc/core/types"
 	tmtypes "github.com/kava-labs/tendermint/types"
 )
 
@@ -21,6 +22,7 @@ type BnbChainClient interface { // XXX should be defined in the claimer, not the
 	GetAccount(address types.AccAddress) (types.Account, error)
 	GetChainID() string
 	BroadcastTx(tx tmtypes.Tx) error
+	Status() (*ctypes.ResultStatus, error)
 }
 
 var _ BnbChainClient = rpcBNBClient{}
@@ -112,4 +114,8 @@ func (bc rpcBNBClient) BroadcastTx(tx tmtypes.Tx) error {
 		return fmt.Errorf("transaction failed to get into mempool: %s", res.Log)
 	}
 	return nil
+}
+
+func (bc rpcBNBClient) Status() (*ctypes.ResultStatus, error) {
+	return bc.bnbSDKClient.Status()
 }
