@@ -1,4 +1,4 @@
-package main
+package health
 
 import (
 	"context"
@@ -15,10 +15,9 @@ import (
 
 const HEALTH_CHECK_LISTEN_ADDR_KEY = "HEALTH_CHECK_LISTEN_ADDR"
 
-func startHealthCheckService(
+func StartHealthCheckService(
 	ctx context.Context,
 	logger zerolog.Logger,
-	config Config,
 	kavaClaimer claim.KavaClaimer,
 ) {
 	// Create a new Checker.
