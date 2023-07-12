@@ -29,6 +29,7 @@ func StartHealthCheckService(
 			Name: "kava grpc",
 			Check: func(ctx context.Context) error {
 				_, err := kavaClaimer.KavaClient.GetChainID()
+				logger.Debug().Err(err).Msg("kava grpc periodic health check")
 				return err
 			},
 		}),
@@ -36,6 +37,7 @@ func StartHealthCheckService(
 			Name: "bnb grpc",
 			Check: func(ctx context.Context) error {
 				_, err := kavaClaimer.BnbClient.Status()
+				logger.Debug().Err(err).Msg("bnb periodic health check")
 				return err
 			},
 		}),
@@ -43,7 +45,7 @@ func StartHealthCheckService(
 		health.WithStatusListener(func(ctx context.Context, state health.CheckerState) {
 			logger.
 				Debug().
-				Str("status", string(state.Status)).
+				Interface("state", state).
 				Msg("health status changed")
 		}),
 	)
