@@ -5,12 +5,14 @@ package integration
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"testing"
 	"time"
 
 	bnbRpc "github.com/kava-labs/binance-chain-go-sdk/client/rpc"
 	"github.com/kava-labs/binance-chain-go-sdk/common/types"
+	"github.com/rs/zerolog"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
@@ -19,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/kava-labs/go-tools/deputy-claimer/claim"
+	"github.com/kava-labs/go-tools/deputy-claimer/health"
 	"github.com/kava-labs/go-tools/deputy-claimer/test/addresses"
 	"github.com/kava-labs/go-tools/deputy-claimer/test/swap"
 )
@@ -142,6 +145,40 @@ func TestClaimKava(t *testing.T) {
 		"expected swap status '%s', actual '%s'",
 		bep3types.SWAP_STATUS_COMPLETED, status,
 	)
+}
+
+func TestHealthCheck(t *testing.T) {
+	addrs := addresses.GetAddresses()
+
+	// run
+	ctx, shutdownClaimer := context.WithCancel(context.Background())
+	kavaClaimer := claim.NewKavaClaimer(
+		addresses.KavaGrpcURL,
+		addresses.BnbNodeURL,
+		getDeputyAddresses(addrs),
+		addrs.KavaUserMnemonics()[:2],
+	)
+
+	kavaClaimer.Start(ctx)
+
+	defer shutdownClaimer()
+	time.Sleep(8 * time.Second)
+
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
+	health.StartHealthCheckService(
+		ctx,
+		logger,
+		kavaClaimer,
+	)
+
+	// give time for the server to start and health check to pass
+	// healthcheck delays on start by 3 seconds
+	time.Sleep(5 * time.Second)
+
+	resp, err := http.Get("http://localhost:8080/health")
+	require.NoError(t, err)
+	require.Equal(t, 200, resp.StatusCode)
 }
 
 func getDeputyAddresses(addrs addresses.Addresses) claim.DeputyAddresses {

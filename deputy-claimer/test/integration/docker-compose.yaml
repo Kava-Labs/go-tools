@@ -17,7 +17,7 @@ services:
             - --laddr=tcp://0.0.0.0:8080
             - --node=tcp://bnbnode:26657
         ports:
-            - 8080:8080
+            - 26659:8080
         volumes:
             - ./binance/initstate/.bnbcli:/root/.bnbcli
     kavanode:

@@ -16,26 +16,32 @@ import (
 	kava "github.com/kava-labs/kava/app"
 
 	"github.com/kava-labs/go-tools/claimer/config"
-	"github.com/kava-labs/go-tools/claimer/server"
+	"github.com/kava-labs/go-tools/claimer/types"
 )
 
 var JobQueueSize = 1000
 
 type Dispatcher struct {
-	config   config.Config
-	jobQueue chan server.ClaimJob
+	config       config.Config
+	jobQueue     chan types.ClaimJob
+	KavaClient   grpcKavaClient
+	BnbClient    *brpc.HTTP
+	failuresChan chan error
+	CurrentError error
 }
 
-func NewDispatcher(cfg config.Config) Dispatcher {
-	jobQueue := make(chan server.ClaimJob, JobQueueSize)
+func NewDispatcher(cfg config.Config) *Dispatcher {
+	jobQueue := make(chan types.ClaimJob, JobQueueSize)
+	errorsQueue := make(chan error, 100)
 
-	return Dispatcher{
-		config:   cfg,
-		jobQueue: jobQueue,
+	return &Dispatcher{
+		config:       cfg,
+		jobQueue:     jobQueue,
+		failuresChan: errorsQueue,
 	}
 }
 
-func (d Dispatcher) Start(ctx context.Context) {
+func (d *Dispatcher) Start(ctx context.Context) {
 	// Setup Mnemonics
 	kavaKeys := make(chan cryptotypes.PrivKey, len(d.config.Kava.Mnemonics))
 	for _, kavaMnemonic := range d.config.Kava.Mnemonics {
@@ -49,19 +55,27 @@ func (d Dispatcher) Start(ctx context.Context) {
 
 	// Start Kava GRPC client
 	encodingConfig := kava.MakeEncodingConfig()
-	kavaClient := NewGrpcKavaClient(d.config.Kava.Endpoint, encodingConfig)
+	d.KavaClient = NewGrpcKavaClient(d.config.Kava.Endpoint, encodingConfig)
 
 	// Set up Binance Chain client
 	bncNetwork := btypes.TestNetwork
 	if d.config.BinanceChain.ChainID == "Binance-Chain-Tigris" {
 		bncNetwork = btypes.ProdNetwork
 	}
-	bnbClient := brpc.NewRPCClient(d.config.BinanceChain.Endpoint, bncNetwork)
+	d.BnbClient = brpc.NewRPCClient(d.config.BinanceChain.Endpoint, bncNetwork)
 	bnbKeyManager, err := bkeys.NewMnemonicKeyManager(d.config.BinanceChain.Mnemonic)
 	if err != nil {
 		panic(err)
 	}
-	bnbClient.SetKeyManager(bnbKeyManager)
+	d.BnbClient.SetKeyManager(bnbKeyManager)
+
+	// Continuously update the CurrentError with the latest errors from the
+	// failuresChan. This will be nil when claims are successful.
+	go func() {
+		for err := range d.failuresChan {
+			d.CurrentError = err
+		}
+	}()
 
 	// Run Workers
 	for {
@@ -76,27 +90,37 @@ func (d Dispatcher) Start(ctx context.Context) {
 			})
 			logger.Info("claim request begin processing")
 			switch strings.ToUpper(claim.TargetChain) {
-			case server.TargetKava:
+			case types.TargetKava:
 				// fetch an available mnemonic, waiting if none available // TODO should respect ctx
 				key := <-kavaKeys
 
 				go func() {
 					// release the mnemonic when done
 					defer func() { kavaKeys <- key }()
-					Retry(30, 20*time.Second, logger, func() (string, string, error) {
-						return claimOnKava(d.config.Kava, kavaClient, claim, key)
-					})
+					Retry(
+						30,
+						20*time.Second,
+						logger,
+						d.failuresChan,
+						func() (string, string, error) {
+							return claimOnKava(d.config.Kava, d.KavaClient, claim, key)
+						})
 				}()
-			case server.TargetBinance, server.TargetBinanceChain:
+			case types.TargetBinance, types.TargetBinanceChain:
 				// TODO make binance safe for concurrent requests
 				go func() {
-					Retry(30, 20*time.Second, logger, func() (string, string, error) {
-						return claimOnBinanceChain(bnbClient, claim)
-					})
+					Retry(
+						30,
+						20*time.Second,
+						logger,
+						d.failuresChan,
+						func() (string, string, error) {
+							return claimOnBinanceChain(d.BnbClient, claim)
+						})
 				}()
 			}
 		}
 	}
 }
 
-func (d Dispatcher) JobQueue() chan server.ClaimJob { return d.jobQueue }
+func (d *Dispatcher) JobQueue() chan types.ClaimJob { return d.jobQueue }

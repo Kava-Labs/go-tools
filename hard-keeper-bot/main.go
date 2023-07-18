@@ -17,6 +17,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/kava-labs/go-tools/signing"
 	"github.com/kava-labs/kava/app"
+	"github.com/rs/zerolog"
 	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -25,15 +26,16 @@ import (
 func main() {
 	app.SetSDKConfig()
 	encodingConfig := app.MakeEncodingConfig()
+	logger := zerolog.New(os.Stderr)
 
 	config, err := LoadConfig(&EnvLoader{})
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Send()
 	}
 
 	grpcUrl, err := url.Parse(config.KavaGrpcUrl)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Send()
 	}
 
 	var secureOpt grpc.DialOption
@@ -49,20 +51,20 @@ func main() {
 
 	http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Send()
 	}
 	liquidationClient := NewRpcLiquidationClient(http, encodingConfig.Amino)
 
 	conn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Send()
 	}
 	defer conn.Close()
 
 	tmClient := tmservice.NewServiceClient(conn)
 	nodeInfoResponse, err := tmClient.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Send()
 	}
 
 	txClient := txtypes.NewServiceClient(conn)
@@ -82,6 +84,7 @@ func main() {
 		txClient,
 		privKey,
 		10,
+		logger,
 	)
 
 	// channels to communicate with signer
@@ -90,7 +93,7 @@ func main() {
 	// signer starts it's own go routines and returns
 	responses, err := signer.Run(requests)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal().Err(err).Send()
 		os.Exit(1)
 	}
 
@@ -142,6 +145,4 @@ func main() {
 		// wait for next interval
 		time.Sleep(config.KavaLiquidationInterval)
 	}
-
-	select {}
 }
