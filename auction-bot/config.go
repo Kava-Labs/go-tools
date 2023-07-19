@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -15,6 +16,7 @@ const (
 	mnemonicEnvKey          = "KEEPER_MNEMONIC"
 	profitMarginKey         = "BID_MARGIN"
 	bidIntervalKey          = "BID_INTERVAL"
+	priceOverridesKey       = "PRICE_OVERRIDES"
 	heathCheckListenAddrKey = "HEALTH_CHECK_LISTEN_ADDR"
 )
 
@@ -31,6 +33,7 @@ type Config struct {
 	KavaKeeperMnemonic   string
 	ProfitMargin         sdk.Dec
 	HeathCheckListenAddr string
+	PriceOverrides       map[string]sdk.Dec
 }
 
 // LoadConfig loads key values from a ConfigLoader
@@ -67,12 +70,20 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 		healthCheckListenAddr = ":8080"
 	}
 
+	var priceOverrides map[string]sdk.Dec
+	if raw := loader.Get(priceOverridesKey); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &priceOverrides); err != nil {
+			return Config{}, fmt.Errorf("%s invalid json: %v", priceOverridesKey, err)
+		}
+	}
+
 	return Config{
 		KavaGrpcUrl:          grpcURL,
 		KavaBidInterval:      keeperBidInterval,
 		KavaKeeperMnemonic:   keeperMnemonic,
 		ProfitMargin:         marginDec,
 		HeathCheckListenAddr: healthCheckListenAddr,
+		PriceOverrides:       priceOverrides,
 	}, nil
 }
 

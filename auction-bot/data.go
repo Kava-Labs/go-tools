@@ -25,7 +25,6 @@ type AuctionData struct {
 	Assets       map[string]AssetInfo
 	Auctions     []auctiontypes.Auction
 	BidIncrement sdk.Dec
-	BidMargin    sdk.Dec
 }
 
 func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
@@ -69,11 +68,6 @@ func GetAuctionData(client GrpcClient, cdc codec.Codec) (*AuctionData, error) {
 		price, ok := priceData[market.SpotMarketID]
 		if !ok {
 			return nil, fmt.Errorf("no price for market id %s", market.SpotMarketID)
-		}
-
-		// fix usdx price at $1 USD
-		if market.Denom == "usdx" {
-			price = sdk.OneDec()
 		}
 
 		assetInfo[market.Denom] = AssetInfo{

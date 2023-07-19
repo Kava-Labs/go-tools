@@ -138,12 +138,20 @@ func main() {
 				Msgf("failed to get auction data, retrying")
 
 			priceErrors += 1
+			logger.Debug().Err(err).Msg("failed to fetch auction data")
 			time.Sleep(time.Second * 5)
 			continue
 		}
 
 		logger.Info().Msgf("fetched prices after %d attempt(s)\n", priceErrors+1)
 		priceErrors = 0
+
+		// apply price overrides
+		for denom, price := range config.PriceOverrides {
+			info := data.Assets[denom]
+			info.Price = price
+			data.Assets[denom] = info
+		}
 
 		latestHeight, err := grpcClient.LatestHeight()
 		if err != nil {

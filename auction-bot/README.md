@@ -9,12 +9,19 @@ Create a `.env` file:
 ```
 # GRPC endpoint, scheme must be included
 KAVA_GRPC_URL="https://grpc.testnet.kava.io:443"
-# Disable TLS if not supported by endpoint
-GRPC_TLS=false
 # Mnemonic
 KEEPER_MNEMONIC="secret words here"
 # Profit margin required for bot to bid (1.5% in the example)
 BID_MARGIN="0.015"
+```
+
+Optional config:
+
+```
+# Time between attempts to bid on auctions
+BID_INTERVAL="10m"
+# Manually set prices for assets
+PRICE_OVERRIDES="{\"usdc\": \"1.00\",\"example\":\"1.234\"}"
 ```
 
 ## Usage
