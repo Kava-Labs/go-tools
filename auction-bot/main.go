@@ -11,7 +11,6 @@ import (
 	"github.com/kava-labs/kava/app"
 	"github.com/rs/zerolog"
 
-	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -43,6 +42,7 @@ func main() {
 
 	logger.
 		Info().
+		Str("chainId", config.KavaChainId).
 		Str("grpcUrl", config.KavaGrpcUrl).
 		Dur("bidInterval", config.KavaBidInterval).
 		Str("profitMargin", config.ProfitMargin.String()).
@@ -78,13 +78,8 @@ func main() {
 		Str("signing address", sdk.AccAddress(privKey.PubKey().Address()).String()).
 		Send()
 
-	nodeInfoResponse, err := grpcClient.Tm.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to fetch chain id")
-	}
-
 	signer := signing.NewSigner(
-		nodeInfoResponse.DefaultNodeInfo.Network,
+		config.KavaChainId,
 		encodingConfig,
 		grpcClient.Auth,
 		grpcClient.Tx,

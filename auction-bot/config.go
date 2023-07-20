@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	kavaChainIdEnvKey       = "KAVA_CHAIN_ID"
 	kavaGrpcUrlEnvKey       = "KAVA_GRPC_URL"
 	mnemonicEnvKey          = "KEEPER_MNEMONIC"
 	profitMarginKey         = "BID_MARGIN"
@@ -28,6 +29,7 @@ type ConfigLoader interface {
 
 // Config provides application configuration
 type Config struct {
+	KavaChainId          string
 	KavaGrpcUrl          string
 	KavaBidInterval      time.Duration
 	KavaKeeperMnemonic   string
@@ -42,6 +44,10 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Printf(".env not found, attempting to proceed with available env variables\n")
+	}
+	chainId := loader.Get(kavaChainIdEnvKey)
+	if chainId == "" {
+		return Config{}, fmt.Errorf("%s not set", kavaChainIdEnvKey)
 	}
 	grpcURL := loader.Get(kavaGrpcUrlEnvKey)
 	if grpcURL == "" {
@@ -78,6 +84,7 @@ func LoadConfig(loader ConfigLoader) (Config, error) {
 	}
 
 	return Config{
+		KavaChainId:          chainId,
 		KavaGrpcUrl:          grpcURL,
 		KavaBidInterval:      keeperBidInterval,
 		KavaKeeperMnemonic:   keeperMnemonic,
