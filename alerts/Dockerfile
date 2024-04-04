@@ -1,4 +1,4 @@
-FROM golang:1.17-bullseye as build-env
+FROM golang:1.20-bullseye as build-env
 
 ADD . /src
 RUN cd /src && go build -o /alerts
