@@ -54,7 +54,7 @@ var runUsdxCmd = &cobra.Command{
 		ascendexClient := ascendex.NewAscendexHttpClient()
 
 		// Create slack alerts client
-		slackAlerter := alerter.NewSlackAlerter(config.SlackToken)
+		slackAlerter := alerter.NewSlackAlerter(config.SlackWebhookUrl)
 
 		logger.With(
 			"UsdxDeviation", config.UsdxDeviation.String(),
@@ -111,10 +111,7 @@ var runUsdxCmd = &cobra.Command{
 			} else {
 				logger.Info("Sending alert to Slack")
 
-				if err := slackAlerter.Warn(
-					config.SlackChannelId,
-					warningMsg,
-				); err != nil {
+				if err := slackAlerter.Warn(warningMsg); err != nil {
 					logger.Error("Failed to send Slack alert", err.Error())
 				}
 

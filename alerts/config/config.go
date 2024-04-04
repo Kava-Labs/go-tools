@@ -3,8 +3,7 @@ package config
 const (
 	kavaRpcUrlEnvKey               = "KAVA_RPC_URL"
 	dynamoDbTableNameEnvKey        = "DYNAMODB_TABLE_NAME"
-	slackTokenEnvKey               = "SLACK_TOKEN"
-	slackChannelIdEnvKey           = "SLACK_CHANNEL_ID"
+	slackWebhookUrlEnvKey          = "SLACK_WEBHOOK_URL"
 	intervalEnvKey                 = "INTERVAL"
 	alertFrequencyEnvKey           = "ALERT_FREQUENCY"
 	usdThresholdEnvKey             = "USD_THRESHOLD"

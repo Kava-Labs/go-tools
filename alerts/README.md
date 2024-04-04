@@ -4,9 +4,13 @@ Bot for sending alerts to Slack for various events on the Kava blockchain.
 
 ## Slack Setup
 
-1. [Create a Slack app](https://api.slack.com/apps/new)
-2. Add the `chat:write` bot token scope
-3. Add the bot to the desired Slack channel
+1. Create a Slack Workflow that starts with webhook
+   * Channel settings > Integrations > Add Automation > Start with webhook
+   * Use this webhook's URL as `SLACK_WEBHOOK_URL`
+2. Configure the workflow with data variable `text`
+3. Output the `text` variable to the desired channel
+
+There is a utility command `alerts slack-test` that can be used to test your workflow's webhook trigger.
 
 ## DynamoDB Setup
 

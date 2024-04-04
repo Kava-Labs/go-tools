@@ -11,8 +11,7 @@ import (
 // Config provides application configuration
 type BaseConfig struct {
 	DynamoDbTableName string
-	SlackToken        string
-	SlackChannelId    string
+	SlackWebhookUrl   string
 	Interval          time.Duration
 	AlertFrequency    time.Duration
 }
@@ -31,14 +30,9 @@ func LoadBaseConfig(loader ConfigLoader, logger log.Logger) (BaseConfig, error) 
 		return BaseConfig{}, fmt.Errorf("%s not set", dynamoDbTableNameEnvKey)
 	}
 
-	slackToken := loader.Get(slackTokenEnvKey)
-	if slackToken == "" {
-		return BaseConfig{}, fmt.Errorf("%s not set", slackToken)
-	}
-
-	slackChannelId := loader.Get(slackChannelIdEnvKey)
-	if slackChannelId == "" {
-		return BaseConfig{}, fmt.Errorf("%s not set", slackChannelId)
+	slackWebhookUrl := loader.Get(slackWebhookUrlEnvKey)
+	if slackWebhookUrl == "" {
+		return BaseConfig{}, fmt.Errorf("%s not set", slackWebhookUrlEnvKey)
 	}
 
 	updateInterval, err := time.ParseDuration(loader.Get(intervalEnvKey))
@@ -54,8 +48,7 @@ func LoadBaseConfig(loader ConfigLoader, logger log.Logger) (BaseConfig, error) 
 	return BaseConfig{
 		Interval:          updateInterval,
 		AlertFrequency:    alertFrequency,
-		SlackToken:        slackToken,
-		SlackChannelId:    slackChannelId,
+		SlackWebhookUrl:   slackWebhookUrl,
 		DynamoDbTableName: dynamoDbTableName,
 	}, nil
 }

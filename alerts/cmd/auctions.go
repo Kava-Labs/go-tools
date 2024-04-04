@@ -60,7 +60,7 @@ var runAuctionsCmd = &cobra.Command{
 		kavaConfig.Seal()
 
 		// Create slack alerts client
-		slackAlerter := alerter.NewSlackAlerter(config.SlackToken)
+		slackAlerter := alerter.NewSlackAlerter(config.SlackWebhookUrl)
 
 		logger.With(
 			"rpcUrl", config.KavaRpcUrl,
@@ -144,10 +144,7 @@ var runAuctionsCmd = &cobra.Command{
 
 				logger.Info("Sending alert to Slack")
 
-				if err := slackAlerter.Warn(
-					config.SlackChannelId,
-					warningMsg,
-				); err != nil {
+				if err := slackAlerter.Warn(warningMsg); err != nil {
 					logger.Error("Failed to send Slack alert", err.Error())
 				}
 
@@ -191,10 +188,7 @@ var runAuctionsCmd = &cobra.Command{
 
 			logger.Info("Sending alert to Slack")
 
-			if err := slackAlerter.Warn(
-				config.SlackChannelId,
-				warningMsg,
-			); err != nil {
+			if err := slackAlerter.Warn(warningMsg); err != nil {
 				logger.Error("Failed to send Slack alert", err.Error())
 			}
 		}
