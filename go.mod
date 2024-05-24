@@ -3,7 +3,10 @@ module github.com/kava-labs/go-tools
 go 1.17
 
 require (
+	github.com/alexliesenfeld/health v0.7.0
 	github.com/cosmos/cosmos-sdk v0.44.5
+	github.com/go-chi/chi/v5 v5.0.8
+	github.com/joho/godotenv v1.4.0
 	github.com/kava-labs/go-tools/signing v0.0.0-20240404001505-7ad3de810cdd
 	github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b
 	github.com/rs/zerolog v1.29.1
