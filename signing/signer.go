@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kava-labs/kava/app/params"
-
+	"github.com/cosmos/cosmos-sdk/client"
 	sdkclient "github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -19,38 +20,47 @@ import (
 	tmmempool "github.com/tendermint/tendermint/mempool"
 )
 
+// MsgRequest contains the signing request
 type MsgRequest struct {
-	Msgs      []sdk.Msg
-	GasLimit  uint64
-	FeeAmount sdk.Coins
-	Memo      string
-	// Arbitrary data to be referenced in the corresponding MsgResponse, unused
-	// in signing. This is mostly useful to match MsgResponses with MsgRequests.
-	Data interface{}
+	Msgs      []sdk.Msg   // Messages to be included in the transaction
+	GasLimit  uint64      // Gas limit for the transaction
+	FeeAmount sdk.Coins   // Fees for the transaction
+	Memo      string      // Memo field for the transaction
+	Data      interface{} // Arbitrary data for matching responses with requests
 }
 
+// MsgResponse contains the signing response
 type MsgResponse struct {
-	Request MsgRequest
-	Tx      authsigning.Tx
-	TxBytes []byte
-	Result  sdk.TxResponse
-	Err     error
+	Request MsgRequest     // The original request that was signed
+	Tx      authsigning.Tx // The signed transaction
+	TxBytes []byte         // The raw bytes of the signed transaction
+	Result  sdk.TxResponse // The result of broadcasting the transaction
+	Err     error          // Any error encountered during signing or broadcasting
 }
 
 // internal result for inner loop logic
 type broadcastTxResult int
 
 const (
-	txOK broadcastTxResult = iota
-	txFailed
-	txRetry
-	txResetSequence
+	txOK            broadcastTxResult = iota // Transaction successfully broadcast and in the mempool
+	txFailed                                 // Transaction failed and is not recoverable
+	txRetry                                  // Transaction failed but can be retried
+	txResetSequence                          // Transaction sequence is invalid, needs to be reset
 )
+
+// EncodingConfig defines the necessary methods for encoding and decoding transactions to be able to reuse the signer
+// for cosmos-sdk chains other than kava
+type EncodingConfig interface {
+	InterfaceRegistry() types.InterfaceRegistry // Returns the interface registry
+	Marshaler() codec.Codec                     // Returns the codec for marshaling
+	TxConfig() client.TxConfig                  // Returns the transaction configuration
+	Amino() *codec.LegacyAmino                  // Returns the legacy Amino codec
+}
 
 // Signer broadcasts msgs to a single kava node
 type Signer struct {
 	chainID         string
-	encodingConfig  params.EncodingConfig
+	encodingConfig  EncodingConfig
 	authClient      authtypes.QueryClient
 	txClient        txtypes.ServiceClient
 	privKey         cryptotypes.PrivKey
@@ -59,15 +69,19 @@ type Signer struct {
 	accStatus       error
 }
 
+// NewSigner creates a new Signer instance
 func NewSigner(
 	chainID string,
-	encodingConfig params.EncodingConfig,
+	encodingConfig EncodingConfig,
 	authClient authtypes.QueryClient,
 	txClient txtypes.ServiceClient,
 	privKey cryptotypes.PrivKey,
 	inflightTxLimit uint64,
 	logger zerolog.Logger,
-) *Signer {
+) (*Signer, error) {
+	if inflightTxLimit == 0 {
+		return nil, fmt.Errorf("inflightTxLimit cannot be zero")
+	}
 
 	return &Signer{
 		chainID:         chainID,
@@ -78,7 +92,7 @@ func NewSigner(
 		inflightTxLimit: inflightTxLimit,
 		logger:          logger,
 		accStatus:       nil,
-	}
+	}, nil
 }
 
 // GetAccountError returns the error encountered when querying the signing account
@@ -86,63 +100,102 @@ func (s *Signer) GetAccountError() error {
 	return s.accStatus
 }
 
-func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
+func (s *Signer) setAccountError(err error) {
+	s.accStatus = err
+}
+
+func (s *Signer) clearAccountError() {
+	s.accStatus = nil
+}
+
+// pollAccountState periodically polls the account state, retrying on errors
+func (s *Signer) pollAccountState(ctx context.Context, retryInterval, pollInterval time.Duration) <-chan authtypes.AccountI {
 	accountState := make(chan authtypes.AccountI)
 
 	go func() {
+		defer close(accountState) // Close channel when goroutine exits
 		for {
-			accAddr := GetAccAddress(s.privKey)
-
-			request := authtypes.QueryAccountRequest{
-				Address: accAddr.String(),
+			select {
+			case <-ctx.Done():
+				s.logger.Info().Msg("Stopping pollAccountState goroutine")
+				return
+			default:
+				account, err := s.getAccountState(ctx)
+				if err != nil {
+					s.setAccountError(err)
+					s.logger.Error().
+						Err(err).
+						Dur("retryInterval", retryInterval).
+						Msg("trying again with delay")
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(retryInterval):
+						continue
+					}
+				}
+				s.clearAccountError()
+				accountState <- account
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(pollInterval):
+				}
 			}
-			response, err := s.authClient.Account(context.Background(), &request)
-			if err != nil {
-				s.accStatus = err
-
-				s.logger.Error().
-					Str("address", accAddr.String()).
-					Err(err).
-					Msg("failed to query signing account, trying again in 10s")
-
-				time.Sleep(10 * time.Second)
-				continue
-			}
-
-			var account authtypes.AccountI
-			if err = s.encodingConfig.InterfaceRegistry.UnpackAny(response.Account, &account); err != nil {
-				s.accStatus = err
-
-				s.logger.Error().
-					Str("address", accAddr.String()).
-					Err(err).
-					Msg("failed to unpack signing account, trying again in 10s")
-
-				time.Sleep(10 * time.Second)
-				continue
-			}
-
-			s.accStatus = nil
-			accountState <- account
-			time.Sleep(1 * time.Second)
 		}
 	}()
 
 	return accountState
 }
 
-func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
+// getAccountState queries the account state using the private key
+func (s *Signer) getAccountState(ctx context.Context) (authtypes.AccountI, error) {
+	accAddr := GetAccAddress(s.privKey)
+	response, err := s.authClient.Account(ctx, &authtypes.QueryAccountRequest{
+		Address: accAddr.String(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to query signed account address[%s]: %w", accAddr.String(), err)
+	}
+
+	var account authtypes.AccountI
+	if err = s.encodingConfig.InterfaceRegistry().UnpackAny(response.Account, &account); err != nil {
+		return nil, fmt.Errorf("unable to unpack signed account address[%s]: %w", accAddr.String(), err)
+	}
+
+	return account, nil
+}
+
+// Run starts the signer, processing incoming requests and broadcasting transactions
+//
+//	The broadcast loop:
+//		Ensure Transaction is in Mempool:
+//			The loop continuously attempts to broadcast transactions until they are successfully placed into the node's
+//			mempool. This involves handling various errors, such as connectivity issues or mempool capacity errors,
+//			and retrying as necessary.
+//		Handle Sequence Errors:
+//			If there are sequence-related errors, the loop resets the sequence to try placing transactions again,
+//			ensuring that the mempool is filled correctly.
+//		Respond to Requests:
+//			Once a transaction is successfully in the mempool, the loop stores the response and
+//			processes the next request.
+func (s *Signer) Run(ctx context.Context, requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 	// poll account state in it's own goroutine
 	// and send status updates to the signing goroutine
 	//
 	// TODO: instead of polling, we can wait for block
 	// websocket events with a fallback to polling
-	accountState := s.pollAccountState()
+	accountState := s.pollAccountState(ctx, 10*time.Second, 1*time.Second)
 
 	responses := make(chan MsgResponse)
 	go func() {
+		defer close(responses)
 		// wait until account is loaded to start signing
-		account := <-accountState
+		account, ok := <-accountState
+		if !ok {
+			s.logger.Error().Msg("Failed to load account state")
+			return
+		}
 		// store current request waiting to be broadcasted
 		var currentRequest *MsgRequest
 		// keep track of all successfully broadcasted txs
@@ -168,10 +221,10 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 			// if currentRequest is not nil, then checkTxSeq will be used to sign that request
 			//
 			// therefore, assuming no errors, broadcastTxSeq will be checkTxSeq-1 or checkTxSeq, dependent on
-			// if the currentRequest has been been successfully broadcast
+			// if the currentRequest has been successfully broadcast
 			//
-			// if an unauthorized error occurs, a tx in the mempool was dropped (or mempool flushed, node restart, etc)
-			// and broadcastTxSeq is reset to account.GetSequence() in order to refil the mempool and ensure
+			// if an unauthorized error occurs, a tx in the mempool was dropped (or mempool flushed, node restart, etc.)
+			// and broadcastTxSeq is reset to account.GetSequence() in order to refill the mempool and ensure
 			// checkTxSeq is valid
 			//
 			// if an authorized error occurs due to another process signing messages on behalf of the same
@@ -181,10 +234,10 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 			// draining our inflight messages to 0.
 			//
 			// On deployments, a similar event will occur. we will continually broadcast until
-			// all of the previous transactions are processed and out of the mempool.
+			// all the previous transactions are processed and out of the mempool.
 			//
 			// it's possible to increase the checkTx (up to the inflight limit) until met with a successful broadcast,
-			// to fill the mempool faster, but this feature is umimplemented and would be best enabled only once
+			// to fill the mempool faster, but this feature is unimplemented and would be best enabled only once
 			// on startup.  An authorized error during normal operation would be difficult or impossible to tell apart
 			// from a dropped mempool tx (without further improving mempool queries).  Options such as persisting inflight
 			// state out of process may be better.
@@ -193,12 +246,23 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 			// if we are still processing a request or the inflight limit is reached
 			// then block until the next account update without accepting new requests
 			if currentRequest != nil || inflightLimitReached {
-				account = <-accountState
+				account, ok = <-accountState
+				if !ok {
+					s.logger.Error().Msg("Account state channel closed unexpectedly")
+					return
+				}
 			} else {
 				// block on state update or new requests
 				select {
+				case <-ctx.Done():
+					s.logger.Info().Msg("Stopping Run goroutine")
+					return
 				case account = <-accountState:
-				case request := <-requests:
+				case request, k := <-requests:
+					if !k {
+						s.logger.Info().Msg("Request channel closed")
+						return
+					}
 					currentRequest = &request
 				}
 			}
@@ -241,10 +305,10 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 			//   - recover from dropped txs (broadcastTxSeq < lastRequestTxSeq)
 			//   - send new requests (currentRequest is set)
 			//   - send mempool heartbeat (currentRequest is nil)
-		BROADCAST_LOOP:
+		BroadcastLoop:
 			for broadcastTxSeq <= lastRequestTxSeq {
 
-				// we have a new request that has not been successfully broadcasted
+				// we have a new request that has not been successfully broadcast
 				// and are at the last broadcastTxSeq (broadcastTxSeq == checkTxSeq in this case)
 				sendingCurrentRequest := broadcastTxSeq == lastRequestTxSeq && currentRequest != nil
 
@@ -260,8 +324,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						broadcastTxSeq++
 						continue
 					}
-
-					txBuilder := s.encodingConfig.TxConfig.NewTxBuilder()
+					txBuilder := s.encodingConfig.TxConfig().NewTxBuilder()
 					txBuilder.SetMsgs(currentRequest.Msgs...)
 					txBuilder.SetGasLimit(currentRequest.GasLimit)
 					txBuilder.SetFeeAmount(currentRequest.FeeAmount)
@@ -272,7 +335,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						Sequence:      broadcastTxSeq,
 					}
 
-					tx, txBytes, err := Sign(s.encodingConfig.TxConfig, s.privKey, txBuilder, signerData)
+					tx, txBytes, err := Sign(s.encodingConfig.TxConfig(), s.privKey, txBuilder, signerData)
 
 					response = &MsgResponse{
 						Request: *currentRequest,
@@ -283,8 +346,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 
 					// could not sign and encode the currentRequest
 					if response.Err != nil {
-						s.logger.
-							Error().
+						s.logger.Error().
 							Err(err).
 							Uint64("sequence", broadcastTxSeq).
 							Interface("tx", txBuilder.GetTx()).
@@ -314,7 +376,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 					TxBytes: response.TxBytes,
 					Mode:    txtypes.BroadcastMode_BROADCAST_MODE_SYNC,
 				}
-				broadcastResponse, err := s.txClient.BroadcastTx(context.Background(), &broadcastRequest)
+				broadcastResponse, err := s.txClient.BroadcastTx(ctx, &broadcastRequest)
 
 				// set to determine action at the end of loop
 				// default is OK
@@ -399,15 +461,15 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						currentRequest = nil
 					}
 
-					// immediatley response to channel
+					// immediately respond to channel
 					responses <- *response
 					// go to next request
 					broadcastTxSeq++
 				case txRetry:
-					break BROADCAST_LOOP
+					break BroadcastLoop
 				case txResetSequence:
 					broadcastTxSeq = account.GetSequence()
-					break BROADCAST_LOOP
+					break BroadcastLoop
 				}
 			}
 		}
@@ -421,7 +483,7 @@ func (s *Signer) Address() sdk.AccAddress {
 	return GetAccAddress(s.privKey)
 }
 
-// Sign signs a populated TxBuilder and returns a signed Tx and raw transaction bytes
+// Sign signs a transaction using the provided private key and signer data
 func Sign(
 	txConfig sdkclient.TxConfig,
 	privKey cryptotypes.PrivKey,
@@ -441,7 +503,11 @@ func Sign(
 		return txBuilder.GetTx(), nil, err
 	}
 
-	signBytes, err := txConfig.SignModeHandler().GetSignBytes(signing.SignMode_SIGN_MODE_DIRECT, signerData, txBuilder.GetTx())
+	signBytes, err := txConfig.SignModeHandler().GetSignBytes(
+		signing.SignMode_SIGN_MODE_DIRECT,
+		signerData,
+		txBuilder.GetTx(),
+	)
 	if err != nil {
 		return txBuilder.GetTx(), nil, err
 	}
@@ -466,6 +532,7 @@ func Sign(
 	return txBuilder.GetTx(), txBytes, nil
 }
 
+// GetAccAddress returns the account address for a given private key
 func GetAccAddress(privKey cryptotypes.PrivKey) sdk.AccAddress {
 	return privKey.PubKey().Address().Bytes()
 }

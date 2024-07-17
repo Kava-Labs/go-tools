@@ -7,16 +7,16 @@ import (
 	"os"
 	"time"
 
-	"github.com/kava-labs/go-tools/signing"
-	"github.com/kava-labs/kava/app"
-	"github.com/rs/zerolog"
-
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/kava-labs/go-tools/signing"
+	"github.com/kava-labs/kava/app"
+	"github.com/rs/zerolog"
 )
 
 func main() {
+	ctx := context.Background()
 	// create base logger
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 
@@ -78,18 +78,21 @@ func main() {
 		Str("signing address", sdk.AccAddress(privKey.PubKey().Address()).String()).
 		Send()
 
-	signer := signing.NewSigner(
+	signer, err := signing.NewSigner(
 		config.KavaChainId,
-		encodingConfig,
+		signing.EncodingConfigAdapter{EncodingConfig: encodingConfig},
 		grpcClient.Auth,
 		grpcClient.Tx,
 		privKey,
 		100,
 		logger,
 	)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("unable to initialize signer")
+	}
 
 	startHealthCheckService(
-		context.Background(),
+		ctx,
 		logger,
 		config,
 		grpcClient,
@@ -100,7 +103,7 @@ func main() {
 	requests := make(chan signing.MsgRequest)
 
 	// signer starts it's own go routines and returns
-	responses, err := signer.Run(requests)
+	responses, err := signer.Run(ctx, requests)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to start signer")
 	}

@@ -24,6 +24,7 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
 	app.SetSDKConfig()
 	encodingConfig := app.MakeEncodingConfig()
 	logger := zerolog.New(os.Stderr)
@@ -62,7 +63,7 @@ func main() {
 	defer conn.Close()
 
 	tmClient := tmservice.NewServiceClient(conn)
-	nodeInfoResponse, err := tmClient.GetNodeInfo(context.Background(), &tmservice.GetNodeInfoRequest{})
+	nodeInfoResponse, err := tmClient.GetNodeInfo(ctx, &tmservice.GetNodeInfoRequest{})
 	if err != nil {
 		logger.Fatal().Err(err).Send()
 	}
@@ -77,21 +78,24 @@ func main() {
 	}
 	privKey := &secp256k1.PrivKey{Key: privKeyBytes}
 
-	signer := signing.NewSigner(
+	signer, err := signing.NewSigner(
 		nodeInfoResponse.DefaultNodeInfo.Network,
-		encodingConfig,
+		signing.EncodingConfigAdapter{EncodingConfig: encodingConfig},
 		authClient,
 		txClient,
 		privKey,
 		10,
 		logger,
 	)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("unable to initialize signer")
+	}
 
 	// channels to communicate with signer
 	requests := make(chan signing.MsgRequest)
 
 	// signer starts it's own go routines and returns
-	responses, err := signer.Run(requests)
+	responses, err := signer.Run(ctx, requests)
 	if err != nil {
 		logger.Fatal().Err(err).Send()
 		os.Exit(1)
