@@ -67,3 +67,8 @@ This package provides functionality to sign and broadcast transactions to a Cosm
 - Attempt to broadcast each transaction, handling errors and retrying if needed. 
 - Manage transaction sequences to ensure proper placement into the node's mempool. 
 - Respond with the result of each transaction attempt.
+
+## Testing:
+- Run a local chain with kvtool
+  - `$ kvtool testnet boostrap`
+- cd go run main.go
