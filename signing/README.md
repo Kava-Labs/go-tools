@@ -70,5 +70,8 @@ This package provides functionality to sign and broadcast transactions to a Cosm
 
 ## Testing:
 - Run a local chain with kvtool
-  - `$ kvtool testnet boostrap`
-- cd go run main.go
+  - `$ kvtool testnet bootstrap`
+- Run the example:
+  - `$ go run signing/testing/main.go` 
+- Shutdown local chain:
+- `$ kvtool testnet down`
