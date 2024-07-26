@@ -80,7 +80,7 @@ func main() {
 
 	signer := signing.NewSigner(
 		config.KavaChainId,
-		encodingConfig,
+		signing.EncodingConfigAdapter{EncodingConfig: encodingConfig},
 		grpcClient.Auth,
 		grpcClient.Tx,
 		privKey,
