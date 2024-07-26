@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kava-labs/kava/app/params"
-
+	"github.com/cosmos/cosmos-sdk/client"
 	sdkclient "github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -47,10 +48,19 @@ const (
 	txResetSequence
 )
 
+// EncodingConfig defines the necessary methods for encoding and decoding transactions to be able to reuse the signer
+// for cosmos-sdk chains other than kava
+type EncodingConfig interface {
+	InterfaceRegistry() types.InterfaceRegistry // Returns the interface registry
+	Marshaler() codec.Codec                     // Returns the codec for marshaling
+	TxConfig() client.TxConfig                  // Returns the transaction configuration
+	Amino() *codec.LegacyAmino                  // Returns the legacy Amino codec
+}
+
 // Signer broadcasts msgs to a single kava node
 type Signer struct {
 	chainID         string
-	encodingConfig  params.EncodingConfig
+	encodingConfig  EncodingConfig
 	authClient      authtypes.QueryClient
 	txClient        txtypes.ServiceClient
 	privKey         cryptotypes.PrivKey
@@ -61,7 +71,7 @@ type Signer struct {
 
 func NewSigner(
 	chainID string,
-	encodingConfig params.EncodingConfig,
+	encodingConfig EncodingConfig,
 	authClient authtypes.QueryClient,
 	txClient txtypes.ServiceClient,
 	privKey cryptotypes.PrivKey,
@@ -110,7 +120,7 @@ func (s *Signer) pollAccountState() <-chan authtypes.AccountI {
 			}
 
 			var account authtypes.AccountI
-			if err = s.encodingConfig.InterfaceRegistry.UnpackAny(response.Account, &account); err != nil {
+			if err = s.encodingConfig.InterfaceRegistry().UnpackAny(response.Account, &account); err != nil {
 				s.accStatus = err
 
 				s.logger.Error().
@@ -261,7 +271,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						continue
 					}
 
-					txBuilder := s.encodingConfig.TxConfig.NewTxBuilder()
+					txBuilder := s.encodingConfig.TxConfig().NewTxBuilder()
 					txBuilder.SetMsgs(currentRequest.Msgs...)
 					txBuilder.SetGasLimit(currentRequest.GasLimit)
 					txBuilder.SetFeeAmount(currentRequest.FeeAmount)
@@ -272,7 +282,7 @@ func (s *Signer) Run(requests <-chan MsgRequest) (<-chan MsgResponse, error) {
 						Sequence:      broadcastTxSeq,
 					}
 
-					tx, txBytes, err := Sign(s.encodingConfig.TxConfig, s.privKey, txBuilder, signerData)
+					tx, txBytes, err := Sign(s.encodingConfig.TxConfig(), s.privKey, txBuilder, signerData)
 
 					response = &MsgResponse{
 						Request: *currentRequest,
