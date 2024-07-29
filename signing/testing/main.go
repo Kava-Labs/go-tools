@@ -58,7 +58,7 @@ func main() {
 
 	signer := signing.NewSigner(
 		nodeInfoResponse.DefaultNodeInfo.Network,
-		encodingConfig,
+		signing.EncodingConfigAdapter{EncodingConfig: encodingConfig},
 		authClient,
 		txClient,
 		privKey,
