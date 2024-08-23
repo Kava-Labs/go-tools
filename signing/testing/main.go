@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"os"
 
@@ -31,7 +32,7 @@ func main() {
 	app.SetSDKConfig()
 	encodingConfig := app.MakeEncodingConfig()
 
-	conn, err := grpc.Dial(grpcUrl, grpc.WithInsecure())
+	conn, err := grpc.Dial(grpcUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
