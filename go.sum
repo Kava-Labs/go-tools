@@ -484,8 +484,8 @@ github.com/julienschmidt/httprouter v1.1.1-0.20170430222011-975b5c4c7c21/go.mod 
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356/go.mod h1:Od972xHfMJowv7NGVDiWVxk2zxnWgjLlJzE+F4F7AGU=
-github.com/kava-labs/go-tools/signing v0.0.0-20240404001505-7ad3de810cdd h1:CXXeIs0LwSlBAgLL9JE4YP6U4SFcjED62KXwNW1OK6M=
-github.com/kava-labs/go-tools/signing v0.0.0-20240404001505-7ad3de810cdd/go.mod h1:uT0UsTZlJBTRZ354Rk761cIbYQN1sLWn67KxV8mGYBY=
+github.com/kava-labs/go-tools/signing v0.0.0-20240729153035-2e263b3a24d2 h1:WKxchPMQqg8B5gTDKqyrmVKOEFmcyjKUosafIWDNmvI=
+github.com/kava-labs/go-tools/signing v0.0.0-20240729153035-2e263b3a24d2/go.mod h1:uT0UsTZlJBTRZ354Rk761cIbYQN1sLWn67KxV8mGYBY=
 github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b h1:pWNse+gPttYLkNgDZfkhkz9k2+wWNxFb38OpskIA130=
 github.com/kava-labs/kava v0.16.0-rc1.0.20220111173147-4615cef9393b/go.mod h1:lUMcS7UHOYL+zXE4KUPZvGNBnpitT5nXMnRiMQzM72w=
 github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d h1:Z+RDyXzjKE0i2sTjZ/b1uxiGtPhFy34Ou/Tk0qwN0kM=

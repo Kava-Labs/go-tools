@@ -12,7 +12,6 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.63.2
-	github.com/coinbase/rosetta-sdk-go v0.7.9
 )
 
 require (
@@ -221,7 +220,6 @@ replace (
 	// Use the cosmos keyring code
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 
-	github.com/coinbase/rosetta-sdk-go/types => github.com/coinbase/rosetta-sdk-go/types v1.0.0
 	// Use cometbft fork of tendermint
 	github.com/cometbft/cometbft => github.com/kava-labs/cometbft v0.37.4-kava.1
 	github.com/cometbft/cometbft-db => github.com/kava-labs/cometbft-db v0.9.1-kava.1
