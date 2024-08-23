@@ -14,7 +14,10 @@ modules:
 build-all:
 	@for dir in $(MODULES); do \
     	echo "Building module in $$dir..."; \
-    	(cd $$dir && go build -o $(BASEDIR)/$$(basename $$dir)/$$(basename $$dir)) || { echo "Skipping $$dir due to build failure or permission issues."; continue; }; \
+    	if ! (cd $$dir && go build -o $(BASEDIR)/$$(basename $$dir)/$$(basename $$dir)); then \
+        	echo "Failed to build $$dir"; \
+        	exit 1; \
+        fi; \
     	echo "Built module $$dir successfully."; \
     done
 
