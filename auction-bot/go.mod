@@ -10,10 +10,19 @@ require (
 	github.com/kava-labs/kava v0.26.1
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.4.0
-	github.com/gogo/protobuf v1.3.2
 	google.golang.org/grpc v1.63.2
-	github.com/btcsuite/btcd v0.23.4
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2
+	//github.com/kava-labs/go-tools/signing v0.0.0-20240922163407-93f98f6d066b
+)
+
+require (
+	github.com/cosmos/rosetta-sdk-go v0.10.0 // indirect
+	github.com/coinbase/rosetta-sdk-go v0.7.9 // indirect
+	cosmossdk.io/tools/rosetta v0.2.1 // indirect
+	github.com/btcsuite/btcd v0.23.4 // indirect
+    	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
+    	github.com/btcsuite/btcd/btcutil v1.1.3 // indirect
+    	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 )
 
 replace (
