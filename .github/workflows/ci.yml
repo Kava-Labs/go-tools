@@ -49,3 +49,62 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           args: --timeout=10m
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout go-tools-kava
+        uses: actions/checkout@v4
+        with:
+          path: go-tools
+
+      # TODO(yevhenii): consider reusing already built kava docker image instead of rebuilding it
+      - name: Checkout kava
+        uses: actions/checkout@v4
+        with:
+          repository: Kava-Labs/kava
+          # There are 2 cases here:
+          # - workflow was triggered by repository_dispatch event which was sent by kava repo, in that case we're using
+          #   kava version provided in event: github.event.client_payload.ref
+          # - workflow was triggered by commit in rosetta-kava repo, in that case github.event.client_payload.ref will be empty
+          #   and default branch will be used instead
+          ref: ${{ github.event.client_payload.ref }}
+          path: kava
+          submodules: 'true'
+
+      - name: Print kava version
+        run: |
+          git branch
+          git rev-parse HEAD
+        working-directory: ./kava
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go-tools/go.mod
+
+      - name: Cache Go Modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('./rosetta-kava/**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build kava docker image
+        run: make docker-build
+        working-directory: ./kava
+
+      - name: Install kvtool
+        run: make install
+        working-directory: ./kava/tests/e2e/kvtool
+
+      - name: Run kava docker container
+        run: KAVA_TAG=local kvtool t bootstrap
+
+      - name: Wait until kava node is ready to serve traffic
+        run: bash ${GITHUB_WORKSPACE}/go-tools/.github/scripts/wait-for-node-init.sh
+
+      - name: Run integration tests
+        run: KAVA_RPC_URL=http://localhost:26657 NETWORK=kava-local PORT=4000 SKIP_LIVE_NODE_TESTS=true make test-integration
+        working-directory: ./go-tools

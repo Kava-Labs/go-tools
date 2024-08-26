@@ -89,7 +89,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	msg := banktypes.NewMsgSend(accAddr, toAddr, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1))))
+	msg := banktypes.NewMsgSend(accAddr, toAddr, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(321))))
 
 	for i := 0; i < 1000; i++ {
 		requests <- signing.MsgRequest{

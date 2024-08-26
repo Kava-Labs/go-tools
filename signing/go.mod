@@ -7,6 +7,7 @@ require (
 	github.com/cosmos/cosmos-sdk v0.47.10
 	github.com/kava-labs/kava v0.26.1
 	github.com/rs/zerolog v1.32.0
+	golang.org/x/sync v0.6.0
 	google.golang.org/grpc v1.63.2
 )
 
@@ -193,7 +194,6 @@ require (
 	golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/term v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

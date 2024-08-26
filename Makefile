@@ -32,3 +32,7 @@ vet:
 .PHONY: test
 test:
 	go test -v ./...
+
+.PHONY: test-integration
+test-integration:
+	cd signing/testing && go test -v -tags=integration -count=1
