@@ -63,11 +63,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Kava-Labs/kava
-          # There are 2 cases here:
-          # - workflow was triggered by repository_dispatch event which was sent by kava repo, in that case we're using
-          #   kava version provided in event: github.event.client_payload.ref
-          # - workflow was triggered by commit in rosetta-kava repo, in that case github.event.client_payload.ref will be empty
-          #   and default branch will be used instead
           ref: ${{ github.event.client_payload.ref }}
           path: kava
           submodules: 'true'
@@ -106,5 +101,5 @@ jobs:
         run: bash ${GITHUB_WORKSPACE}/go-tools/.github/scripts/wait-for-node-init.sh
 
       - name: Run integration tests
-        run: KAVA_RPC_URL=http://localhost:26657 NETWORK=kava-local PORT=4000 SKIP_LIVE_NODE_TESTS=true make test-integration
+        run: make test-integration
         working-directory: ./go-tools
