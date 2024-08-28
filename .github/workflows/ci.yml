@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go Modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        run: make build-all
+
+      - name: Vet
+        run: make vet
+
+      - name: Test
+        run: make test
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.21'
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: --timeout=10m
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout go-tools-kava
+        uses: actions/checkout@v4
+        with:
+          path: go-tools
+
+      # TODO(yevhenii): consider reusing already built kava docker image instead of rebuilding it
+      - name: Checkout kava
+        uses: actions/checkout@v4
+        with:
+          repository: Kava-Labs/kava
+          ref: ${{ github.event.client_payload.ref }}
+          path: kava
+          submodules: 'true'
+
+      - name: Print kava version
+        run: |
+          git branch
+          git rev-parse HEAD
+        working-directory: ./kava
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go-tools/go.mod
+
+      - name: Cache Go Modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('./rosetta-kava/**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build kava docker image
+        run: make docker-build
+        working-directory: ./kava
+
+      - name: Install kvtool
+        run: make install
+        working-directory: ./kava/tests/e2e/kvtool
+
+      - name: Run kava docker container
+        run: KAVA_TAG=local kvtool t bootstrap
+
+      - name: Wait until kava node is ready to serve traffic
+        run: bash ${GITHUB_WORKSPACE}/go-tools/.github/scripts/wait-for-node-init.sh
+
+      - name: Run integration tests
+        run: make test-integration
+        working-directory: ./go-tools

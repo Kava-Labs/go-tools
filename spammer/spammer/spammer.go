@@ -7,7 +7,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/cosmos/go-bip39"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/kava-labs/go-sdk/keys"

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/kava-labs/go-tools/spammer/types"
 )

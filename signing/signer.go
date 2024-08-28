@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	tmmempool "github.com/cometbft/cometbft/mempool"
 	"github.com/cosmos/cosmos-sdk/client"
 	sdkclient "github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -17,7 +18,6 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/rs/zerolog"
-	tmmempool "github.com/tendermint/tendermint/mempool"
 )
 
 type MsgRequest struct {

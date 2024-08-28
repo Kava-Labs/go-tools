@@ -255,7 +255,7 @@ func handleReverseDebtAuction(
 }
 
 func calculateUSDValue(coin sdk.Coin, assetInfo AssetInfo) sdk.Dec {
-	return coin.Amount.ToDec().Quo(assetInfo.ConversionFactor.ToDec()).Mul(assetInfo.Price)
+	return coin.Amount.ToLegacyDec().Quo(assetInfo.ConversionFactor.ToLegacyDec()).Mul(assetInfo.Price)
 }
 
 func calculateProposedBid(
@@ -269,13 +269,13 @@ func calculateProposedBid(
 	if lotUSDValue.IsZero() {
 		return sdk.Coin{}, false
 	}
-	minBid := currentBid.Amount.ToDec().Mul(d("1.0105")).RoundInt()
+	minBid := currentBid.Amount.ToLegacyDec().Mul(d("1.0105")).RoundInt()
 	if minBid.GT(maxbid.Amount) {
 		minBid = maxbid.Amount
 	}
 
 	for _, bidIncrement := range bidsToTry {
-		bidAmountInt := maxbid.Amount.ToDec().Mul(bidIncrement).TruncateInt()
+		bidAmountInt := maxbid.Amount.ToLegacyDec().Mul(bidIncrement).TruncateInt()
 		if bidAmountInt.LT(minBid) {
 			bidAmountInt = minBid
 		}
@@ -326,7 +326,7 @@ func calculateProposedLot(
 	}
 
 	for _, lotIncrement := range incrementsToTry {
-		proposedLotInt := lot.Amount.ToDec().Mul(sdk.OneDec().Sub(lotIncrement)).TruncateInt()
+		proposedLotInt := lot.Amount.ToLegacyDec().Mul(sdk.OneDec().Sub(lotIncrement)).TruncateInt()
 		proposedLotCoin := sdk.NewCoin(lot.Denom, proposedLotInt)
 		proposedLotUSDValue := calculateUSDValue(proposedLotCoin, assetInfoLot)
 		if proposedLotUSDValue.IsZero() {

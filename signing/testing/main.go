@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"os"
 
@@ -31,7 +32,7 @@ func main() {
 	app.SetSDKConfig()
 	encodingConfig := app.MakeEncodingConfig()
 
-	conn, err := grpc.Dial(grpcUrl, grpc.WithInsecure())
+	conn, err := grpc.Dial(grpcUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
@@ -88,7 +89,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	msg := banktypes.NewMsgSend(accAddr, toAddr, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(1))))
+	msg := banktypes.NewMsgSend(accAddr, toAddr, sdk.NewCoins(sdk.NewCoin("ukava", sdk.NewInt(321))))
 
 	for i := 0; i < 1000; i++ {
 		requests <- signing.MsgRequest{
