@@ -1,13 +1,14 @@
-FROM --platform=$BUILDPLATFORM golang:1.20-bookworm as build-env
+FROM golang:1.21.9-bullseye as build-env
 
-ARG TARGETOS TARGETARCH
 ADD . /src
-RUN cd /src/auction-bot && GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /main
+RUN --mount=type=cache,target=/root/.cache/go-build \
+      --mount=type=cache,target=/go/pkg/mod \
+      cd /src/auction-bot && go build -o /main
 
-FROM debian:bookworm
+FROM debian:bullseye
 
 RUN apt-get update \
-      && apt-get install -y curl ca-certificates \
+      && apt-get install -y ca-certificates \
       && rm -rf /var/lib/apt/lists/* \
       && update-ca-certificates
 
