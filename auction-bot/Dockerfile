@@ -1,11 +1,11 @@
-FROM golang:1.21.9-bullseye as build-env
+FROM golang:1.21.9-bookworm as build-env
 
 ADD . /src
 RUN --mount=type=cache,target=/root/.cache/go-build \
       --mount=type=cache,target=/go/pkg/mod \
       cd /src/auction-bot && go build -o /main
 
-FROM debian:bullseye
+FROM debian:bookworm
 
 RUN apt-get update \
       && apt-get install -y ca-certificates \
