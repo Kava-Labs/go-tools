@@ -5,10 +5,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       --mount=type=cache,target=/go/pkg/mod \
       cd /src/auction-bot && go build -o /main
 
-FROM debian:bookworm
+FROM debian:bookworm-slim
 
 RUN apt-get update \
-      && apt-get install -y ca-certificates \
+      && apt-get install -y curl ca-certificates \
       && rm -rf /var/lib/apt/lists/* \
       && update-ca-certificates
 
