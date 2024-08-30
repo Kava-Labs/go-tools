@@ -17,4 +17,4 @@ docker-login:
 
 .PHONY: docker-build-and-push
 docker-build-and-push:
-	cd ..; $(DOCKER) buildx build --platform linux/amd64  -t $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT) -f auction-bot/Dockerfile --push . 
+	cd ..; $(DOCKER) buildx build --platform linux/amd64  -t $(DOCKER_REPOSITORY_URL):$(COMMIT_ID_SHORT) -f auction-bot/Dockerfile --push .
