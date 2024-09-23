@@ -45,7 +45,7 @@ type GrpcAuctionClient struct {
 
 var _ AuctionClient = (*GrpcAuctionClient)(nil)
 
-// NewGrpcAuctionClient NewRpcAuctionClient returns a new RpcAuctionClient
+// NewGrpcAuctionClient returns a new GrpcAuctionClient
 func NewGrpcAuctionClient(
 	grpcClient *kavagrpc.KavaGrpcClient,
 	cdc codec.Codec,
@@ -76,7 +76,7 @@ func (c *GrpcAuctionClient) GetInfo() (*InfoResponse, error) {
 	}, nil
 }
 
-// GetPrices gets the current prices for markets
+// GetPrices gets the current prices for markets for provided height
 func (c *GrpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPriceResponses, error) {
 	heightCtx := c.util.CtxAtHeight(height)
 	prices, err := c.grpcClient.Query.Pricefeed.Prices(
@@ -90,7 +90,7 @@ func (c *GrpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrice
 	return prices.Prices, nil
 }
 
-// GetMarkets gets an array of collateral params for each collateral type
+// GetMarkets gets an array of collateral params for each collateral type for provided height
 func (c *GrpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, error) {
 	heightCtx := c.util.CtxAtHeight(height)
 	params, err := c.grpcClient.Query.Cdp.Params(heightCtx, &cdptypes.QueryParamsRequest{})
@@ -101,7 +101,7 @@ func (c *GrpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams,
 	return params.Params.CollateralParams, nil
 }
 
-// GetMoneyMarkets gets an array of money markets for each asset
+// GetMoneyMarkets gets an array of money markets for each asset for provided height
 func (c *GrpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
 	heightCtx := c.util.CtxAtHeight(height)
 	params, err := c.grpcClient.Query.Hard.Params(heightCtx, &hardtypes.QueryParamsRequest{})
@@ -112,7 +112,7 @@ func (c *GrpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarket
 	return params.Params.MoneyMarkets, nil
 }
 
-// GetAuctions gets all the currently running auctions
+// GetAuctions gets all the currently running auctions for provided height
 func (c *GrpcAuctionClient) GetAuctions(height int64) ([]auctiontypes.Auction, error) {
 	var (
 		auctions []auctiontypes.Auction
