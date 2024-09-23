@@ -4,20 +4,20 @@ import (
 	"fmt"
 )
 
-// LoadRpcConfig provides Kava RPC configuration
-type RpcConfig struct {
-	KavaRpcUrl string
+// LoadGrpcConfig provides Kava GRPC configuration
+type GrpcConfig struct {
+	KavaGrpcUrl string
 }
 
-// LoadRpcConfig loads key values from a ConfigLoader and returns a new
+// LoadGrpcConfig loads key values from a ConfigLoader and returns a new
 // RpcConfig used for multiple different commands
-func LoadRpcConfig(loader ConfigLoader) (RpcConfig, error) {
-	rpcURL := loader.Get(kavaRpcUrlEnvKey)
+func LoadGrpcConfig(loader ConfigLoader) (GrpcConfig, error) {
+	rpcURL := loader.Get(kavaGrpcUrlEnvKey)
 	if rpcURL == "" {
-		return RpcConfig{}, fmt.Errorf("%s not set", kavaRpcUrlEnvKey)
+		return GrpcConfig{}, fmt.Errorf("%s not set", kavaGrpcUrlEnvKey)
 	}
 
-	return RpcConfig{
-		KavaRpcUrl: rpcURL,
+	return GrpcConfig{
+		KavaGrpcUrl: rpcURL,
 	}, nil
 }

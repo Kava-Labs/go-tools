@@ -1,7 +1,7 @@
 package config
 
 const (
-	kavaRpcUrlEnvKey               = "KAVA_RPC_URL"
+	kavaGrpcUrlEnvKey              = "KAVA_GRPC_URL"
 	dynamoDbTableNameEnvKey        = "DYNAMODB_TABLE_NAME"
 	slackWebhookUrlEnvKey          = "SLACK_WEBHOOK_URL"
 	intervalEnvKey                 = "INTERVAL"

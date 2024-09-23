@@ -3,16 +3,13 @@ package auctions
 import (
 	"context"
 	"errors"
-	"fmt"
-
+	"github.com/cometbft/cometbft/libs/bytes"
+	rpcclient "github.com/cometbft/cometbft/rpc/client"
 	"github.com/cosmos/cosmos-sdk/codec"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
-	"github.com/tendermint/tendermint/libs/bytes"
-	rpcclient "github.com/tendermint/tendermint/rpc/client"
 )
 
 const (
@@ -23,15 +20,6 @@ const (
 type InfoResponse struct {
 	ChainId      string `json:"chain_id" yaml:"chain_id"`
 	LatestHeight int64  `json:"latest_height" yaml:"latest_height"`
-}
-
-// AuctionClient defines the expected client interface for interacting with auctions
-type AuctionClient interface {
-	GetInfo() (*InfoResponse, error)
-	GetPrices(height int64) (pricefeedtypes.CurrentPrices, error)
-	GetAuctions(height int64) ([]auctiontypes.Auction, error)
-	GetMarkets(height int64) (cdptypes.CollateralParams, error)
-	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
 // RpcAuctionClient defines a client for interacting with auctions via rpc
@@ -66,15 +54,16 @@ func (c *RpcAuctionClient) GetInfo() (*InfoResponse, error) {
 }
 
 // GetPrices gets the current prices for markets
-func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices, error) {
-	path := fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrices)
+func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPriceResponses, error) {
+	//path := fmt.Sprintf("custom/%s/%s", pricefeedtypes.QuerierRoute, pricefeedtypes.QueryPrices)
+	path := ""
 
 	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
 	if err != nil {
 		return nil, err
 	}
 
-	var currentPrices pricefeedtypes.CurrentPrices
+	var currentPrices pricefeedtypes.CurrentPriceResponses
 	err = c.cdc.UnmarshalJSON(data, &currentPrices)
 	if err != nil {
 		return nil, err
@@ -85,7 +74,8 @@ func (c *RpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices
 
 // GetMarkets gets an array of collateral params for each collateral type
 func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, error) {
-	path := fmt.Sprintf("custom/%s/%s", cdptypes.QuerierRoute, cdptypes.QueryGetParams)
+	//path := fmt.Sprintf("custom/%s/%s", cdptypes.QuerierRoute, cdptypes.QueryGetParams)
+	path := ""
 
 	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
 	if err != nil {
@@ -103,7 +93,12 @@ func (c *RpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, 
 
 // GetMoneyMarkets gets an array of money markets for each asset
 func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error) {
-	path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
+	//path := fmt.Sprintf("custom/%s/%s", hardtypes.QuerierRoute, hardtypes.QueryGetParams)
+	path := ""
+	// https://rpc.app.infra.kava.io/custom/hard/params?height=11624954
+	// https://rpc.app.infra.kava.io/kava/hard/v1beta1/params?height=11624954
+	// https://rpc.app.infra.kava.io/cosmos/base/tendermint/v1beta1/abci_query?path=%22custom/hard/params%22&data=null&height=11624954
+
 	data, err := c.abciQuery(path, bytes.HexBytes{}, height)
 	if err != nil {
 		return nil, err
@@ -119,13 +114,16 @@ func (c *RpcAuctionClient) GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets
 
 // GetAuctions gets all the currently running auctions
 func (c *RpcAuctionClient) GetAuctions(height int64) ([]auctiontypes.Auction, error) {
-	path := fmt.Sprintf("custom/%s/%s", auctiontypes.QuerierRoute, auctiontypes.QueryGetAuctions)
+	//path := fmt.Sprintf("custom/%s/%s", auctiontypes.QuerierRoute, auctiontypes.QueryGetAuctions)
+	path := ""
+	// https://rpc.app.infra.kava.io/custom/hard/params?height=11624954
 
 	page := 1
 	var auctions []auctiontypes.Auction
 
 	for {
-		params := auctiontypes.NewQueryAllAuctionParams(page, c.PageLimit, "", "", "", sdk.AccAddress{})
+		//params := auctiontypes.NewQueryAllAuctionParams(page, c.PageLimit, "", "", "", sdk.AccAddress{})
+		params := ""
 		bz, err := c.cdc.MarshalJSON(&params)
 
 		if err != nil {

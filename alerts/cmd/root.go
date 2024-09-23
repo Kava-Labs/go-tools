@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cometbft/cometbft/libs/log"
 	"github.com/kava-labs/go-tools/alerts/alerter"
 	"github.com/kava-labs/go-tools/alerts/config"
 	"github.com/spf13/cobra"
-	"github.com/tendermint/tendermint/libs/log"
 )
 
 var (
