@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	kavagrpc "github.com/kava-labs/kava/client/grpc"
 	"os"
 	"strings"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/kava-labs/go-tools/alerts/config"
 	"github.com/kava-labs/go-tools/alerts/persistence"
 	kava "github.com/kava-labs/kava/app"
+	kavagrpc "github.com/kava-labs/kava/client/grpc"
 	"github.com/spf13/cobra"
 )
 
@@ -69,15 +69,10 @@ var runAuctionsCmd = &cobra.Command{
 			"AlertFrequency", config.AlertFrequency.String(),
 		).Info("config loaded")
 
-		// Bootstrap rpc http clent
-		//http, err := rpchttpclient.New(config.GrpcConfig, "/websocket")
-		//if err != nil {
-		//	return err
-		//}
-		//http.Logger = logger
-
 		// Create codec for messages
 		encodingConfig := kava.MakeEncodingConfig()
+
+		// Bootstrap grpc http client
 
 		grpcClient, err := kavagrpc.NewClient(config.KavaGrpcUrl)
 		if err != nil {
@@ -86,7 +81,7 @@ var runAuctionsCmd = &cobra.Command{
 
 		// Create rpc client for fetching data
 		logger.Info("creating rpc client")
-		auctionClient := auctions.NewGrpcAuctionClient(grpcClient, *encodingConfig.Amino)
+		auctionClient := auctions.NewGrpcAuctionClient(grpcClient, encodingConfig.Marshaler)
 
 		firstIteration := true
 

@@ -15,6 +15,16 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	DefaultPageLimit = 1000
+)
+
+// InfoResponse defines the ID and latest height for a specific chain
+type InfoResponse struct {
+	ChainId      string `json:"chain_id" yaml:"chain_id"`
+	LatestHeight int64  `json:"latest_height" yaml:"latest_height"`
+}
+
 // AuctionClient defines the expected client interface for interacting with auctions
 type AuctionClient interface {
 	GetInfo() (*InfoResponse, error)
