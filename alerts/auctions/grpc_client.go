@@ -120,7 +120,8 @@ func (c *GrpcAuctionClient) GetAuctions(height int64) ([]auctiontypes.Auction, e
 	)
 
 	for {
-		auctionsResponse, err := c.grpcClient.Query.Auction.Auctions(context.Background(), &auctiontypes.QueryAuctionsRequest{
+		heightCtx := c.util.CtxAtHeight(height)
+		auctionsResponse, err := c.grpcClient.Query.Auction.Auctions(heightCtx, &auctiontypes.QueryAuctionsRequest{
 			Pagination: &query.PageRequest{
 				Key:   key,
 				Limit: c.PageLimit,

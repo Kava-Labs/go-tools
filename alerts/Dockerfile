@@ -8,7 +8,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM debian:bullseye
 
 RUN apt-get update \
-      && apt-get install -y curl ca-certificates \
+      && apt-get install -y ca-certificates \
       && rm -rf /var/lib/apt/lists/* \
       && update-ca-certificates
 
