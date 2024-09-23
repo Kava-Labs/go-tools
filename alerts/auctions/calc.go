@@ -35,7 +35,7 @@ func CalculateTotalAuctionsUSDValue(data *AuctionData) (sdk.Dec, error) {
 	return totalValue, nil
 }
 
-// calculateUSDValue calculates the USD value of a given Coin and AssetInfo
+// CalculateUSDValue calculates the USD value of a given Coin and AssetInfo
 func CalculateUSDValue(coin sdk.Coin, assetInfo AssetInfo) sdk.Dec {
 	return coin.Amount.ToLegacyDec().Quo(assetInfo.ConversionFactor.ToLegacyDec()).Mul(assetInfo.Price)
 }

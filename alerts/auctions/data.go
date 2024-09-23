@@ -84,7 +84,7 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 func deduplicateMarkets(cdpMarkets cdptypes.CollateralParams, hardMarkets hardtypes.MoneyMarkets) []auctionMarket {
 	seenDenoms := make(map[string]bool)
 
-	markets := []auctionMarket{}
+	markets := make([]auctionMarket, 0)
 
 	for _, cdpMarket := range cdpMarkets {
 		_, seen := seenDenoms[cdpMarket.Denom]
