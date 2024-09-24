@@ -34,6 +34,10 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 	// use height to get consistent state from rpc client
 	height := info.LatestHeight
 
+	return getAuctionDataAtHeight(client, height)
+}
+
+func getAuctionDataAtHeight(client AuctionClient, height int64) (*AuctionData, error) {
 	prices, err := client.GetPrices(height)
 	if err != nil {
 		return nil, err

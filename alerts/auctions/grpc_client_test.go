@@ -73,7 +73,7 @@ func TestGrpcGetAuctions(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	auctions, err := pruningQueryClient.GetAuctions(11000000)
+	auctions, err := dataQueryClient.GetAuctions(11000000)
 	require.NoError(t, err)
 	require.Len(t, auctions, 10)
 	for _, auction := range auctions {
