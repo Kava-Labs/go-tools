@@ -1,8 +1,6 @@
 package auctions
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -92,9 +90,6 @@ func TestGrpcGetMarkets(t *testing.T) {
 
 	markets, err := dataQueryClient.GetMarkets(11000000)
 	require.NoError(t, err)
-	jsonMarkets, err := json.Marshal(markets)
-	fmt.Println(len(markets))
-	fmt.Println(string(jsonMarkets))
 	require.Len(t, markets, 10)
 }
 
