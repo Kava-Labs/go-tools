@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// LoadGrpcConfig provides Kava GRPC configuration
+// GrpcConfig provides Kava GRPC configuration
 type GrpcConfig struct {
 	KavaGrpcUrl string
 }

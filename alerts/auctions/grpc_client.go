@@ -127,7 +127,7 @@ func (c *GrpcAuctionClient) GetAuctions(height int64) ([]auctiontypes.Auction, e
 			},
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get auctions: %w", err)
 		}
 
 		for _, anyAuction := range auctionsResponse.GetAuctions() {

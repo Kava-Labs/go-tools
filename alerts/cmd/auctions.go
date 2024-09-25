@@ -72,8 +72,7 @@ var runAuctionsCmd = &cobra.Command{
 		// Create codec for messages
 		encodingConfig := kava.MakeEncodingConfig()
 
-		// Bootstrap grpc http client
-
+		// Bootstrap grpc client
 		grpcClient, err := kavagrpc.NewClient(config.KavaGrpcUrl)
 		if err != nil {
 			return fmt.Errorf("failed to create grpc client: %v", err)
