@@ -54,4 +54,25 @@ AWS_PROFILE=development $GOPATH/bin/alerts usdx run
 
 ## Alerts
 
-There is a separate auction alerts service run that is described in the [doc](./auctions/README.md).
+### Auction
+
+Auction alerts tracks ongoing auctions on the Kava Chain and alerts for:
+
+- Total value of auctions above configured value
+- Percentage price deviation of auction clearing price above configured value
+
+Runs with:
+```bash
+go run . auctions run
+```
+
+### USDX
+
+USDX alerts tracks the USDX price on the Kava Chain and alerts for:
+
+- Price deviation of USDX below configured value
+
+Runs with:
+```bash
+go run . usdx run
+```
