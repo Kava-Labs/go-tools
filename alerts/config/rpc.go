@@ -10,7 +10,7 @@ type GrpcConfig struct {
 }
 
 // LoadGrpcConfig loads key values from a ConfigLoader and returns a new
-// RpcConfig used for multiple different commands
+// GrpcConfig used for multiple different commands
 func LoadGrpcConfig(loader ConfigLoader) (GrpcConfig, error) {
 	rpcURL := loader.Get(kavaGrpcUrlEnvKey)
 	if rpcURL == "" {
