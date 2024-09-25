@@ -11,25 +11,27 @@ import (
 
 // NewGrpcConnection parses a GRPC endpoint and creates a connection to it
 func NewGrpcConnection(endpoint string) (*grpc.ClientConn, error) {
-	grpcUrl, err := url.Parse(endpoint)
+	grpcURL, err := url.Parse(endpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse grpc url: %w", err)
 	}
 
 	var secureOpt grpc.DialOption
-	switch grpcUrl.Scheme {
+	switch grpcURL.Scheme {
 	case "http":
 		secureOpt = grpc.WithInsecure()
 	case "https":
-		creds := credentials.NewTLS(&tls.Config{})
+		creds := credentials.NewTLS(&tls.Config{
+			MinVersion: tls.VersionTLS12,
+		})
 		secureOpt = grpc.WithTransportCredentials(creds)
 	default:
-		return nil, fmt.Errorf("unknown grpc url scheme: %s", grpcUrl.Scheme)
+		return nil, fmt.Errorf("unknown grpc url scheme: %s", grpcURL.Scheme)
 	}
 
-	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
+	grpcConn, err := grpc.Dial(grpcURL.Host, secureOpt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to dial grpc: %w", err)
 	}
 
 	return grpcConn, nil
