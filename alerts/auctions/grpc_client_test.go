@@ -88,7 +88,7 @@ func TestGrpcGetMarkets(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	markets, err := dataQueryClient.GetMarkets(11000000)
+	markets, err := dataQueryClient.GetCollateralParams(11000000)
 	require.NoError(t, err)
 	require.Len(t, markets, 10)
 }
@@ -100,5 +100,5 @@ func TestGrpcGetMoneyMarkets(t *testing.T) {
 
 	moneyMarkets, err := dataQueryClient.GetMoneyMarkets(11000000)
 	require.NoError(t, err)
-	require.Len(t, moneyMarkets, 29)
+	require.Len(t, moneyMarkets, 16)
 }

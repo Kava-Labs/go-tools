@@ -12,7 +12,6 @@ import (
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
 	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -30,13 +29,12 @@ type AuctionClient interface {
 	GetInfo() (*InfoResponse, error)
 	GetPrices(height int64) (pricefeedtypes.CurrentPriceResponses, error)
 	GetAuctions(height int64) ([]auctiontypes.Auction, error)
-	GetMarkets(height int64) (cdptypes.CollateralParams, error)
+	GetCollateralParams(height int64) (cdptypes.CollateralParams, error)
 	GetMoneyMarkets(height int64) (hardtypes.MoneyMarkets, error)
 }
 
 // GrpcAuctionClient defines a client for interacting with auctions via rpc
 type GrpcAuctionClient struct {
-	conn       *grpc.ClientConn
 	grpcClient *kavagrpc.KavaGrpcClient
 	util       *kavagrpcutil.Util
 	cdc        codec.Codec
@@ -90,8 +88,8 @@ func (c *GrpcAuctionClient) GetPrices(height int64) (pricefeedtypes.CurrentPrice
 	return prices.Prices, nil
 }
 
-// GetMarkets gets an array of collateral params for each collateral type for provided height
-func (c *GrpcAuctionClient) GetMarkets(height int64) (cdptypes.CollateralParams, error) {
+// GetCollateralParams gets an array of collateral params for each collateral type for provided height
+func (c *GrpcAuctionClient) GetCollateralParams(height int64) (cdptypes.CollateralParams, error) {
 	heightCtx := c.util.CtxAtHeight(height)
 	params, err := c.grpcClient.Query.Cdp.Params(heightCtx, &cdptypes.QueryParamsRequest{})
 	if err != nil {

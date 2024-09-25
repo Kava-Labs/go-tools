@@ -51,3 +51,7 @@ make install
 
 AWS_PROFILE=development $GOPATH/bin/alerts usdx run
 ```
+
+## Alerts
+
+There is a separate auction alerts service run that is described in the [doc](./auctions/README.md).

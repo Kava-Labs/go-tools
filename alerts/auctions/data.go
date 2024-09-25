@@ -48,7 +48,7 @@ func getAuctionDataAtHeight(client AuctionClient, height int64) (*AuctionData, e
 		return nil, err
 	}
 
-	cdpMarkets, err := client.GetMarkets(height)
+	cdpMarkets, err := client.GetCollateralParams(height)
 	if err != nil {
 		return nil, err
 	}
