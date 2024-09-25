@@ -4,7 +4,7 @@ run:
   allow-parallel-runners: true # enables parallel execution of linters to speed up linting process
   skip-dirs:
     - vendor
-    - hard-keeper-bot # a lot of errors for old code, need to fix
+    - hard-keeper-bot # TODO(boodyvo): a lot of errors for old code, need to fix during the hard-keeper-bot update
 
 linters:
   disable-all: true
