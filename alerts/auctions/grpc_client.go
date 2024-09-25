@@ -3,9 +3,10 @@ package auctions
 import (
 	"context"
 	"fmt"
+
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/codec"
-	query "github.com/cosmos/cosmos-sdk/types/query"
+	"github.com/cosmos/cosmos-sdk/types/query"
 	kavagrpc "github.com/kava-labs/kava/client/grpc"
 	kavagrpcutil "github.com/kava-labs/kava/client/grpc/util"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"

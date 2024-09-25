@@ -131,3 +131,7 @@ linters-settings:
     for-loops: false # disables preallocation checks in for loops
   unparam:
     check-exported: true # checks exported functions and methods for unused params
+  revive:
+    rules:
+      - name: unused-parameter
+        severity: error
