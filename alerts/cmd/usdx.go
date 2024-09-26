@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cometbft/cometbft/libs/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-tools/alerts/alerter"
 	"github.com/kava-labs/go-tools/alerts/ascendex"
 	"github.com/kava-labs/go-tools/alerts/config"
 	"github.com/kava-labs/go-tools/alerts/persistence"
 	"github.com/spf13/cobra"
-	"github.com/tendermint/tendermint/libs/log"
 )
 
 const (

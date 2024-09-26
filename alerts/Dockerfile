@@ -1,7 +1,9 @@
-FROM golang:1.20-bullseye as build-env
+FROM golang:1.21.9-bullseye AS build-env
 
 ADD . /src
-RUN cd /src && go build -o /alerts
+RUN --mount=type=cache,target=/root/.cache/go-build \
+      --mount=type=cache,target=/go/pkg/mod \
+      cd /src && go build -o /alerts
 
 FROM debian:bullseye
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cometbft/cometbft/libs/log"
 	"github.com/joho/godotenv"
-	"github.com/tendermint/tendermint/libs/log"
 )
 
 // Config provides application configuration

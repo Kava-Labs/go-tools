@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	auctiontypes "github.com/kava-labs/kava/x/auction/types"
 	cdptypes "github.com/kava-labs/kava/x/cdp/types"
@@ -13,7 +14,7 @@ import (
 // AssetInfo defines the price and conversion factor of a specific asset
 type AssetInfo struct {
 	Price            sdk.Dec
-	ConversionFactor sdk.Int
+	ConversionFactor sdkmath.Int
 }
 
 // AuctionData defines a map of AssetInfo and array of current auctions
@@ -33,6 +34,10 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 	// use height to get consistent state from rpc client
 	height := info.LatestHeight
 
+	return getAuctionDataAtHeight(client, height)
+}
+
+func getAuctionDataAtHeight(client AuctionClient, height int64) (*AuctionData, error) {
 	prices, err := client.GetPrices(height)
 	if err != nil {
 		return nil, err
@@ -43,7 +48,7 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 		return nil, err
 	}
 
-	cdpMarkets, err := client.GetMarkets(height)
+	cdpMarkets, err := client.GetCollateralParams(height)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +88,7 @@ func GetAuctionData(client AuctionClient) (*AuctionData, error) {
 func deduplicateMarkets(cdpMarkets cdptypes.CollateralParams, hardMarkets hardtypes.MoneyMarkets) []auctionMarket {
 	seenDenoms := make(map[string]bool)
 
-	markets := []auctionMarket{}
+	markets := make([]auctionMarket, 0)
 
 	for _, cdpMarket := range cdpMarkets {
 		_, seen := seenDenoms[cdpMarket.Denom]
@@ -110,5 +115,5 @@ func deduplicateMarkets(cdpMarkets cdptypes.CollateralParams, hardMarkets hardty
 type auctionMarket struct {
 	Denom            string
 	SpotMarketID     string
-	ConversionFactor sdk.Int
+	ConversionFactor sdkmath.Int
 }

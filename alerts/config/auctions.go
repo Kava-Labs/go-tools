@@ -3,13 +3,13 @@ package config
 import (
 	"time"
 
+	"github.com/cometbft/cometbft/libs/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/tendermint/tendermint/libs/log"
 )
 
 type AuctionsConfig struct {
 	BaseConfig
-	RpcConfig
+	GrpcConfig
 	// US dollar value of auctions that triggers alert
 	UsdThreshold                   sdk.Dec
 	InefficientAuctionUSDThreshold sdk.Dec
@@ -24,7 +24,7 @@ func LoadAuctionsConfig(loader ConfigLoader, logger log.Logger) (AuctionsConfig,
 		return AuctionsConfig{}, err
 	}
 
-	rpcConfig, err := LoadRpcConfig(loader)
+	grpcConfig, err := LoadGrpcConfig(loader)
 	if err != nil {
 		return AuctionsConfig{}, err
 	}
@@ -56,7 +56,7 @@ func LoadAuctionsConfig(loader ConfigLoader, logger log.Logger) (AuctionsConfig,
 
 	return AuctionsConfig{
 		BaseConfig:                     baseConfig,
-		RpcConfig:                      rpcConfig,
+		GrpcConfig:                     grpcConfig,
 		UsdThreshold:                   usdThresholdDec,
 		InefficientAuctionUSDThreshold: inefficientThresholdDec,
 		InefficientRatio:               inefficientRatioDec,

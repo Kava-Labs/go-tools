@@ -30,7 +30,7 @@ type DynamoDbPersister struct {
 var _ AlertPersister = (*DynamoDbPersister)(nil)
 
 // NewDynamoDbPersister returns a db with the AWS configuration initialized
-func NewDynamoDbPersister(tableName string, serviceName string, rpcEndpoint string) (DynamoDbPersister, error) {
+func NewDynamoDbPersister(tableName string, serviceName string, grpcEndpoint string) (DynamoDbPersister, error) {
 	awsCfg, err := aws_config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		return DynamoDbPersister{}, err
@@ -39,7 +39,7 @@ func NewDynamoDbPersister(tableName string, serviceName string, rpcEndpoint stri
 	return DynamoDbPersister{
 		tableName:   tableName,
 		serviceName: serviceName,
-		rpcEndpoint: rpcEndpoint,
+		rpcEndpoint: grpcEndpoint,
 		svc:         dynamodb.NewFromConfig(awsCfg),
 	}, nil
 }

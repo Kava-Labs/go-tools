@@ -38,17 +38,28 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version-file: go.mod
+
+      - name: Load Version
+        id: load-version
+        run: |
+          ls -lah
+          GOLANGCI_VERSION=$(cat .golangci-version)
+          REV=$(git merge-base origin/master HEAD)
+          echo "GOLANGCI_VERSION=$GOLANGCI_VERSION" >> $GITHUB_ENV
+          echo "REV=$REV" >> $GITHUB_ENV
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          args: --timeout=10m
+          version: ${{ env.GOLANGCI_VERSION }}
+          args: -v -c .golangci.yml --new-from-rev ${{ env.REV }}
 
   integration-tests:
     runs-on: ubuntu-latest

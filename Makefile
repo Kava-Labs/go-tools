@@ -30,8 +30,14 @@ vet:
 	go vet ./...
 
 .PHONY: test
+# Find all directories containing go.mod, and run go test for each module, excluding auction-audit
 test:
-	go test -v ./...
+	find . -name "go.mod" -not -path "*/vendor/*" -not -path "*/auction-audit/*" -exec dirname {} \; | \
+	while read dir; do \
+		echo "Running tests in $$dir..."; \
+		(cd $$dir && go test ./... -v) || exit 1; \
+	done
+
 
 .PHONY: test-integration
 test-integration:

@@ -6,15 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cometbft/cometbft/libs/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/kava-labs/go-tools/alerts/alerter"
 	"github.com/kava-labs/go-tools/alerts/auctions"
 	"github.com/kava-labs/go-tools/alerts/config"
 	"github.com/kava-labs/go-tools/alerts/persistence"
 	kava "github.com/kava-labs/kava/app"
+	kavagrpc "github.com/kava-labs/kava/client/grpc"
 	"github.com/spf13/cobra"
-	"github.com/tendermint/tendermint/libs/log"
-	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 )
 
 var _auctionsServiceName = "AuctionAlerts"
@@ -39,9 +39,9 @@ var runAuctionsCmd = &cobra.Command{
 			return err
 		}
 
-		// Create a new alert persister backed with DynamoDB. If AWS config is
+		// Create a new alert persisted backed with DynamoDB. If AWS config is
 		// invalid, exits with error
-		auctionDB, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaRpcUrl)
+		auctionDB, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _auctionsServiceName, config.KavaGrpcUrl)
 		if err != nil {
 			return err
 		}
@@ -63,25 +63,24 @@ var runAuctionsCmd = &cobra.Command{
 		slackAlerter := alerter.NewSlackAlerter(config.SlackWebhookUrl)
 
 		logger.With(
-			"rpcUrl", config.KavaRpcUrl,
+			"grpcUrl", config.KavaGrpcUrl,
 			"UsdThreshold", strings.Split(config.UsdThreshold.String(), ".")[0],
 			"Interval", config.Interval.String(),
 			"AlertFrequency", config.AlertFrequency.String(),
 		).Info("config loaded")
 
-		// Bootstrap rpc http clent
-		http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
-		if err != nil {
-			return err
-		}
-		http.Logger = logger
-
 		// Create codec for messages
 		encodingConfig := kava.MakeEncodingConfig()
 
+		// Bootstrap grpc client
+		grpcClient, err := kavagrpc.NewClient(config.KavaGrpcUrl)
+		if err != nil {
+			return fmt.Errorf("failed to create grpc client: %v", err)
+		}
+
 		// Create rpc client for fetching data
 		logger.Info("creating rpc client")
-		auctionClient := auctions.NewRpcAuctionClient(http, *encodingConfig.Amino)
+		auctionClient := auctions.NewGrpcAuctionClient(grpcClient, encodingConfig.Marshaler)
 
 		firstIteration := true
 
@@ -110,7 +109,7 @@ var runAuctionsCmd = &cobra.Command{
 			}
 
 			for _, auction := range inEfficientAuctions {
-				inefficientAuctionDB, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _inefficientAuctionServiceName+fmt.Sprint(auction.GetID()), config.KavaRpcUrl)
+				inefficientAuctionDB, err := persistence.NewDynamoDbPersister(config.DynamoDbTableName, _inefficientAuctionServiceName+fmt.Sprint(auction.GetID()), config.KavaGrpcUrl)
 				if err != nil {
 					return err
 				}
