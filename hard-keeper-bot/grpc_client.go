@@ -11,8 +11,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	grpctypes "github.com/cosmos/cosmos-sdk/types/grpc"
-	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	hardtypes "github.com/kava-labs/kava/x/hard/types"
 	pricefeedtypes "github.com/kava-labs/kava/x/pricefeed/types"
 
@@ -23,8 +21,6 @@ import (
 
 type GrpcClient struct {
 	GrpcClientConn *grpc.ClientConn
-	Auth           authtypes.QueryClient
-	Tx             txtypes.ServiceClient
 	Tm             tmservice.ServiceClient
 	Hard           hardtypes.QueryClient
 	Pricefeed      pricefeedtypes.QueryClient
