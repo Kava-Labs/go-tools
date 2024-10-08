@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net/url"
 	"strconv"
 
@@ -20,10 +19,10 @@ import (
 )
 
 type GrpcClient struct {
-	GrpcClientConn *grpc.ClientConn
-	Tm             tmservice.ServiceClient
-	Hard           hardtypes.QueryClient
-	Pricefeed      pricefeedtypes.QueryClient
+	Conn            *grpc.ClientConn
+	TmClient        tmservice.ServiceClient
+	HardClient      hardtypes.QueryClient
+	PricefeedClient pricefeedtypes.QueryClient
 }
 
 var _ LiquidationClient = (*GrpcClient)(nil)
@@ -33,38 +32,37 @@ func ctxAtHeight(height int64) context.Context {
 	return metadata.AppendToOutgoingContext(context.Background(), grpctypes.GRPCBlockHeightHeader, heightStr)
 }
 
-func NewGrpcClient(target string) GrpcClient {
-	grpcUrl, err := url.Parse(target)
+func NewGrpcClient(target string) (*GrpcClient, error) {
+	grpcURL, err := url.Parse(target)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	var secureOpt grpc.DialOption
-	switch grpcUrl.Scheme {
+	var dialOptions grpc.DialOption
+	switch grpcURL.Scheme {
 	case "http":
-		secureOpt = grpc.WithInsecure()
+		dialOptions = grpc.WithInsecure()
 	case "https":
-		creds := credentials.NewTLS(&tls.Config{})
-		secureOpt = grpc.WithTransportCredentials(creds)
+		dialOptions = grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{}))
 	default:
-		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
+		return nil, fmt.Errorf("unsupported scheme: %s", grpcURL.Scheme)
 	}
 
-	grpcConn, err := grpc.Dial(grpcUrl.Host, secureOpt)
+	conn, err := grpc.Dial(grpcURL.Host, dialOptions)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	return GrpcClient{
-		GrpcClientConn: grpcConn,
-		Tm:             tmservice.NewServiceClient(grpcConn),
-		Hard:           hardtypes.NewQueryClient(grpcConn),
-		Pricefeed:      pricefeedtypes.NewQueryClient(grpcConn),
-	}
+	return &GrpcClient{
+		Conn:            conn,
+		TmClient:        tmservice.NewServiceClient(conn),
+		HardClient:      hardtypes.NewQueryClient(conn),
+		PricefeedClient: pricefeedtypes.NewQueryClient(conn),
+	}, nil
 }
 
-func (c GrpcClient) GetInfo() (*InfoResponse, error) {
-	latestBlock, err := c.Tm.GetLatestBlock(context.Background(), &tmservice.GetLatestBlockRequest{})
+func (c *GrpcClient) GetInfo() (*InfoResponse, error) {
+	latestBlock, err := c.TmClient.GetLatestBlock(context.Background(), &tmservice.GetLatestBlockRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch latest block: %w", err)
 	}
@@ -75,64 +73,61 @@ func (c GrpcClient) GetInfo() (*InfoResponse, error) {
 	}, nil
 }
 
-func (c GrpcClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices, error) {
-	pricesRes, err := c.Pricefeed.Prices(ctxAtHeight(height), &pricefeedtypes.QueryPricesRequest{})
+func (c *GrpcClient) GetPrices(height int64) (pricefeedtypes.CurrentPrices, error) {
+	pricesRes, err := c.PricefeedClient.Prices(ctxAtHeight(height), &pricefeedtypes.QueryPricesRequest{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch prices: %w", err)
 	}
 
-	var prices []pricefeedtypes.CurrentPrice
-	for _, response := range pricesRes.Prices {
-		price := pricefeedtypes.CurrentPrice{
+	prices := make([]pricefeedtypes.CurrentPrice, len(pricesRes.Prices))
+	for i, response := range pricesRes.Prices {
+		prices[i] = pricefeedtypes.CurrentPrice{
 			MarketID: response.MarketID,
 			Price:    response.Price,
 		}
-		prices = append(prices, price)
 	}
 
 	return prices, nil
 }
 
-func (c GrpcClient) GetMarkets(height int64) (hardtypes.MoneyMarkets, error) {
-	paramsRes, err := c.Hard.Params(ctxAtHeight(height), &hardtypes.QueryParamsRequest{})
+func (c *GrpcClient) GetMarkets(height int64) (hardtypes.MoneyMarkets, error) {
+	paramsRes, err := c.HardClient.Params(ctxAtHeight(height), &hardtypes.QueryParamsRequest{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch money markets: %w", err)
 	}
 
 	return paramsRes.Params.MoneyMarkets, nil
 }
 
-func (c GrpcClient) GetBorrows(height int64) (hardtypes.Borrows, error) {
-	borrowRes, err := c.Hard.Borrows(ctxAtHeight(height), &hardtypes.QueryBorrowsRequest{})
+func (c *GrpcClient) GetBorrows(height int64) (hardtypes.Borrows, error) {
+	borrowRes, err := c.HardClient.Borrows(ctxAtHeight(height), &hardtypes.QueryBorrowsRequest{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch borrows: %w", err)
 	}
 
-	var borrows []hardtypes.Borrow
-	for _, response := range borrowRes.Borrows {
-		borrow := hardtypes.Borrow{
+	borrows := make([]hardtypes.Borrow, len(borrowRes.Borrows))
+	for i, response := range borrowRes.Borrows {
+		borrows[i] = hardtypes.Borrow{
 			Borrower: sdk.AccAddress(response.Borrower),
 			Amount:   response.Amount,
 		}
-		borrows = append(borrows, borrow)
 	}
 
 	return borrows, nil
 }
 
-func (c GrpcClient) GetDeposits(height int64) (hardtypes.Deposits, error) {
-	depositRes, err := c.Hard.Deposits(ctxAtHeight(height), &hardtypes.QueryDepositsRequest{})
+func (c *GrpcClient) GetDeposits(height int64) (hardtypes.Deposits, error) {
+	depositRes, err := c.HardClient.Deposits(ctxAtHeight(height), &hardtypes.QueryDepositsRequest{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch deposits: %w", err)
 	}
 
-	var deposits []hardtypes.Deposit
-	for _, response := range depositRes.Deposits {
-		deposit := hardtypes.Deposit{
+	deposits := make([]hardtypes.Deposit, len(depositRes.Deposits))
+	for i, response := range depositRes.Deposits {
+		deposits[i] = hardtypes.Deposit{
 			Depositor: sdk.AccAddress(response.Depositor),
 			Amount:    response.Amount,
 		}
-		deposits = append(deposits, deposit)
 	}
 
 	return deposits, nil

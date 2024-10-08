@@ -48,7 +48,10 @@ func main() {
 		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
 	}
 
-	liquidationClient := NewGrpcClient(config.KavaGrpcUrl)
+	liquidationClient, err := NewGrpcClient(config.KavaGrpcUrl)
+	if err != nil {
+		logger.Fatal().Err(err).Send()
+	}
 
 	conn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {

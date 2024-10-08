@@ -7,10 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var grpcClient GrpcClient
+var latestHeight int64
+var grpcClient *GrpcClient
 
 func TestMain(m *testing.M) {
-	grpcClient = NewGrpcClient("https://grpc.kava.io:443")
+	grpcClient, _ = NewGrpcClient("https://grpc.kava.io:443")
 
 	os.Exit(m.Run())
 }
@@ -24,6 +25,7 @@ func TestHardKeeperGetInfo(t *testing.T) {
 	require.NoError(t, err)
 	require.Greater(t, res.LatestHeight, int64(11000000))
 	require.Equal(t, "kava_2222-10", res.ChainId)
+	latestHeight = res.LatestHeight
 }
 
 func TestHardKeeperGetPrices(t *testing.T) {
@@ -31,7 +33,7 @@ func TestHardKeeperGetPrices(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	res, err := grpcClient.GetPrices(12076815)
+	res, err := grpcClient.GetPrices(latestHeight)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 	require.Equal(t, len(res), 29)
@@ -42,7 +44,7 @@ func TestHardKeeperGetMarkets(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	res, err := grpcClient.GetMarkets(12076815)
+	res, err := grpcClient.GetMarkets(latestHeight)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 	require.Equal(t, len(res), 16)
@@ -53,7 +55,7 @@ func TestHardKeeperGetBorrows(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	res, err := grpcClient.GetBorrows(12076815)
+	res, err := grpcClient.GetBorrows(latestHeight)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 	require.Equal(t, len(res), 100)
@@ -64,7 +66,7 @@ func TestHardKeeperGetDeposits(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	res, err := grpcClient.GetDeposits(12076815)
+	res, err := grpcClient.GetDeposits(latestHeight)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 	require.Equal(t, len(res), 100)
