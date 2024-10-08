@@ -12,13 +12,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/grpc/tmservice"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/kava-labs/go-tools/signing"
 	"github.com/kava-labs/kava/app"
 	"github.com/rs/zerolog"
-	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -49,11 +47,7 @@ func main() {
 		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
 	}
 
-	http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
-	if err != nil {
-		logger.Fatal().Err(err).Send()
-	}
-	liquidationClient := NewRpcLiquidationClient(http, encodingConfig.Amino)
+	liquidationClient := NewGrpcClient(config.KavaGrpcUrl)
 
 	conn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {
@@ -134,12 +128,12 @@ func main() {
 		for _, msg := range msgs {
 			fmt.Printf("sending liquidation for %s\n", msg.Borrower)
 
-			requests <- signing.MsgRequest{
-				Msgs:      []sdk.Msg{&msg},
-				GasLimit:  1000000,
-				FeeAmount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(50000)}},
-				Memo:      "",
-			}
+			// requests <- signing.MsgRequest{
+			// 	Msgs:      []sdk.Msg{&msg},
+			// 	GasLimit:  1000000,
+			// 	FeeAmount: sdk.Coins{sdk.Coin{Denom: "ukava", Amount: sdk.NewInt(50000)}},
+			// 	Memo:      "",
+			// }
 		}
 
 		// wait for next interval
