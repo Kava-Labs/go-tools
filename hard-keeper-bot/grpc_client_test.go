@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var invalidHeight int64 = 100
 var latestHeight int64
 var grpcClient *GrpcClient
 
@@ -14,6 +15,11 @@ func TestMain(m *testing.M) {
 	grpcClient, _ = NewGrpcClient("https://grpc.kava.io:443")
 
 	os.Exit(m.Run())
+}
+
+func TestGrpcClientInvalidUrl(t *testing.T) {
+	_, err := NewGrpcClient("invalid-url")
+	require.Error(t, err)
 }
 
 func TestHardKeeperGetInfo(t *testing.T) {
@@ -39,6 +45,15 @@ func TestHardKeeperGetPrices(t *testing.T) {
 	require.Equal(t, len(res), 29)
 }
 
+func TestHardKeeperGetPricesInvalidHeight(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	_, err := grpcClient.GetPrices(invalidHeight)
+	require.Error(t, err)
+}
+
 func TestHardKeeperGetMarkets(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
@@ -48,6 +63,15 @@ func TestHardKeeperGetMarkets(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 	require.Equal(t, len(res), 16)
+}
+
+func TestHardKeeperGetMarketsInvalidHeight(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	_, err := grpcClient.GetMarkets(invalidHeight)
+	require.Error(t, err)
 }
 
 func TestHardKeeperGetBorrows(t *testing.T) {
@@ -61,6 +85,15 @@ func TestHardKeeperGetBorrows(t *testing.T) {
 	require.Equal(t, len(res), 100)
 }
 
+func TestHardKeeperGetBorrowsInvalidHeight(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	_, err := grpcClient.GetBorrows(invalidHeight)
+	require.Error(t, err)
+}
+
 func TestHardKeeperGetDeposits(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
@@ -70,4 +103,13 @@ func TestHardKeeperGetDeposits(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 	require.Equal(t, len(res), 100)
+}
+
+func TestHardKeeperGetDepositsInvalidHeight(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	_, err := grpcClient.GetDeposits(invalidHeight)
+	require.Error(t, err)
 }
