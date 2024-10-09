@@ -18,7 +18,6 @@ import (
 	"github.com/kava-labs/go-tools/signing"
 	"github.com/kava-labs/kava/app"
 	"github.com/rs/zerolog"
-	rpchttpclient "github.com/tendermint/tendermint/rpc/client/http"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -49,11 +48,10 @@ func main() {
 		log.Fatalf("unknown rpc url scheme %s\n", grpcUrl.Scheme)
 	}
 
-	http, err := rpchttpclient.New(config.KavaRpcUrl, "/websocket")
+	liquidationClient, err := NewGrpcClient(config.KavaGrpcUrl)
 	if err != nil {
 		logger.Fatal().Err(err).Send()
 	}
-	liquidationClient := NewRpcLiquidationClient(http, encodingConfig.Amino)
 
 	conn, err := grpc.Dial(grpcUrl.Host, secureOpt)
 	if err != nil {
