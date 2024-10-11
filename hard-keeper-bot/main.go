@@ -17,6 +17,8 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/kava-labs/go-tools/signing"
 	"github.com/kava-labs/kava/app"
+
+	// kavaGrpc "github.com/kava-labs/kava/client/grpc"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
