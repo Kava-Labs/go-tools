@@ -1,6 +1,6 @@
 module github.com/kava-labs/go-tools/auction-bot
 
-go 1.21.9
+go 1.23.6
 
 require (
 	github.com/alexliesenfeld/health v0.8.0
