@@ -62,6 +62,38 @@ func TestGetBids(t *testing.T) {
 				Amount: c("usdx", 176_000e6),
 			}},
 		},
+		{
+			name: "min increment forward auction",
+			auctionData: AuctionData{
+				Auctions: []auctiontypes.Auction{
+					&auctiontypes.CollateralAuction{
+						BaseAuction: auctiontypes.BaseAuction{
+							ID:  0,
+							Lot: c("xrp", 25),
+							Bid: c("ukava", 1),
+						},
+						MaxBid:            c("ukava", 4),
+						CorrespondingDebt: c("debt", 0),
+					},
+				},
+				Assets: map[string]AssetInfo{
+					"xrp": {
+						Price:            d("2.00"),
+						ConversionFactor: sdk.NewInt(1e8),
+					},
+					"ukava": {
+						Price:            d("0.44"),
+						ConversionFactor: sdk.NewInt(1e6),
+					},
+				},
+				BidIncrement: d("0.01"),
+			},
+			margin: d("0.05"),
+			expectedBids: AuctionInfos{{
+				ID:     0,
+				Amount: c("ukava", 2),
+			}},
+		},
 	}
 
 	for _, tc := range testCases {
