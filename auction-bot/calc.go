@@ -258,6 +258,13 @@ func calculateUSDValue(coin sdk.Coin, assetInfo AssetInfo) sdk.Dec {
 	return coin.Amount.ToLegacyDec().Quo(assetInfo.ConversionFactor.ToLegacyDec()).Mul(assetInfo.Price)
 }
 
+// calculateProposedBid tries to find a bid amount for a forward auction.
+// Rather than bidding the smallest increment possible, it tries to bid the most while still profiting.
+//
+// It starts with a descending list of percentages of the max bid.
+// It tries the first (largest) one (truncated down, capped by the min possible bid)
+// If the profit (as percent of lot value) is greater than margin, it returns the bid. i.e. if 1 - ( bid_usd / lot_usd ) >= margin
+// The first largest bid will unlikely pass this
 func calculateProposedBid(
 	currentBid, lot, maxbid sdk.Coin,
 	assetInfoLot, assetInfoBid AssetInfo,
@@ -281,7 +288,8 @@ func calculateProposedBid(
 		}
 		bidCoin := sdk.NewCoin(maxbid.Denom, bidAmountInt)
 		bidUSDValue := calculateUSDValue(bidCoin, assetInfoBid)
-		if sdk.OneDec().Sub((bidUSDValue.Quo(lotUSDValue))).GTE(margin) {
+		pctProfit := sdk.OneDec().Sub((bidUSDValue.Quo(lotUSDValue))) // profit made if auction won, as percent of lot value
+		if pctProfit.GTE(margin) {
 			// 			fmt.Printf(`
 			// 	Auction id: %d
 			// 	Increment tried: %s
@@ -297,6 +305,9 @@ func calculateProposedBid(
 	return sdk.Coin{}, false
 }
 
+
+// calculateProposedLot tries to find a lot amount to bid in a reverse auction.
+// Rather than finding the smallest amount the lot could be reduced by, it finds the largest decrement that still makes a profit.
 func calculateProposedLot(
 	logger zerolog.Logger,
 	lot, maxbid sdk.Coin,
@@ -332,7 +343,8 @@ func calculateProposedLot(
 		if proposedLotUSDValue.IsZero() {
 			continue
 		}
-		if sdk.OneDec().Sub((bidUSDValue.Quo(proposedLotUSDValue))).GTE(margin) {
+		pctProfit := sdk.OneDec().Sub((bidUSDValue.Quo(proposedLotUSDValue))) // profit made if auction won, as percent of lot value
+		if pctProfit.GTE(margin) {
 			// 			fmt.Printf(`
 			// 	Auction id: %d
 			// 	Increment tried: %s
