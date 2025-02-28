@@ -54,6 +54,7 @@ func GetBids(
 					auction,
 					keeper,
 					data.Assets,
+					data.BidIncrement,
 					margin,
 				)
 				if !shouldBid {
@@ -110,6 +111,7 @@ func handleForwardCollateralAuction(
 	auction auctiontypes.Auction,
 	keeper sdk.AccAddress,
 	assetInfo map[string]AssetInfo,
+	increment,
 	margin sdk.Dec,
 ) (AuctionInfo, bool) {
 	collateralAuction := auction.(*auctiontypes.CollateralAuction)
@@ -130,6 +132,7 @@ func handleForwardCollateralAuction(
 		assetInfoLot,
 		assetInfoBid,
 		margin,
+		increment,
 		collateralAuction.GetID(),
 	)
 
@@ -268,7 +271,7 @@ func calculateUSDValue(coin sdk.Coin, assetInfo AssetInfo) sdk.Dec {
 func calculateProposedBid(
 	currentBid, lot, maxbid sdk.Coin,
 	assetInfoLot, assetInfoBid AssetInfo,
-	margin sdk.Dec,
+	margin, increment sdk.Dec,
 	id uint64,
 ) (sdk.Coin, bool) {
 	bidsToTry := []sdk.Dec{d("1.0"), d("0.95"), d("0.9"), d("0.8"), d("0.7"), d("0.6"), d("0.5"), d("0.4"), d("0.3"), d("0.2"), d("0.1")}
@@ -276,7 +279,7 @@ func calculateProposedBid(
 	if lotUSDValue.IsZero() {
 		return sdk.Coin{}, false
 	}
-	minBid := currentBid.Amount.ToLegacyDec().Mul(d("1.0105")).RoundInt()
+	minBid := minNewBid(currentBid.Amount, increment)
 	if minBid.GT(maxbid.Amount) {
 		minBid = maxbid.Amount
 	}
@@ -305,6 +308,17 @@ func calculateProposedBid(
 	return sdk.Coin{}, false
 }
 
+// minNewBid calculates the smallest new bid that can be placed.
+// It returns the current bid + 1%. Unless the increment is <1 in which case its the current bid + 1.
+func minNewBid(currentBid sdk.Int, increment sdk.Dec) sdk.Int {
+
+	return currentBid.Add( // new bids must be some % greater than old bid, and at least 1 larger to avoid replacing an old bid at no cost
+		sdk.MaxInt(
+			sdk.NewInt(1),
+			sdk.NewDecFromInt(currentBid).Mul(increment).RoundInt(),
+		),
+	)
+}
 
 // calculateProposedLot tries to find a lot amount to bid in a reverse auction.
 // Rather than finding the smallest amount the lot could be reduced by, it finds the largest decrement that still makes a profit.
