@@ -62,6 +62,35 @@ func TestGetBids(t *testing.T) {
 				Amount: c("usdx", 176_000e6),
 			}},
 		},
+		{
+			name: "min increment forward auction",
+			auctionData: AuctionData{
+				Auctions: []auctiontypes.Auction{
+					&auctiontypes.CollateralAuction{
+						BaseAuction: auctiontypes.BaseAuction{
+							ID:  0,
+							Lot: c("xrp", 25),  // 0.5 µ dollars
+							Bid: c("ukava", 1), // 0.44 µ dollars
+						},
+						MaxBid:            c("ukava", 4),
+						CorrespondingDebt: c("debt", 0),
+					},
+				},
+				Assets: map[string]AssetInfo{
+					"xrp": {
+						Price:            d("2.00"),
+						ConversionFactor: sdk.NewInt(1e8),
+					},
+					"ukava": {
+						Price:            d("0.44"),
+						ConversionFactor: sdk.NewInt(1e6),
+					},
+				},
+				BidIncrement: d("0.01"),
+			},
+			margin:       d("0.05"),
+			expectedBids: nil, // no profitable bid
+		},
 	}
 
 	for _, tc := range testCases {
@@ -91,6 +120,7 @@ func TestCalculateProposedBid(t *testing.T) {
 			ConversionFactor: sdk.NewInt(1e8),
 		},
 	}
+	increment := d("0.01")
 
 	testCases := []struct {
 		name string
@@ -110,6 +140,23 @@ func TestCalculateProposedBid(t *testing.T) {
 			expectedOk:  true,
 			expectedBid: c("usdx", 176_000e6),
 		},
+		{
+			name:        "min increment forward",
+			lot:         c("bnb", 1), // 2 µ dollars
+			bid:         c("usdx", 0),
+			maxBid:      c("usdx", 2), // 2 µ dollars
+			margin:      d("0.05"),
+			expectedOk:  true,
+			expectedBid: c("usdx", 1),
+		},
+		{
+			name:       "min increment forward again",
+			lot:        c("bnb", 1), // 2 µ dollars
+			bid:        c("usdx", 1),
+			maxBid:     c("usdx", 2), // 2 µ dollars
+			margin:     d("0.05"),
+			expectedOk: false, // no profitable bid
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -122,6 +169,7 @@ func TestCalculateProposedBid(t *testing.T) {
 				assetInfos[tc.lot.Denom],
 				assetInfos[tc.bid.Denom],
 				tc.margin,
+				increment,
 				testID,
 			)
 			require.Equal(t, tc.expectedOk, ok)

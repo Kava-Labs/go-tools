@@ -1,4 +1,4 @@
-FROM golang:1.21.9-bookworm as build-env
+FROM golang:1.23.6-bookworm AS build-env
 
 ADD . /src
 RUN --mount=type=cache,target=/root/.cache/go-build \
