@@ -1,6 +1,6 @@
 module github.com/kava-labs/go-tools
 
-go 1.21.9
+go 1.24.9
 
 require (
 	github.com/cosmos/cosmos-sdk v0.44.5

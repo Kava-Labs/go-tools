@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"os"
 	"time"
@@ -108,18 +107,23 @@ func main() {
 	// log responses, if responses are not read, requests will block
 	go func() {
 		for {
-			// response is not returned until the msg is committed to a block
+			// response is not returned until the msg is committed to a block or signer has dropped it
 			response := <-responses
 
-			// error will be set if response is not Code 0 (success) or Code 19 (already in mempool)
+			// error will be set if signer can't submit the tx to a block
 			if response.Err != nil {
-				fmt.Printf("response code: %d error %s\n", response.Result.Code, response.Err)
+				logger.Error().
+					Uint32("response code", response.Result.Code).
+					Err(response.Err).
+					Msg("bid batch failed to be included in block")
+
 				continue
 			}
 
-			// code and result are from broadcast, not deliver tx
-			// it is up to the caller/requester to check the deliver tx code and deal with failure
-			fmt.Printf("response code: %d, hash %s\n", response.Result.Code, response.Result.TxHash)
+			// code and result are from broadcast not DeliverTx, so success of tx within the block is unknown
+			logger.Debug().
+				Str("hash", response.Result.TxHash).
+				Msg("bid batch included in block (success within block unknown)")
 		}
 	}()
 
@@ -174,7 +178,7 @@ func main() {
 
 		auctionDups := make(map[uint64]int64)
 		for _, bid := range msgs {
-			auctionDups[bid.AuctionId] = auctionDups[bid.AuctionId] + 1
+			auctionDups[bid.AuctionId]++
 		}
 
 		for auctionID, numDups := range auctionDups {

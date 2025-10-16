@@ -10,26 +10,43 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v6
         with:
-          go-version: '1.21'
-
-      - name: Cache Go Modules
-        uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          go-version-file: go.mod
+          cache-dependency-path: '**/go.sum'
 
       - name: Build
         run: make build-all
 
+  vet:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: '**/go.sum'
+
       - name: Vet
         run: make vet
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: '**/go.sum'
 
       - name: Test
         run: make test
@@ -37,12 +54,13 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
+    needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -65,13 +83,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout go-tools-kava
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: go-tools
 
       # TODO(yevhenii): consider reusing already built kava docker image instead of rebuilding it
       - name: Checkout kava
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: Kava-Labs/kava
           ref: ${{ github.event.client_payload.ref }}
@@ -85,17 +103,9 @@ jobs:
         working-directory: ./kava
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go-tools/go.mod
-
-      - name: Cache Go Modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('./rosetta-kava/**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Build kava docker image
         run: make docker-build
