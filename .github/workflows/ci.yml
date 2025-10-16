@@ -16,7 +16,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.21'
-        cache-dependency-path: '**/go.sum'
+          cache-dependency-path: '**/go.sum'
 
       - name: Build
         run: make build-all
@@ -64,7 +64,7 @@ jobs:
 
       # TODO(yevhenii): consider reusing already built kava docker image instead of rebuilding it
       - name: Checkout kava
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: Kava-Labs/kava
           ref: ${{ github.event.client_payload.ref }}
