@@ -178,7 +178,7 @@ func main() {
 
 		auctionDups := make(map[uint64]int64)
 		for _, bid := range msgs {
-			auctionDups[bid.AuctionId] = auctionDups[bid.AuctionId] + 1
+			auctionDups[bid.AuctionId]++
 		}
 
 		for auctionID, numDups := range auctionDups {
